@@ -1,0 +1,122 @@
+import React from 'react';
+import { Tabs } from 'expo-router';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandColors } from '@/constants/theme';
+import { TabImageIcon } from '@/components/common/TabImageIcon';
+import { CenterAIMascotTabButton } from '@/components/common/CenterAIMascotTabButton';
+
+export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
+  // Compact, lowered padding for mobile screens
+  const tabBottomPadding = Platform.select({
+    ios: Math.min(insets.bottom, 16),
+    web: 4,
+    default: Math.min(insets.bottom, 6),
+  });
+
+  // Slim, sleek tab height lowered down for phones
+  const tabHeight = Platform.select({
+    ios: 54 + tabBottomPadding,
+    web: 56,
+    default: 54 + tabBottomPadding,
+  });
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: BrandColors.primary,
+        tabBarInactiveTintColor: BrandColors.gray500,
+        tabBarStyle: {
+          backgroundColor: BrandColors.white,
+          borderTopColor: '#F1F5F9',
+          borderTopWidth: 1,
+          height: tabHeight,
+          paddingTop: 4,
+          paddingBottom: tabBottomPadding,
+          overflow: 'visible', // Allows center mascot to sit snugly above the bar
+          elevation: 6,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 6,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingVertical: 1,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+          lineHeight: 12,
+          marginTop: 1,
+          marginBottom: 1,
+        },
+      }}>
+      {/* 1. Trang chủ */}
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Trang chủ',
+          tabBarIcon: ({ focused }) => (
+            <TabImageIcon name="home" focused={focused} size={22} />
+          ),
+        }}
+      />
+
+      {/* 2. Dịch vụ */}
+      <Tabs.Screen
+        name="services"
+        options={{
+          title: 'Dịch vụ',
+          tabBarIcon: ({ focused }) => (
+            <TabImageIcon name="services" focused={focused} size={22} />
+          ),
+        }}
+      />
+
+      {/* 3. Trung tâm: Robot Mascot 3D chuyển động linh hoạt */}
+      <Tabs.Screen
+        name="ai"
+        options={{
+          title: '',
+          tabBarLabel: () => null,
+          tabBarButton: (props) => <CenterAIMascotTabButton {...props} />,
+        }}
+      />
+
+      {/* 4. Đơn hàng */}
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: 'Đơn hàng',
+          tabBarIcon: ({ focused }) => (
+            <TabImageIcon name="bookings" focused={focused} size={22} />
+          ),
+        }}
+      />
+
+      {/* 5. Tài khoản */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Tài khoản',
+          tabBarIcon: ({ focused }) => (
+            <TabImageIcon name="profile" focused={focused} size={22} />
+          ),
+        }}
+      />
+
+      {/* Ẩn route Chat khỏi tab bar */}
+      <Tabs.Screen
+        name="chat"
+        options={{
+          href: null,
+        }}
+      />
+    </Tabs>
+  );
+}
