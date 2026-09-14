@@ -19,10 +19,10 @@ export interface CustomerAddress {
   title: string; // e.g. "Nhà riêng", "Văn phòng", "Nhà bố mẹ"
   recipientName: string;
   recipientPhone: string;
-  streetAddress: string; // e.g. "Số 456 Xuân Thủy"
+  streetAddress: string; // e.g. "Số 208 Nguyễn Hữu Cảnh"
   ward: string; // e.g. "Dịch Vọng Hậu"
-  district: string; // e.g. "Cầu Giấy"
-  city: string; // e.g. "Hà Nội"
+  district: string; // e.g. "Bình Thạnh"
+  city: string; // e.g. "TP. Hồ Chí Minh"
   fullAddress: string;
   latitude: number;
   longitude: number;

@@ -28,19 +28,19 @@ const CATEGORIES: { label: string; value: 'ALL' | ServiceCategory }[] = [
   { label: 'Tổng vệ sinh nhà/căn hộ', value: 'DEEP_CLEAN' },
 ];
 
-const HANOI_DISTRICTS = [
-  'Cầu Giấy',
-  'Nam Từ Liêm',
-  'Bắc Từ Liêm',
-  'Đống Đa',
-  'Ba Đình',
-  'Thanh Xuân',
-  'Tây Hồ',
-  'Hai Bà Trưng',
-  'Hoàn Kiếm',
-  'Long Biên',
-  'Hà Đông',
-  'Hoàng Mai',
+const HO_CHI_MINH_CITY_AREAS = [
+  'Bình Thạnh',
+  'Quận 7',
+  'Gò Vấp',
+  'Quận 3',
+  'Quận 1',
+  'Tân Bình',
+  'TP. Thủ Đức',
+  'Quận 10',
+  'Phú Nhuận',
+  'Quận 5',
+  'Tân Phú',
+  'Bình Tân',
 ];
 
 const WEEK_DAYS = [
@@ -64,7 +64,7 @@ export default function ServicesScreen() {
 
   // Staff states (Section 12 & 13)
   const [activeDistricts, setActiveDistricts] = useState<string[]>(
-    currentStaff?.operatingDistricts || ['Cầu Giấy', 'Nam Từ Liêm', 'Đống Đa', 'Thanh Xuân']
+    currentStaff?.operatingDistricts || ['Bình Thạnh', 'Quận 7', 'Quận 3', 'Tân Bình']
   );
   const [selectedDayIdx, setSelectedDayIdx] = useState(1);
   const [availableSlots, setAvailableSlots] = useState<{ [key: string]: boolean }>({
@@ -148,7 +148,7 @@ export default function ServicesScreen() {
               </View>
 
               <View style={styles.districtChipsGrid}>
-                {HANOI_DISTRICTS.map((d) => {
+                {HO_CHI_MINH_CITY_AREAS.map((d) => {
                   const isChecked = activeDistricts.includes(d);
                   return (
                     <Pressable
@@ -159,6 +159,7 @@ export default function ServicesScreen() {
                       ]}
                       onPress={() => toggleDistrict(d)}>
                       <Text
+                        numberOfLines={1}
                         style={[
                           styles.districtChipText,
                           isChecked && styles.districtChipTextActive,
@@ -445,24 +446,29 @@ const styles = StyleSheet.create({
   districtChipsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
+    rowGap: 8,
   },
   districtChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    width: '31.8%',
+    paddingVertical: 9,
+    paddingHorizontal: 4,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: BrandColors.gray300,
     backgroundColor: BrandColors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   districtChipActive: {
     borderColor: BrandColors.primary,
     backgroundColor: '#F0FDF4',
   },
   districtChipText: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: BrandColors.gray700,
     fontWeight: '600',
+    textAlign: 'center',
   },
   districtChipTextActive: {
     color: BrandColors.primaryDark,

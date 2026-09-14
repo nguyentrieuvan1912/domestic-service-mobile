@@ -5,9 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/theme';
 import { TabImageIcon } from '@/components/common/TabImageIcon';
 import { CenterAIMascotTabButton } from '@/components/common/CenterAIMascotTabButton';
+import { useAuth } from '@/context/AuthContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { currentRole } = useAuth();
+  const isStaff = currentRole === 'STAFF';
 
   // Compact, lowered padding for mobile screens
   const tabBottomPadding = Platform.select({
@@ -60,7 +63,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Trang chủ',
+          title: isStaff ? 'Việc làm' : 'Trang chủ',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="home" focused={focused} size={22} />
           ),
@@ -71,7 +74,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="services"
         options={{
-          title: 'Dịch vụ',
+          title: isStaff ? 'Lịch rảnh' : 'Dịch vụ',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="services" focused={focused} size={22} />
           ),
@@ -92,7 +95,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="bookings"
         options={{
-          title: 'Đơn hàng',
+          title: isStaff ? 'Ca làm' : 'Đơn hàng',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="bookings" focused={focused} size={22} />
           ),

@@ -581,14 +581,14 @@ export const mockBookings: Booking[] = [
   },
 
   // bk-023: IN_PROGRESS (Test case 5) - Staff An, Mode A, Customer Huy
-  // Matches mockup: "Đang thực hiện - Giúp việc theo giờ 15:00 - 19:00, 123 Nguyễn Văn Cừ"
+  // Matches mockup: "Đang thực hiện - Giúp việc theo giờ 15:00 - 19:00, 123 Mai Chí Thọ"
   {
     id: 'bk-023',
     bookingCode: 'BK-2024-023',
     customerId: 'cust-004',
     serviceId: 'srv-001',
     packageId: 'pkg-002', // Gói 4 giờ (320.000đ)
-    addressId: 'addr-006', // 123 Nguyễn Văn Cừ
+    addressId: 'addr-006', // 123 Mai Chí Thọ
     mode: 'MODE_A',
     requiredStaffCount: 1,
     bookingDate: '2024-06-12',
@@ -648,7 +648,7 @@ export const mockBookings: Booking[] = [
     startTime: '09:00',
     endTime: '13:00',
     status: 'ACCEPTED',
-    notes: 'Dọn dẹp chung cư Goldmark City',
+    notes: 'Dọn dẹp chung cư Cityland Park Hills',
     packagePrice: 320000,
     addOnsTotal: 80000, // Cửa kính ban công
     discountAmount: 0,

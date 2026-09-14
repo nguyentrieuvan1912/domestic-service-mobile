@@ -106,28 +106,28 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Role Switcher Card */}
-          <View style={styles.roleSwitcherCard}>
-            <View style={styles.roleSwitcherInfo}>
-              <Text style={styles.roleSwitcherTitle}>
-                Vai trò hiện tại:{' '}
-                <Text style={{ color: BrandColors.primary, fontWeight: '800' }}>
-                  {isCustomer ? 'KHÁCH HÀNG' : 'NHÂN VIÊN GIÚP VIỆC'}
+          {/* The account role is fixed in production. This switch is available only to review both mock flows. */}
+          {__DEV__ && (
+            <View style={styles.roleSwitcherCard}>
+              <View style={styles.roleSwitcherInfo}>
+                <Text style={styles.roleSwitcherTitle}>
+                  Xem trước vai trò:{' '}
+                  <Text style={{ color: BrandColors.primary, fontWeight: '800' }}>
+                    {isCustomer ? 'KHÁCH HÀNG' : 'NHÂN VIÊN GIÚP VIỆC'}
+                  </Text>
                 </Text>
-              </Text>
-              <Text style={styles.roleSwitcherSub}>
-                {isCustomer
-                  ? 'Xem luồng nhận đơn & quản lý thu nhập của Nhân viên'
-                  : 'Quay về luồng đặt đơn của Khách hàng'}
-              </Text>
-            </View>
+                <Text style={styles.roleSwitcherSub}>
+                  Chỉ dùng để xem dữ liệu mẫu; tài khoản thực tế không thể đổi vai trò trong ứng dụng.
+                </Text>
+              </View>
 
-            <Pressable style={styles.switchRoleBtn} onPress={handleRoleToggle}>
-              <Text style={styles.switchRoleBtnText}>
-                {isCustomer ? 'Chuyển sang Staff' : 'Chuyển sang Khách'}
-              </Text>
-            </Pressable>
-          </View>
+              <Pressable style={styles.switchRoleBtn} onPress={handleRoleToggle}>
+                <Text style={styles.switchRoleBtnText}>
+                  {isCustomer ? 'Xem Staff' : 'Xem Khách'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* ========================================================= */}
           {/* ==================== STAFF VIEW ========================= */}

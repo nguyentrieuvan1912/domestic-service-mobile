@@ -85,11 +85,13 @@ export default function HomeScreen() {
   const isStaff = currentRole === 'STAFF';
 
   const { width: windowWidth } = useWindowDimensions();
-  const bannerWidth = Math.min(windowWidth - Spacing.three * 2, 600);
+  const bannerWidth = Math.floor(Math.min(windowWidth - Spacing.three * 2, 600));
 
-  const [selectedCity, setSelectedCity] = useState('Hà Nội');
+  const [selectedCity, setSelectedCity] = useState('TP. Hồ Chí Minh');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const activeBannerIndexRef = useRef(0);
+  activeBannerIndexRef.current = activeBannerIndex;
 
   // Staff states
   const [isStaffOnline, setIsStaffOnline] = useState(true);
@@ -99,12 +101,13 @@ export default function HomeScreen() {
   const bannerScrollRef = useRef<ScrollView>(null);
   const isInteracting = useRef(false);
 
-  // Auto-slide carousel every 4.5 seconds for Customer view
+  // Auto-slide carousel smoothly every 4.5 seconds for Customer view
   useEffect(() => {
-    if (isStaff) return;
+    if (isStaff || bannerWidth <= 0) return;
     const timer = setInterval(() => {
       if (!isInteracting.current && bannerScrollRef.current) {
-        const nextIndex = (activeBannerIndex + 1) % HERO_BANNERS.length;
+        const nextIndex = (activeBannerIndexRef.current + 1) % HERO_BANNERS.length;
+        activeBannerIndexRef.current = nextIndex;
         bannerScrollRef.current.scrollTo({
           x: nextIndex * bannerWidth,
           animated: true,
@@ -114,12 +117,14 @@ export default function HomeScreen() {
     }, 4500);
 
     return () => clearInterval(timer);
-  }, [activeBannerIndex, bannerWidth, isStaff]);
+  }, [bannerWidth, isStaff]);
 
-  const handleBannerScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (bannerWidth <= 0) return;
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / bannerWidth);
-    if (index >= 0 && index < HERO_BANNERS.length && index !== activeBannerIndex) {
+    if (index >= 0 && index < HERO_BANNERS.length) {
+      activeBannerIndexRef.current = index;
       setActiveBannerIndex(index);
     }
   };
@@ -243,7 +248,7 @@ export default function HomeScreen() {
               <Pressable style={styles.cityDropdown}>
                 <Text style={styles.cityName}>
                   {isStaff
-                    ? currentStaff?.operatingDistricts?.slice(0, 2).join(', ') || 'Cầu Giấy, Nam Từ Liêm'
+                    ? currentStaff?.operatingDistricts?.slice(0, 2).join(', ') || 'Bình Thạnh, Quận 7'
                     : selectedCity}
                 </Text>
                 <IconSymbol name="chevronDown" size={12} color={BrandColors.gray600} />
@@ -377,7 +382,7 @@ export default function HomeScreen() {
 
                   <Text style={styles.jobServiceTitle}>Dọn vệ sinh theo ca lẻ (Gói 3 giờ)</Text>
                   <Text style={styles.jobAddress}>
-                    📍 123 Nguyễn Văn Cừ, Long Biên, Hà Nội
+                    📍 123 Mai Chí Thọ, TP. Thủ Đức, TP. Hồ Chí Minh
                   </Text>
                   <Text style={styles.jobTime}>
                     ⏰ {activeBooking.startTime} – {activeBooking.endTime} • Thu nhập ca: {formatVND(activeBooking.totalAmount * 0.8)} (80%)
@@ -413,7 +418,7 @@ export default function HomeScreen() {
                       <Text style={styles.orderTime}>{order.startTime} {order.bookingDate}</Text>
                     </View>
                     <Text style={styles.orderServiceName}>Dọn dẹp theo ca lẻ</Text>
-                    <Text style={styles.orderLocation}>Khu vực: Cầu Giấy, Hà Nội</Text>
+                    <Text style={styles.orderLocation}>Khu vực: Bình Thạnh, TP. Hồ Chí Minh</Text>
                     <Text style={styles.orderIncome}>
                       Thu nhập nhận: <Text style={{ fontWeight: '800', color: BrandColors.primary }}>{formatVND(order.totalAmount * 0.8)}</Text> (80%)
                     </Text>
@@ -454,7 +459,7 @@ export default function HomeScreen() {
                       <Text style={styles.orderTime}>{order.startTime} {order.bookingDate}</Text>
                     </View>
                     <Text style={styles.orderServiceName}>Dọn vệ sinh gia đình</Text>
-                    <Text style={styles.orderLocation}>Khu vực: Nam Từ Liêm, Hà Nội</Text>
+                    <Text style={styles.orderLocation}>Khu vực: Quận 7, TP. Hồ Chí Minh</Text>
                     <Text style={styles.orderIncome}>
                       Thu nhập nhận: <Text style={{ fontWeight: '800', color: BrandColors.primary }}>{formatVND(order.totalAmount * 0.8)}</Text>
                     </Text>
@@ -487,54 +492,52 @@ export default function HomeScreen() {
 
               {/* Hero Banner Carousel (3 Services + Add-ons) */}
               <View style={[styles.carouselWrapper, { width: bannerWidth }]}>
-                <ScrollView
-                  ref={bannerScrollRef}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onScroll={handleBannerScroll}
-                  scrollEventThrottle={16}
-                  decelerationRate="fast"
-                  snapToInterval={bannerWidth}
-                  snapToAlignment="start"
-                  onScrollBeginDrag={() => {
-                    isInteracting.current = true;
-                  }}
-                  onScrollEndDrag={() => {
-                    isInteracting.current = false;
-                  }}
-                  style={{ width: bannerWidth }}
-                  contentContainerStyle={styles.heroCarouselContent}>
-                  {HERO_BANNERS.map((banner) => (
-                    <View key={banner.id} style={{ width: bannerWidth }}>
-                      <LinearGradient
-                        colors={banner.bgGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.heroBanner}>
-                        <View style={styles.heroTextContent}>
-                          <Badge label={banner.badge} variant={banner.badgeVariant} size="sm" />
-                          <Text style={styles.heroTitle}>{banner.title}</Text>
-                          <Text style={styles.heroHighlight}>{banner.highlight}</Text>
-                          <Text style={styles.heroDescription} numberOfLines={2}>
-                            {banner.description}
-                          </Text>
-                          <Pressable
-                            style={styles.heroButton}
-                            onPress={() => router.push(`/service/${banner.serviceId}`)}>
-                            <Text style={styles.heroButtonText}>{banner.buttonText}</Text>
-                            <IconSymbol name="chevronRight" size={14} color={BrandColors.white} />
-                          </Pressable>
-                        </View>
-                        <Image
-                          source={{ uri: banner.imageUri }}
-                          style={styles.heroImage}
-                          resizeMode="cover"
-                        />
-                      </LinearGradient>
-                    </View>
-                  ))}
-                </ScrollView>
+                <View style={[styles.heroBannerContainer, { width: bannerWidth, height: 160 }]}>
+                  <ScrollView
+                    ref={bannerScrollRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={handleMomentumScrollEnd}
+                    onScrollBeginDrag={() => {
+                      isInteracting.current = true;
+                    }}
+                    onScrollEndDrag={() => {
+                      isInteracting.current = false;
+                    }}
+                    style={{ width: bannerWidth, height: 160 }}
+                    contentContainerStyle={styles.heroCarouselContent}>
+                    {HERO_BANNERS.map((banner) => (
+                      <View key={banner.id} style={{ width: bannerWidth, height: 160 }}>
+                        <LinearGradient
+                          colors={banner.bgGradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.heroBanner}>
+                          <View style={styles.heroTextContent}>
+                            <Badge label={banner.badge} variant={banner.badgeVariant} size="sm" />
+                            <Text style={styles.heroTitle}>{banner.title}</Text>
+                            <Text style={styles.heroHighlight}>{banner.highlight}</Text>
+                            <Text style={styles.heroDescription} numberOfLines={2}>
+                              {banner.description}
+                            </Text>
+                            <Pressable
+                              style={styles.heroButton}
+                              onPress={() => router.push(`/service/${banner.serviceId}`)}>
+                              <Text style={styles.heroButtonText}>{banner.buttonText}</Text>
+                              <IconSymbol name="chevronRight" size={14} color={BrandColors.white} />
+                            </Pressable>
+                          </View>
+                          <Image
+                            source={{ uri: banner.imageUri }}
+                            style={styles.heroImage}
+                            resizeMode="cover"
+                          />
+                        </LinearGradient>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
 
                 {/* Carousel Pagination Dots */}
                 <View style={styles.carouselPagination}>
@@ -542,6 +545,7 @@ export default function HomeScreen() {
                     <Pressable
                       key={idx}
                       onPress={() => {
+                        activeBannerIndexRef.current = idx;
                         bannerScrollRef.current?.scrollTo({
                           x: idx * bannerWidth,
                           animated: true,
@@ -633,7 +637,12 @@ export default function HomeScreen() {
                 {/* Card 2: Chọn dịch vụ (Mode B) */}
                 <Pressable
                   style={styles.startCardModeB}
-                  onPress={() => router.push('/services')}>
+                  onPress={() =>
+                    router.push({
+                      pathname: '/booking/new',
+                      params: { serviceId: 'srv-001', mode: 'MODE_B' },
+                    })
+                  }>
                   <View style={styles.iconCircleModeB}>
                     <View style={styles.sparkleIconWrapper}>
                       <Text style={styles.sparkleStarText}>✦</Text>
@@ -1112,6 +1121,8 @@ const styles = StyleSheet.create({
   },
   carouselWrapper: {
     marginBottom: Spacing.three,
+  },
+  heroBannerContainer: {
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
   },

@@ -48,6 +48,7 @@ export default function ServiceDetailScreen() {
       params: {
         serviceId: service.id,
         packageId: selectedPackage?.id || '',
+        mode: 'MODE_B',
       },
     });
   };

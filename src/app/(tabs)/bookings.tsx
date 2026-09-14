@@ -15,6 +15,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { mockBookings } from '@/data/bookings';
+import { mockBookingAssignments } from '@/data/bookingAssignments';
 import { getServiceById, getStaffById } from '@/data';
 import { BookingStatus } from '@/types/booking';
 
@@ -22,12 +23,26 @@ type TabFilter = 'ALL' | 'IN_PROGRESS' | 'UPCOMING' | 'COMPLETED' | 'ABSENT' | '
 
 export default function BookingsScreen() {
   const router = useRouter();
-  const { currentRole } = useAuth();
+  const { currentRole, currentStaff } = useAuth();
   const isStaff = currentRole === 'STAFF';
 
   const [activeFilter, setActiveFilter] = useState<TabFilter>('ALL');
 
-  const filteredBookings = mockBookings.filter((b) => {
+  const staffId = currentStaff?.id || 'staff-001';
+  const staffBookingIds = new Set(
+    mockBookingAssignments
+      .filter(
+        (assignment) =>
+          assignment.staffId === staffId &&
+          ['ASSIGNED', 'ACCEPTED'].includes(assignment.status)
+      )
+      .map((assignment) => assignment.bookingId)
+  );
+  const visibleBookings = isStaff
+    ? mockBookings.filter((booking) => staffBookingIds.has(booking.id))
+    : mockBookings;
+
+  const filteredBookings = visibleBookings.filter((b) => {
     switch (activeFilter) {
       case 'IN_PROGRESS':
         return b.status === 'IN_PROGRESS';
@@ -100,7 +115,7 @@ export default function BookingsScreen() {
                   styles.filterChipText,
                   activeFilter === 'ALL' && styles.filterChipTextActive,
                 ]}>
-                Tất cả ({mockBookings.length})
+                Tất cả ({visibleBookings.length})
               </Text>
             </Pressable>
 
@@ -220,7 +235,7 @@ export default function BookingsScreen() {
                         🕒 {b.startTime} - {b.endTime} • {b.bookingDate}
                       </Text>
                       <Text style={styles.staffNameText}>
-                        👤 {isStaff ? 'Khách hàng: Nguyễn Thị Hoa' : `Nhân viên: ${staff?.fullName || 'Đang điều phối'}`}
+                        👤 {isStaff ? 'Thông tin khách hiển thị sau khi nhận đơn' : `Nhân viên: ${staff?.fullName || 'Đang điều phối'}`}
                       </Text>
                     </View>
                   </View>

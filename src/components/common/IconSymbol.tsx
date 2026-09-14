@@ -6,13 +6,21 @@ import { Text, StyleSheet, TextStyle, ColorValue } from 'react-native';
 const GLYPH_MAP: Record<string, string> = {
   // Navigation & Actions
   search: '🔍',
+  magnifyingGlass: '🔍',
   location: '📍',
   notification: '🔔',
+  bell: '🔔',
+  gift: '🎁',
+  ticket: '🎟️',
+  voucher: '🎟️',
   back: '‹',
+  arrowBack: '‹',
   chevronRight: '›',
+  arrowForward: '›',
   chevronDown: '⌄',
   close: '✕',
   check: '✓',
+  checkmark: '✓',
   plus: '+',
   minus: '−',
   filter: '⚙️',
@@ -20,14 +28,21 @@ const GLYPH_MAP: Record<string, string> = {
   heart: '❤️',
   heartOutline: '🤍',
 
-  // Services
+  // Services & Items
   clock: '⏱️',
   clean: '✨',
+  sparkles: '✨',
+  sparkle: '✨',
   cooking: '🍳',
   care: '🤲',
+  home: '🏠',
+  house: '🏡',
   office: '🏢',
   laundry: '🧺',
   sofa: '🛋️',
+  carpet: '🪵',
+  bed: '🛏️',
+  curtain: '🪟',
   baby: '👶',
   elderly: '👵',
   fridge: '❄️',
@@ -36,6 +51,8 @@ const GLYPH_MAP: Record<string, string> = {
   starOutline: '☆',
 
   // Communication & Status
+  user: '👤',
+  users: '👥',
   phone: '📞',
   chat: '💬',
   message: '💬',
@@ -43,10 +60,19 @@ const GLYPH_MAP: Record<string, string> = {
   send: '➤',
   calendar: '📅',
   wallet: '💳',
+  creditCard: '💳',
+  cash: '💵',
+  money: '💵',
   receipt: '🧾',
   truck: '🚚',
   warning: '⚠️',
   success: '✅',
+  info: 'ℹ️',
+  copy: '📋',
+  thumbUp: '👍',
+  award: '🏆',
+  lock: '🔒',
+  badge: '🏷️',
 };
 
 interface IconSymbolProps {
