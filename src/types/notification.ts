@@ -22,6 +22,10 @@ export interface AppNotification {
   content: string;
   type: NotificationType;
   referenceId?: string; // bookingId, promotionId, etc.
+  data?: { bookingId?: string; [key: string]: any };
   isRead: boolean;
   createdAt: string;
 }
+
+export type Notification = AppNotification;
+

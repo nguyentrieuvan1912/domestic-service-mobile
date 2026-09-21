@@ -24,6 +24,7 @@ export * from './conversations';
 export * from './messages';
 export * from './aiConversations';
 export * from './aiMessages';
+export * from './serviceBundles';
 
 import { mockServices } from './services';
 import { mockServicePackages } from './servicePackages';
@@ -101,16 +102,35 @@ export const getAIMessagesByConversationId = (conversationId: string) =>
 /**
  * Filter staff for Mode A & Mode B matching
  */
-export const getAvailableStaffs = (filter?: {
-  district?: string;
-  competency?: string;
-  onlyOnline?: boolean;
-}) => {
+export const getAvailableStaffs = (
+  filter?:
+    | {
+        district?: string;
+        competency?: string;
+        onlyOnline?: boolean;
+      }
+    | string
+) => {
+  const comp = typeof filter === 'string' ? filter : filter?.competency;
+  const dist = typeof filter === 'object' ? filter?.district : undefined;
+  const onlyOn = typeof filter === 'object' ? filter?.onlyOnline : true;
+
   return mockStaffs.filter((staff) => {
     if (staff.status === 'SUSPENDED' || staff.status === 'RESTRICTED') return false;
-    if (filter?.onlyOnline && !staff.isOnline) return false;
-    if (filter?.district && !staff.operatingDistricts.includes(filter.district)) return false;
-    if (filter?.competency && !staff.competencies.includes(filter.competency)) return false;
+    if (onlyOn && !staff.isOnline) return false;
+    if (dist && !staff.operatingDistricts.includes(dist)) return false;
+    if (comp && !staff.competencies.includes(comp)) return false;
     return true;
   });
 };
+
+/**
+ * Get past completed bookings for a customer to enable 1-click re-booking
+ */
+export const getRecentCompletedBookings = (customerId: string) => {
+  return mockBookings
+    .filter((b) => b.customerId === customerId && (b.status === 'COMPLETED' || b.status === 'CONFIRMED'))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+};
+
+

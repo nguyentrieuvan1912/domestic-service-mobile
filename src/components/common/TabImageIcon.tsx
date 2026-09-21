@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, Image, Text, StyleSheet } from 'react-native';
 
 const TAB_IMAGES = {
   home: require('@/assets/images/tabIcons/home-3d.png'),
@@ -9,7 +9,7 @@ const TAB_IMAGES = {
 };
 
 interface TabImageIconProps {
-  name: keyof typeof TAB_IMAGES;
+  name: 'home' | 'services' | 'bookings' | 'profile' | 'chat';
   focused: boolean;
   size?: number;
 }
@@ -19,6 +19,21 @@ export const TabImageIcon: React.FC<TabImageIconProps> = ({
   focused,
   size = 22,
 }) => {
+  if (name === 'chat') {
+    return (
+      <View style={[styles.container, { width: size + 4, height: size + 4 }]}>
+        <View
+          style={[
+            styles.image,
+            { width: size, height: size, alignItems: 'center', justifyContent: 'center' },
+            focused ? styles.imageFocused : styles.imageUnfocused,
+          ]}>
+          <Text style={{ fontSize: size - 4 }}>💬</Text>
+        </View>
+      </View>
+    );
+  }
+
   const source = TAB_IMAGES[name];
 
   return (
@@ -35,6 +50,7 @@ export const TabImageIcon: React.FC<TabImageIconProps> = ({
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

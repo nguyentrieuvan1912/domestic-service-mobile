@@ -67,8 +67,14 @@ export interface Staff {
   bio: string;
   competencies: string[]; // List of service category tags
   operatingDistricts: string[];
+  isVerified?: boolean;
+  distanceKm?: number;
+  arrivalTimeMin?: number;
+  specialties?: string[];
+  completedBookingsCount?: number;
   createdAt: string;
 }
+
 
 export interface StaffAvailability {
   id: string;

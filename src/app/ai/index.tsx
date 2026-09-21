@@ -9,28 +9,32 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
-import { formatVND } from '@/components/common/Badge';
+import { AIChatBubble } from '@/components/common/AIChatBubble';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { mockAIMessages } from '@/data/aiMessages';
 import { AIMessage, AISuggestion } from '@/types/ai';
 
 const QUICK_PROMPTS = [
-  'Tôi cần tổng vệ sinh căn hộ 70m2',
-  'Nên chọn gói 2 giờ hay 4 giờ?',
-  'Chính sách hủy đơn và hoàn tiền',
-  'Khuyến mãi hôm nay có gì?',
+  'Tôi muốn vệ sinh 3 máy lạnh vào chiều thứ bảy',
+  'Tìm bảo mẫu trông bé 2 tuổi bán thời gian',
+  'Nhà 70m2 nên đặt gói dọn dẹp nào?',
+  'Khuyến mãi & mã giảm giá hôm nay có gì?',
+  'Chính sách bảo hiểm hư hại của HomeCare',
 ];
 
 export default function AIAssistantScreen() {
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
-  const [messages, setMessages] = useState<AIMessage[]>(mockAIMessages.slice(0, 6));
+  const [messages, setMessages] = useState<AIMessage[]>(mockAIMessages.slice(0, 4));
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
 
   const sendMessage = (textToSend: string) => {
     if (!textToSend.trim()) return;
@@ -47,59 +51,107 @@ export default function AIAssistantScreen() {
     setInputText('');
     setIsTyping(true);
 
-    // Intelligent context-aware AI simulated answer
     setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
+    // Natural language context-aware AI response
+    setTimeout(() => {
+      const q = textToSend.toLowerCase();
       let aiReply: AIMessage;
 
-      if (textToSend.includes('70m2') || textToSend.includes('diện tích')) {
+      if (q.includes('máy lạnh') || q.includes('điều hòa')) {
         aiReply = {
           id: `ai-bot-${Date.now()}`,
           conversationId: 'ai-conv-001',
           role: 'ASSISTANT',
           content:
-            'Với căn hộ 70m² (thường 2 phòng ngủ), mình khuyên bạn nên chọn **Gói Tổng vệ sinh căn hộ (< 80m²)** 650.000đ để nhân viên tổng vệ sinh sạch sâu sàn, vách kính và hút bụi toàn diện nhé!',
+            'Dạ em đã ghi nhận nhu cầu của bạn:\n• Dịch vụ: **Vệ sinh máy lạnh**\n• Số lượng dự kiến: **3 bộ máy**\n• Thời gian đề xuất: **Chiều Thứ Bảy (14:00 - 16:00)**\n\nEm gợi ý bạn chọn **Combo 3 máy lạnh (380.000đ)** kèm Add-on **Khử khuẩn Nano Bạc** để tối ưu chi phí và bảo hành 30 ngày nhé!',
           suggestions: [
             {
               type: 'PACKAGE',
-              referenceId: 'pkg-004',
-              title: 'Tổng vệ sinh căn hộ (< 80m²)',
-              subtitle: '4 giờ • Làm sạch sâu toàn diện',
-              price: 650000,
+              referenceId: 'pkg-014',
+              title: 'Combo vệ sinh 3 máy lạnh',
+              subtitle: 'Tiết kiệm 100k • Tặng kiểm tra gas',
+              price: 380000,
+            },
+            {
+              type: 'SERVICE',
+              referenceId: 'srv-004',
+              title: 'Chi tiết dịch vụ Vệ sinh máy lạnh',
+              subtitle: 'Thợ điện lạnh chuyên nghiệp',
+              price: 150000,
             },
           ],
           createdAt: new Date().toISOString(),
         };
-      } else if (textToSend.includes('2 giờ') || textToSend.includes('4 giờ')) {
+      } else if (q.includes('trẻ em') || q.includes('bé') || q.includes('bảo mẫu')) {
         aiReply = {
           id: `ai-bot-${Date.now()}`,
           conversationId: 'ai-conv-001',
           role: 'ASSISTANT',
           content:
-            'Với căn hộ từ 55m² - 85m² hoặc nhà có nấu ăn, **Gói 4 giờ (320.000đ)** là tối ưu nhất. Gói 2 giờ chỉ phù hợp cho căn hộ studio hoặc dọn dẹp cơ bản.',
+            'Với nhu cầu trông bé, HomeCare có đội ngũ **Bảo mẫu mầm non** đã qua kiểm tra lý lịch tư pháp số 2 và có chứng chỉ sư phạm mầm non. Bạn có thể chọn ca 4 giờ hoặc ca nguyên ngày 8 giờ.',
           suggestions: [
             {
-              type: 'PACKAGE',
-              referenceId: 'pkg-002',
-              title: 'Giúp việc theo giờ (Gói 4 giờ)',
-              subtitle: 'Phổ biến nhất • Dọn dẹp tiêu chuẩn',
-              price: 320000,
+              type: 'SERVICE',
+              referenceId: 'srv-009',
+              title: 'Bảo mẫu & Chăm sóc trẻ em',
+              subtitle: '100% nhân viên lý lịch sạch',
+              price: 120000,
             },
           ],
           createdAt: new Date().toISOString(),
         };
-      } else if (textToSend.includes('khuyến mãi') || textToSend.includes('voucher')) {
+      } else if (q.includes('người già') || q.includes('người cao tuổi') || q.includes('ông bà')) {
         aiReply = {
           id: `ai-bot-${Date.now()}`,
           conversationId: 'ai-conv-001',
           role: 'ASSISTANT',
           content:
-            'Hôm nay bạn có thể dùng mã **SUMMER20** để được giảm 20% (tối đa 50.000đ), hoặc mã **FLASH50K** trong khung giờ sáng nhé!',
+            'Dịch vụ **Chăm sóc người cao tuổi** có nhân viên được đào tạo kỹ năng điều dưỡng gia đình, đo huyết áp, nhắc uống thuốc và hỗ trợ vận động an toàn.',
+          suggestions: [
+            {
+              type: 'SERVICE',
+              referenceId: 'srv-010',
+              title: 'Chăm sóc người cao tuổi',
+              subtitle: 'Điều dưỡng tận tâm, nhẹ nhàng',
+              price: 130000,
+            },
+          ],
+          createdAt: new Date().toISOString(),
+        };
+      } else if (q.includes('70m2') || q.includes('tổng vệ sinh') || q.includes('căn hộ')) {
+        aiReply = {
+          id: `ai-bot-${Date.now()}`,
+          conversationId: 'ai-conv-001',
+          role: 'ASSISTANT',
+          content:
+            'Với căn hộ 70m² (2 phòng ngủ), em khuyên bạn nên chọn **Gói Tổng vệ sinh căn hộ tiêu chuẩn (60 - 90m²)** 1.100.000đ để nhân viên tẩy cặn canxi kính, hút bụi trần sàn và chà sàn công nghiệp nhé!',
+          suggestions: [
+            {
+              type: 'PACKAGE',
+              referenceId: 'pkg-009',
+              title: 'Tổng vệ sinh căn hộ (60–90m²)',
+              subtitle: 'Làm sạch sâu toàn diện',
+              price: 1100000,
+            },
+          ],
+          createdAt: new Date().toISOString(),
+        };
+      } else if (q.includes('khuyến mãi') || q.includes('voucher') || q.includes('giảm giá')) {
+        aiReply = {
+          id: `ai-bot-${Date.now()}`,
+          conversationId: 'ai-conv-001',
+          role: 'ASSISTANT',
+          content:
+            'Hôm nay bạn có thể nhập mã **FLASH50K** để được giảm ngay 50.000đ cho mọi đơn dịch vụ gia đình, hoặc mã **SUMMER20** giảm 20% đơn từ 200.000đ!',
           suggestions: [
             {
               type: 'PROMOTION',
-              referenceId: 'promo-001',
-              title: 'Mã SUMMER20 - Giảm 50.000đ',
-              subtitle: 'Đơn từ 200.000đ',
+              referenceId: 'promo-002',
+              title: 'Mã FLASH50K - Giảm 50.000đ',
+              subtitle: 'Áp dụng cho mọi đơn',
             },
           ],
           createdAt: new Date().toISOString(),
@@ -110,13 +162,13 @@ export default function AIAssistantScreen() {
           conversationId: 'ai-conv-001',
           role: 'ASSISTANT',
           content:
-            'Dạ em đã hiểu nhu cầu của bạn! HomeCare có đầy đủ các dịch vụ giúp việc theo giờ, tổng vệ sinh và chăm sóc gia đình với đội ngũ nhân viên 5 sao đã xác minh lý lịch rõ ràng.',
+            'Em là HomeCare AI. Nền tảng hiện cung cấp đầy đủ 16 dịch vụ gia đình: vệ sinh nhà, điện lạnh, máy giặt, chăm sóc trẻ em, người già, thú cưng, nấu ăn, đi chợ hộ. Bạn cần em tư vấn dịch vụ nào ạ?',
           suggestions: [
             {
               type: 'SERVICE',
               referenceId: 'srv-001',
-              title: 'Giúp việc theo giờ',
-              subtitle: 'Từ 80.000đ/giờ',
+              title: 'Vệ sinh nhà theo giờ',
+              subtitle: 'Linh hoạt 2 - 4h',
               price: 80000,
             },
           ],
@@ -126,202 +178,167 @@ export default function AIAssistantScreen() {
 
       setMessages((prev) => [...prev, aiReply]);
       setIsTyping(false);
-    }, 1000);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }, 1200);
   };
 
   const handleSuggestionPress = (sug: AISuggestion) => {
     if (sug.type === 'PACKAGE' || sug.type === 'SERVICE') {
-      router.push(`/service/srv-001`);
+      const targetId = sug.referenceId.startsWith('srv') ? sug.referenceId : 'srv-004';
+      router.push(`/service/${targetId}`);
     } else if (sug.type === 'PROMOTION') {
-      router.push(`/booking/new?serviceId=srv-001`);
+      router.push('/(tabs)/services');
     }
   };
 
+  const handleClearHistory = () => {
+    setMessages(mockAIMessages.slice(0, 1));
+    setShowClearModal(false);
+    Alert.alert('Đã xóa', 'Lịch sử hội thoại với Trợ lý AI đã được làm mới.');
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* HEADER */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          hitSlop={8}>
-          <IconSymbol name="back" size={24} color={BrandColors.gray900} />
+        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+          <IconSymbol name="back" size={20} color={BrandColors.gray800} />
         </Pressable>
 
-        <View style={styles.botIconWrapper}>
-          <Text style={{ fontSize: 20 }}>🤖</Text>
-        </View>
-
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>Trợ lý HomeCare AI</Text>
-          <View style={styles.onlineBadge}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Tư vấn thông minh</Text>
+        <View style={styles.headerCenter}>
+          <Image
+            source={require('@/assets/images/ai-mascot.png')}
+            style={styles.headerAvatar}
+          />
+          <View>
+            <Text style={styles.headerTitle}>Trợ lý HomeCare AI</Text>
+            <View style={styles.onlineBadge}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.onlineText}>Luôn sẵn sàng tư vấn 24/7</Text>
+            </View>
           </View>
         </View>
+
+        <Pressable
+          style={styles.trashBtn}
+          onPress={() => setShowClearModal(true)}
+          hitSlop={8}>
+          <IconSymbol name="close" size={18} color={BrandColors.gray500} />
+        </Pressable>
       </View>
 
-      {/* Quick Questions Chips */}
-      <View style={styles.quickPromptsRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickPromptsScroll}>
-          {QUICK_PROMPTS.map((prompt) => (
-            <Pressable
-              key={prompt}
-              style={styles.promptChip}
-              onPress={() => sendMessage(prompt)}>
-              <Text style={styles.promptChipText}>{prompt}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Messages Scroll Area */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}>
+        {/* MESSAGES SCROLL VIEW */}
         <ScrollView
           ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.messageScroll}>
-          {messages.map((msg) => {
-            const isUser = msg.role === 'USER';
+          contentContainerStyle={styles.messagesList}>
+          {messages.map((msg) => (
+            <AIChatBubble
+              key={msg.id}
+              message={msg}
+              onSuggestionPress={handleSuggestionPress}
+            />
+          ))}
 
-            return (
-              <View
-                key={msg.id}
-                style={[
-                  styles.msgRow,
-                  isUser ? styles.msgRowRight : styles.msgRowLeft,
-                ]}>
-                {!isUser && (
-                  <View style={styles.botAvatarMini}>
-                    <Image
-                      source={require('@/assets/images/ai-mascot.png')}
-                      style={{ width: 28, height: 28, borderRadius: 14 }}
-                      resizeMode="cover"
-                    />
-                  </View>
-                )}
-
-                <View
-                  style={[
-                    styles.bubble,
-                    isUser ? styles.bubbleRight : styles.bubbleLeft,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.bubbleText,
-                      isUser ? styles.bubbleTextRight : styles.bubbleTextLeft,
-                    ]}>
-                    {msg.content}
-                  </Text>
-
-                  {/* Interactive Action Cards */}
-                  {msg.suggestions && msg.suggestions.length > 0 && (
-                    <View style={styles.suggestionCardsContainer}>
-                      {msg.suggestions.map((sug, idx) => (
-                        <Pressable
-                          key={idx}
-                          style={styles.suggestionCard}
-                          onPress={() => handleSuggestionPress(sug)}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.sugTitle}>{sug.title}</Text>
-                            {sug.subtitle && (
-                              <Text style={styles.sugSubtitle}>{sug.subtitle}</Text>
-                            )}
-                          </View>
-                          {sug.price ? (
-                            <View style={styles.sugPriceCol}>
-                              <Text style={styles.sugPrice}>{formatVND(sug.price)}</Text>
-                              <View style={styles.sugBtn}>
-                                <Text style={styles.sugBtnText}>Đặt ngay</Text>
-                              </View>
-                            </View>
-                          ) : null}
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          })}
-
+          {/* Typing indicator */}
           {isTyping && (
-            <View style={[styles.msgRow, styles.msgRowLeft]}>
-              <View style={styles.botAvatarMini}>
-                <Text style={{ fontSize: 16 }}>🤖</Text>
-              </View>
-              <View style={[styles.bubble, styles.bubbleLeft, { paddingVertical: 10 }]}>
-                <Text style={{ color: BrandColors.gray500, fontSize: 12 }}>
-                  HomeCare AI đang phân tích và soạn câu trả lời...
-                </Text>
-              </View>
+            <View style={styles.typingBox}>
+              <Text style={styles.typingText}>🤖 HomeCare AI đang suy nghĩ câu trả lời...</Text>
             </View>
           )}
         </ScrollView>
 
-        {/* Input Bar */}
+        {/* QUICK PROMPTS CHIPS */}
+        <View style={styles.quickPromptsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickScroll}>
+            {QUICK_PROMPTS.map((prompt, idx) => (
+              <Pressable
+                key={idx}
+                style={styles.quickChip}
+                onPress={() => sendMessage(prompt)}>
+                <Text style={styles.quickChipText}>{prompt}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* INPUT BAR */}
         <View style={styles.inputBar}>
           <TextInput
-            placeholder="Hỏi AI về dịch vụ, diện tích nhà, giá cả..."
-            placeholderTextColor={BrandColors.gray400}
+            style={styles.input}
             value={inputText}
             onChangeText={setInputText}
-            style={styles.inputField}
+            placeholder="Hỏi về dịch vụ, giá tiền, chọn thợ..."
+            placeholderTextColor={BrandColors.gray400}
+            returnKeyType="send"
             onSubmitEditing={() => sendMessage(inputText)}
           />
           <Pressable
             style={[
               styles.sendBtn,
-              inputText.trim() ? styles.sendBtnActive : null,
+              inputText.trim().length > 0 && styles.sendBtnActive,
             ]}
             onPress={() => sendMessage(inputText)}>
-            <IconSymbol
-              name="send"
-              size={16}
-              color={inputText.trim() ? BrandColors.white : BrandColors.gray400}
-            />
+            <Text style={styles.sendIcon}>➤</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Clear conversation modal */}
+      <ConfirmModal
+        visible={showClearModal}
+        title="Làm mới cuộc trò chuyện"
+        message="Bạn có chắc chắn muốn xóa toàn bộ lịch sử tư vấn và bắt đầu đoạn chat mới?"
+        confirmText="Xóa lịch sử"
+        cancelText="Hủy"
+        isDestructive
+        onConfirm={handleClearHistory}
+        onCancel={() => setShowClearModal(false)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: BrandColors.white,
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: BrandColors.gray100,
+    borderBottomColor: '#E2E8F0',
   },
   backBtn: {
     width: 36,
     height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  botIconWrapper: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: BrandColors.primaryLight,
+  headerCenter: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 8,
+    gap: 10,
   },
-  headerInfo: {
-    flex: 1,
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   headerTitle: {
     fontSize: 15,
@@ -332,166 +349,99 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 1,
+    marginTop: 2,
   },
   onlineDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: BrandColors.success,
+    backgroundColor: '#10B981',
   },
   onlineText: {
     fontSize: 10,
-    color: BrandColors.success,
-    fontWeight: '700',
+    color: BrandColors.gray500,
   },
-  quickPromptsRow: {
-    paddingVertical: Spacing.one,
-    backgroundColor: BrandColors.gray50,
-    borderBottomWidth: 1,
-    borderBottomColor: BrandColors.gray100,
+  trashBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quickPromptsScroll: {
-    paddingHorizontal: Spacing.two,
-    gap: 6,
+  messagesList: {
+    padding: Spacing.three,
+    paddingBottom: 16,
   },
-  promptChip: {
-    backgroundColor: BrandColors.white,
+  typingBox: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.lg,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  typingText: {
+    fontSize: 12,
+    color: BrandColors.gray600,
+    fontStyle: 'italic',
+  },
+  quickPromptsWrapper: {
+    backgroundColor: '#FFF',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  quickScroll: {
+    paddingHorizontal: Spacing.three,
+    gap: 8,
+  },
+  quickChip: {
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: BrandColors.gray200,
+    borderColor: '#BBF7D0',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
   },
-  promptChipText: {
-    fontSize: 11,
+  quickChipText: {
+    fontSize: 12,
+    color: '#15803D',
     fontWeight: '600',
-    color: BrandColors.gray700,
   },
-  messageScroll: {
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
-  msgRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  msgRowLeft: {
-    justifyContent: 'flex-start',
-  },
-  msgRowRight: {
-    justifyContent: 'flex-end',
-  },
-  botAvatarMini: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: BrandColors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  bubble: {
-    maxWidth: '82%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.lg,
-  },
-  bubbleLeft: {
-    backgroundColor: BrandColors.gray100,
-    borderBottomLeftRadius: 2,
-  },
-  bubbleRight: {
-    backgroundColor: BrandColors.primary,
-    borderBottomRightRadius: 2,
-  },
-  bubbleText: {
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  bubbleTextLeft: {
-    color: BrandColors.gray900,
-  },
-  bubbleTextRight: {
-    color: BrandColors.white,
-  },
-
-  // Interactive Suggestion Cards
-  suggestionCardsContainer: {
-    marginTop: Spacing.two,
-    gap: 6,
-  },
-  suggestionCard: {
-    backgroundColor: BrandColors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.two,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: BrandColors.gray200,
-  },
-  sugTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BrandColors.gray900,
-  },
-  sugSubtitle: {
-    fontSize: 10,
-    color: BrandColors.gray500,
-    marginTop: 2,
-  },
-  sugPriceCol: {
-    alignItems: 'flex-end',
-    marginLeft: 8,
-  },
-  sugPrice: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: BrandColors.primary,
-  },
-  sugBtn: {
-    backgroundColor: BrandColors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    marginTop: 2,
-  },
-  sugBtnText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: BrandColors.white,
-  },
-
-  // Input Bar
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FFF',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: BrandColors.gray100,
-    backgroundColor: BrandColors.white,
-    gap: 8,
+    borderTopColor: '#E2E8F0',
+    gap: 10,
   },
-  inputField: {
+  input: {
     flex: 1,
-    backgroundColor: BrandColors.gray100,
+    backgroundColor: '#F1F5F9',
     borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.three,
-    height: 40,
-    fontSize: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
     color: BrandColors.gray900,
   },
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: BrandColors.gray200,
+    backgroundColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendBtnActive: {
     backgroundColor: BrandColors.primary,
+  },
+  sendIcon: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

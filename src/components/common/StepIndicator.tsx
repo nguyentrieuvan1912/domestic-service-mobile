@@ -25,6 +25,7 @@ export const HorizontalStepper: React.FC<HorizontalStepperProps> = ({
   currentStep,
   style,
 }) => {
+
   return (
     <View style={[styles.horizontalContainer, style]}>
       {steps.map((step, index) => {
@@ -76,7 +77,10 @@ export const HorizontalStepper: React.FC<HorizontalStepperProps> = ({
   );
 };
 
+export const StepIndicator = HorizontalStepper;
+
 interface VerticalTimelineProps {
+
   steps: StepItem[];
   style?: ViewStyle;
 }

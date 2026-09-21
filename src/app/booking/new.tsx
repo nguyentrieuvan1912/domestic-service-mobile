@@ -27,6 +27,7 @@ import {
   getAddressesByCustomerId,
   getAvailableStaffs,
   getStaffById,
+  getRelatedServices,
 } from '@/data';
 import { mockPromotions } from '@/data/promotions';
 import { BookingMode } from '@/types/booking';
@@ -105,11 +106,20 @@ export default function NewBookingScreen() {
     serviceId?: string;
     packageId?: string;
     mode?: BookingMode;
+    staffId?: string;
+    addressId?: string;
+    rebook?: string;
   }>();
 
   // Mode selection: null = FLOW 0, otherwise MODE_A or MODE_B
   const [selectedMode, setSelectedMode] = useState<BookingMode | null>(
-    params.mode === 'MODE_A' ? 'MODE_A' : params.mode === 'MODE_B' ? 'MODE_B' : null
+    params.mode === 'MODE_A'
+      ? 'MODE_A'
+      : params.mode === 'MODE_B'
+      ? 'MODE_B'
+      : params.staffId
+      ? 'MODE_A'
+      : null
   );
 
   // Step index
@@ -154,13 +164,14 @@ export default function NewBookingScreen() {
   );
   const service = getServiceById(selectedServiceId) || mockServices[0];
   const packages = getPackagesByServiceId(service.id);
-  const addOns = getAddOnsByServiceId('srv-001');
+  const serviceAddOns = getAddOnsByServiceId(service.id);
+  const addOns = serviceAddOns.length > 0 ? serviceAddOns : getAddOnsByServiceId('srv-001');
   const addresses = getAddressesByCustomerId(currentCustomer?.id || 'cust-001');
   const availableStaffs = getAvailableStaffs();
 
   // Address
   const [selectedAddressId, setSelectedAddressId] = useState<string>(
-    addresses[0]?.id || 'addr-001'
+    params.addressId || addresses[0]?.id || 'addr-001'
   );
   const selectedAddress =
     addresses.find((a) => a.id === selectedAddressId) || addresses[0];
@@ -177,7 +188,9 @@ export default function NewBookingScreen() {
   const [ageFilter, setAgeFilter] = useState<'ALL' | 'UNDER_30' | '31_45' | 'OVER_45'>('ALL');
 
   // Selected Staff
-  const [selectedStaffId, setSelectedStaffId] = useState<string>('staff-001');
+  const [selectedStaffId, setSelectedStaffId] = useState<string>(
+    params.staffId || 'staff-001'
+  );
   const selectedStaff =
     availableStaffs.find((s) => s.id === selectedStaffId) || availableStaffs[0];
 
@@ -191,6 +204,18 @@ export default function NewBookingScreen() {
 
   // Add-ons (default empty so customer can pick or not pick)
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
+
+  // AI Related Services (Cross-sell)
+  const relatedServices = getRelatedServices(service.id);
+  const [selectedRelatedServiceIds, setSelectedRelatedServiceIds] = useState<string[]>([]);
+
+  const toggleRelatedService = (relServiceId: string) => {
+    if (selectedRelatedServiceIds.includes(relServiceId)) {
+      setSelectedRelatedServiceIds(selectedRelatedServiceIds.filter((id) => id !== relServiceId));
+    } else {
+      setSelectedRelatedServiceIds([...selectedRelatedServiceIds, relServiceId]);
+    }
+  };
 
   // Promotion / Voucher (integrated directly in Order Summary)
   const [promoInput, setPromoInput] = useState<string>('');
@@ -340,7 +365,11 @@ export default function NewBookingScreen() {
     .filter((a) => selectedAddOnIds.includes(a.id))
     .reduce((sum, a) => sum + a.price, 0);
 
-  const subtotal = basePrice + addOnsTotal;
+  const relatedServicesTotal = relatedServices
+    .filter((r) => selectedRelatedServiceIds.includes(r.service.id))
+    .reduce((sum, r) => sum + r.discountedPrice, 0);
+
+  const subtotal = basePrice + addOnsTotal + relatedServicesTotal;
 
   const promo = mockPromotions.find(
     (p) => p.code === selectedPromoCode && p.isActive
@@ -1324,6 +1353,58 @@ export default function NewBookingScreen() {
                       {selectedAddOnIds.length === 0 && <View style={styles.radioInnerDot} />}
                     </View>
                   </Pressable>
+
+                  {/* AI GỢI Ý KẾT HỢP DỊCH VỤ LIÊN QUAN */}
+                  {relatedServices.length > 0 && (
+                    <View style={{ marginTop: Spacing.four, marginBottom: Spacing.two }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 16 }}>💡</Text>
+                        <Text style={styles.sectionHeaderTitle}>Gợi ý kết hợp thông minh (AI Combo)</Text>
+                      </View>
+                      <Text style={styles.stepSubtitleNote}>
+                        Khách đặt {service.name} thường chọn thêm các dịch vụ bổ trợ để tiết kiệm chi phí
+                      </Text>
+
+                      {relatedServices.map((rel) => {
+                        const isRelSelected = selectedRelatedServiceIds.includes(rel.service.id);
+                        return (
+                          <Pressable
+                            key={rel.service.id}
+                            style={[
+                              styles.addonCard,
+                              { borderColor: isRelSelected ? BrandColors.primary : '#E2E8F0' },
+                              isRelSelected && { backgroundColor: '#F0FDF4' },
+                            ]}
+                            onPress={() => toggleRelatedService(rel.service.id)}>
+                            <Image source={{ uri: rel.service.image }} style={styles.addonImage} />
+                            <View style={styles.addonInfo}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.addonName}>{rel.service.name}</Text>
+                                <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>AI Gợi ý</Text>
+                                </View>
+                              </View>
+                              <Text numberOfLines={2} style={{ fontSize: 11, color: BrandColors.gray600, marginVertical: 2 }}>
+                                {rel.reason}
+                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={styles.addonPriceBadge}>+{formatVND(rel.discountedPrice)}</Text>
+                                <Text style={{ fontSize: 10, color: BrandColors.gray400, textDecorationLine: 'line-through' }}>
+                                  {formatVND(rel.service.basePrice)}
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>
+                                  {rel.discountOffer}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={[styles.checkboxCircle, isRelSelected && styles.checkboxCircleSelected]}>
+                              {isRelSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
                 </ScrollView>
 
                 {/* USER REQUIREMENT 4: DƯỚI NÚT TIẾP THEO CÓ HIỂN THỊ SỐ TIỀN ƯỚC TÍNH LUÔN CẬP NHẬT KHI THÊM BỚT ADDON */}
@@ -1406,6 +1487,12 @@ export default function NewBookingScreen() {
                       <View style={styles.priceRow}>
                         <Text style={styles.priceKey}>Dịch vụ bổ trợ ({selectedAddOnIds.length})</Text>
                         <Text style={styles.priceVal}>+{formatVND(addOnsTotal)}</Text>
+                      </View>
+                    )}
+                    {relatedServicesTotal > 0 && (
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceKey}>Dịch vụ kết hợp thông minh ({selectedRelatedServiceIds.length})</Text>
+                        <Text style={styles.priceVal}>+{formatVND(relatedServicesTotal)}</Text>
                       </View>
                     )}
                     {discountAmount > 0 && (
@@ -1890,6 +1977,58 @@ export default function NewBookingScreen() {
                       {selectedAddOnIds.length === 0 && <View style={styles.radioInnerDot} />}
                     </View>
                   </Pressable>
+
+                  {/* AI GỢI Ý KẾT HỢP DỊCH VỤ LIÊN QUAN */}
+                  {relatedServices.length > 0 && (
+                    <View style={{ marginTop: Spacing.four, marginBottom: Spacing.two }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Text style={{ fontSize: 16 }}>💡</Text>
+                        <Text style={styles.sectionHeaderTitle}>Gợi ý kết hợp thông minh (AI Combo)</Text>
+                      </View>
+                      <Text style={styles.stepSubtitleNote}>
+                        Gợi ý dịch vụ cùng chuyên môn kỹ thuật giúp tiết kiệm đến 20% chi phí
+                      </Text>
+
+                      {relatedServices.map((rel) => {
+                        const isRelSelected = selectedRelatedServiceIds.includes(rel.service.id);
+                        return (
+                          <Pressable
+                            key={rel.service.id}
+                            style={[
+                              styles.addonCard,
+                              { borderColor: isRelSelected ? BrandColors.primary : '#E2E8F0' },
+                              isRelSelected && { backgroundColor: '#F0FDF4' },
+                            ]}
+                            onPress={() => toggleRelatedService(rel.service.id)}>
+                            <Image source={{ uri: rel.service.image }} style={styles.addonImage} />
+                            <View style={styles.addonInfo}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.addonName}>{rel.service.name}</Text>
+                                <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>AI Gợi ý</Text>
+                                </View>
+                              </View>
+                              <Text numberOfLines={2} style={{ fontSize: 11, color: BrandColors.gray600, marginVertical: 2 }}>
+                                {rel.reason}
+                              </Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={styles.addonPriceBadge}>+{formatVND(rel.discountedPrice)}</Text>
+                                <Text style={{ fontSize: 10, color: BrandColors.gray400, textDecorationLine: 'line-through' }}>
+                                  {formatVND(rel.service.basePrice)}
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>
+                                  {rel.discountOffer}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={[styles.checkboxCircle, isRelSelected && styles.checkboxCircleSelected]}>
+                              {isRelSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
                 </ScrollView>
 
                 {/* USER REQUIREMENT: Hiển thị số tiền ước tính cập nhật real-time */}
@@ -2160,6 +2299,12 @@ export default function NewBookingScreen() {
                       <View style={styles.priceRow}>
                         <Text style={styles.priceKey}>Dịch vụ bổ sung ({selectedAddOnIds.length})</Text>
                         <Text style={styles.priceVal}>+{formatVND(addOnsTotal)}</Text>
+                      </View>
+                    )}
+                    {relatedServicesTotal > 0 && (
+                      <View style={styles.priceRow}>
+                        <Text style={styles.priceKey}>Dịch vụ kết hợp thông minh ({selectedRelatedServiceIds.length})</Text>
+                        <Text style={styles.priceVal}>+{formatVND(relatedServicesTotal)}</Text>
                       </View>
                     )}
                     {discountAmount > 0 && (

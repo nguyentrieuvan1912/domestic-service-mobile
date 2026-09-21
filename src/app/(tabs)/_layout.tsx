@@ -63,41 +63,42 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: isStaff ? 'Việc làm' : 'Trang chủ',
+          title: 'Trang chủ',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="home" focused={focused} size={22} />
           ),
         }}
       />
 
-      {/* 2. Dịch vụ */}
+      {/* 2. Khám phá */}
       <Tabs.Screen
         name="services"
         options={{
-          title: isStaff ? 'Lịch rảnh' : 'Dịch vụ',
+          title: 'Khám phá',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="services" focused={focused} size={22} />
           ),
         }}
       />
 
-      {/* 3. Trung tâm: Robot Mascot 3D chuyển động linh hoạt */}
-      <Tabs.Screen
-        name="ai"
-        options={{
-          title: '',
-          tabBarLabel: () => null,
-          tabBarButton: (props) => <CenterAIMascotTabButton {...props} />,
-        }}
-      />
-
-      {/* 4. Đơn hàng */}
+      {/* 3. Đơn hàng */}
       <Tabs.Screen
         name="bookings"
         options={{
-          title: isStaff ? 'Ca làm' : 'Đơn hàng',
+          title: 'Đơn hàng',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="bookings" focused={focused} size={22} />
+          ),
+        }}
+      />
+
+      {/* 4. Tin nhắn */}
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Tin nhắn',
+          tabBarIcon: ({ focused }) => (
+            <TabImageIcon name="chat" focused={focused} size={22} />
           ),
         }}
       />
@@ -113,9 +114,9 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Ẩn route Chat khỏi tab bar */}
+      {/* Ẩn route AI khỏi tab bar (được kích hoạt từ nút nổi Trang chủ và thanh nhanh) */}
       <Tabs.Screen
-        name="chat"
+        name="ai"
         options={{
           href: null,
         }}
@@ -123,3 +124,4 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+

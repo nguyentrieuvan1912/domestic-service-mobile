@@ -5,44 +5,46 @@ import {
   StyleSheet,
   TextInput,
   Pressable,
-  Image,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types/user';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, quickLoginAsCustomer, quickLoginAsStaff } = useAuth();
+  const { login, quickLoginAsCustomer } = useAuth();
 
-  const [selectedRole, setSelectedRole] = useState<UserRole>('CUSTOMER');
   const [account, setAccount] = useState('0901234001'); // Default demo account
   const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleLogin = () => {
+    setErrorMessage('');
     if (!account.trim() || !password.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ số điện thoại/email và mật khẩu.');
+      setErrorMessage('Vui lòng nhập đầy đủ số điện thoại/email và mật khẩu.');
       return;
     }
 
-    const success = login(account, selectedRole);
-    if (success) {
-      router.replace('/(tabs)');
-    } else {
-      Alert.alert(
-        'Đăng nhập không thành công',
-        `Không tìm thấy tài khoản ${selectedRole === 'CUSTOMER' ? 'Khách hàng' : 'Nhân viên'} tương ứng. Vui lòng bấm vào nút đăng nhập nhanh bên dưới.`
-      );
-    }
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      const success = login(account.trim(), 'CUSTOMER');
+      if (success) {
+        router.replace('/(tabs)');
+      } else {
+        setErrorMessage('Số điện thoại hoặc mật khẩu không chính xác. Thử lại hoặc dùng tài khoản Demo bên dưới.');
+      }
+    }, 600);
   };
 
   const handleDemoCustomer = () => {
@@ -50,12 +52,11 @@ export default function LoginScreen() {
     router.replace('/(tabs)');
   };
 
-  const handleDemoStaff = () => {
-    quickLoginAsStaff('staff-001');
+  const handleForgotPassword = () => {
     Alert.alert(
-      'Đăng nhập Nhân viên',
-      'Đã đăng nhập tài khoản Nhân viên Nguyễn Văn An. Bạn có thể kiểm tra danh sách việc làm và thu nhập tại trang cá nhân.',
-      [{ text: 'Vào ứng dụng', onPress: () => router.replace('/(tabs)') }]
+      'Quên mật khẩu',
+      'Mã OTP khôi phục mật khẩu đã được gửi đến số điện thoại đăng ký của bạn. Vui lòng kiểm tra tin nhắn SMS.',
+      [{ text: 'Đã hiểu' }]
     );
   };
 
@@ -70,135 +71,111 @@ export default function LoginScreen() {
           {/* Logo & Brand Header */}
           <View style={styles.brandHeader}>
             <View style={styles.logoCircle}>
-              <Text style={{ fontSize: 36 }}>🏡</Text>
+              <Text style={{ fontSize: 38 }}>🏡</Text>
             </View>
             <Text style={styles.brandName}>HomeCare</Text>
-            <Text style={styles.brandSlogan}>Sạch nhà, nhẹ lo</Text>
+            <Text style={styles.brandSlogan}>Nền tảng đa dịch vụ gia đình tận tâm</Text>
           </View>
 
-          {/* Role Selection Segmented Bar */}
-          <View style={styles.roleSegment}>
-            <Pressable
-              style={[
-                styles.roleTab,
-                selectedRole === 'CUSTOMER' && styles.roleTabActive,
-              ]}
-              onPress={() => {
-                setSelectedRole('CUSTOMER');
-                setAccount('0901234001');
-              }}>
-              <Text
-                style={[
-                  styles.roleTabText,
-                  selectedRole === 'CUSTOMER' && styles.roleTabTextActive,
-                ]}>
-                Khách hàng
-              </Text>
-            </Pressable>
+          {/* Form Card */}
+          <View style={styles.formCard}>
+            <Text style={styles.formTitle}>Đăng nhập Khách hàng</Text>
+            <Text style={styles.formSubtitle}>
+              Nhập số điện thoại hoặc email để quản lý đơn dịch vụ của bạn
+            </Text>
 
-            <Pressable
-              style={[
-                styles.roleTab,
-                selectedRole === 'STAFF' && styles.roleTabActive,
-              ]}
-              onPress={() => {
-                setSelectedRole('STAFF');
-                setAccount('0912001001');
-              }}>
-              <Text
-                style={[
-                  styles.roleTabText,
-                  selectedRole === 'STAFF' && styles.roleTabTextActive,
-                ]}>
-                Nhân viên đối tác
-              </Text>
-            </Pressable>
-          </View>
+            {errorMessage ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+              </View>
+            ) : null}
 
-          <Text style={styles.welcomeText}>
-            Chào mừng {selectedRole === 'CUSTOMER' ? 'Khách hàng' : 'Đối tác'} trở lại!
-          </Text>
-          <Text style={styles.welcomeSub}>
-            {selectedRole === 'CUSTOMER'
-              ? 'Đăng nhập để đặt dịch vụ giúp việc nhanh chóng'
-              : 'Đăng nhập để nhận đơn và theo dõi thu nhập hàng ngày'}
-          </Text>
-
-          {/* Form Fields */}
-          <View style={styles.formGroup}>
+            {/* Phone/Email Field */}
             <Text style={styles.inputLabel}>Số điện thoại hoặc Email</Text>
-            <View style={styles.inputBox}>
-              <IconSymbol name="user" size={16} color={BrandColors.gray400} />
+            <View style={styles.inputWrapper}>
+              <IconSymbol name="phone" size={18} color={BrandColors.gray400} />
               <TextInput
+                style={styles.input}
                 value={account}
-                onChangeText={setAccount}
-                placeholder="Nhập số điện thoại hoặc email..."
+                onChangeText={(text) => {
+                  setAccount(text);
+                  setErrorMessage('');
+                }}
+                placeholder="0901 234 567"
                 placeholderTextColor={BrandColors.gray400}
-                style={styles.textInput}
+                keyboardType="phone-pad"
                 autoCapitalize="none"
               />
             </View>
-          </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Mật khẩu</Text>
-            <View style={styles.inputBox}>
-              <IconSymbol name="shield" size={16} color={BrandColors.gray400} />
+            {/* Password Field */}
+            <Text style={[styles.inputLabel, { marginTop: Spacing.three }]}>
+              Mật khẩu
+            </Text>
+            <View style={styles.inputWrapper}>
+              <IconSymbol name="lock" size={18} color={BrandColors.gray400} />
               <TextInput
+                style={styles.input}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setErrorMessage('');
+                }}
                 placeholder="Nhập mật khẩu..."
                 placeholderTextColor={BrandColors.gray400}
                 secureTextEntry={!showPassword}
-                style={styles.textInput}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
-                <Text style={styles.showPassText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                hitSlop={8}>
+                <IconSymbol
+                  name={showPassword ? 'eye' : 'eyeOff'}
+                  size={18}
+                  color={BrandColors.gray400}
+                />
               </Pressable>
             </View>
-          </View>
 
-          {/* Remember me & Forgot pass */}
-          <View style={styles.optionsRow}>
-            <Pressable
-              style={styles.checkboxRow}
-              onPress={() => setRememberMe(!rememberMe)}>
-              <View
-                style={[
-                  styles.checkbox,
-                  rememberMe && styles.checkboxActive,
-                ]}>
-                {rememberMe && <Text style={styles.checkIcon}>✓</Text>}
-              </View>
-              <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                Alert.alert('Quên mật khẩu', 'Mã OTP đặt lại mật khẩu sẽ gửi về số điện thoại của bạn.')
-              }>
-              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-            </Pressable>
-          </View>
-
-          {/* Login Button */}
-          <Pressable style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginBtnText}>Đăng nhập</Text>
-          </Pressable>
-
-          {/* Quick Demo Login Helper Box */}
-          <View style={styles.demoBox}>
-            <Text style={styles.demoTitle}>Tài khoản Demo thử nghiệm nhanh:</Text>
-            <View style={styles.demoButtonsRow}>
-              <Pressable style={styles.demoBtn} onPress={handleDemoCustomer}>
-                <Text style={styles.demoBtnText}>👤 Vào vai Khách hàng</Text>
-              </Pressable>
+            {/* Remember Me & Forgot Password */}
+            <View style={styles.rowOptions}>
               <Pressable
-                style={[styles.demoBtn, styles.demoBtnStaff]}
-                onPress={handleDemoStaff}>
-                <Text style={[styles.demoBtnText, styles.demoBtnTextStaff]}>
-                  👷 Vào vai Nhân viên
-                </Text>
+                style={styles.rememberRow}
+                onPress={() => setRememberMe(!rememberMe)}>
+                <Text style={{ fontSize: 16 }}>{rememberMe ? '☑' : '☐'}</Text>
+                <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+              </Pressable>
+
+              <Pressable onPress={handleForgotPassword}>
+                <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+              </Pressable>
+            </View>
+
+            {/* Submit Button */}
+            <Pressable
+              style={[styles.submitButton, isLoading && { opacity: 0.7 }]}
+              onPress={handleLogin}
+              disabled={isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Đăng nhập</Text>
+              )}
+            </Pressable>
+
+            {/* Quick Demo Customer Button */}
+            <Pressable
+              style={styles.demoButton}
+              onPress={handleDemoCustomer}>
+              <Text style={styles.demoButtonText}>
+                ⚡ Đăng nhập nhanh tài khoản mẫu (Demo)
+              </Text>
+            </Pressable>
+
+            {/* Register Link */}
+            <View style={styles.registerRow}>
+              <Text style={styles.registerText}>Chưa có tài khoản? </Text>
+              <Pressable onPress={() => router.push('/auth/register')}>
+                <Text style={styles.registerLink}>Đăng ký ngay</Text>
               </Pressable>
             </View>
           </View>
@@ -211,137 +188,103 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: BrandColors.white,
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
+    padding: Spacing.four,
+    paddingTop: Spacing.five,
   },
   brandHeader: {
     alignItems: 'center',
-    marginVertical: Spacing.three,
+    marginBottom: Spacing.four,
   },
   logoCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: BrandColors.primaryLight,
+    backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.two,
+    marginBottom: 8,
   },
   brandName: {
     fontSize: 26,
-    fontWeight: '900',
-    color: BrandColors.primaryDark,
+    fontWeight: '800',
+    color: BrandColors.gray900,
   },
   brandSlogan: {
     fontSize: 13,
     color: BrandColors.gray500,
     marginTop: 2,
   },
-
-  // Role Segment
-  roleSegment: {
-    flexDirection: 'row',
-    backgroundColor: BrandColors.gray100,
-    borderRadius: BorderRadius.lg,
-    padding: 4,
-    marginVertical: Spacing.two,
-  },
-  roleTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: BorderRadius.md,
-  },
-  roleTabActive: {
-    backgroundColor: BrandColors.white,
-    elevation: 2,
+  formCard: {
+    backgroundColor: '#FFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.four,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
-  roleTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: BrandColors.gray500,
-  },
-  roleTabTextActive: {
-    color: BrandColors.primary,
-    fontWeight: '800',
-  },
-
-  welcomeText: {
+  formTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: BrandColors.gray900,
-    marginTop: Spacing.two,
+    marginBottom: 4,
   },
-  welcomeSub: {
+  formSubtitle: {
     fontSize: 12,
     color: BrandColors.gray500,
-    marginTop: 4,
+    lineHeight: 18,
     marginBottom: Spacing.three,
   },
-  formGroup: {
+  errorBox: {
+    backgroundColor: '#FEE2E2',
+    padding: 10,
+    borderRadius: BorderRadius.md,
     marginBottom: Spacing.three,
+  },
+  errorText: {
+    color: BrandColors.danger,
+    fontSize: 12,
+    lineHeight: 16,
   },
   inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: BrandColors.gray700,
     marginBottom: 6,
   },
-  inputBox: {
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: BrandColors.gray50,
-    borderWidth: 1.5,
-    borderColor: BrandColors.gray200,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.two,
+    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: Spacing.three,
     height: 48,
-    gap: 8,
+    gap: 10,
   },
-  textInput: {
+  input: {
     flex: 1,
     fontSize: 14,
     color: BrandColors.gray900,
   },
-  showPassText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BrandColors.primary,
-  },
-  optionsRow: {
+  rowOptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: Spacing.three,
     marginBottom: Spacing.four,
   },
-  checkboxRow: {
+  rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: BrandColors.gray300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: BrandColors.primary,
-    borderColor: BrandColors.primary,
-  },
-  checkIcon: {
-    color: BrandColors.white,
-    fontSize: 12,
-    fontWeight: '800',
+    gap: 6,
   },
   rememberText: {
     fontSize: 12,
@@ -349,64 +292,47 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: BrandColors.primary,
   },
-  loginBtn: {
+  submitButton: {
     backgroundColor: BrandColors.primary,
-    borderRadius: BorderRadius.full,
     paddingVertical: 14,
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
-    marginBottom: Spacing.four,
-    elevation: 3,
-    shadowColor: BrandColors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    elevation: 2,
   },
-  loginBtnText: {
-    color: BrandColors.white,
-    fontSize: 16,
+  submitButtonText: {
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '800',
   },
-
-  // Demo Fast Box
-  demoBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.gray200,
-  },
-  demoTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: BrandColors.gray500,
-    marginBottom: Spacing.two,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  demoButtonsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  demoBtn: {
-    flex: 1,
-    backgroundColor: BrandColors.primaryLight,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
+  demoButton: {
+    backgroundColor: '#ECFDF5',
+    paddingVertical: 12,
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
-  demoBtnStaff: {
-    backgroundColor: '#EFF6FF',
-  },
-  demoBtnText: {
-    fontSize: 12,
+  demoButtonText: {
+    color: BrandColors.primary,
+    fontSize: 13,
     fontWeight: '700',
-    color: BrandColors.primaryDark,
   },
-  demoBtnTextStaff: {
-    color: '#1D4ED8',
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: Spacing.four,
+  },
+  registerText: {
+    fontSize: 13,
+    color: BrandColors.gray600,
+  },
+  registerLink: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: BrandColors.primary,
   },
 });
