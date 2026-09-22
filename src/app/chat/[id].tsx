@@ -92,7 +92,7 @@ export default function ChatDetailScreen() {
     }
 
     Alert.alert(
-      'Cuộc gọi thoại bảo mật HomeCare',
+      'Cuộc gọi thoại bảo mật CleanMaster',
       'Đang kết nối qua tổng đài thoại nội bộ của nền tảng. Số điện thoại cá nhân và email của đôi bên được bảo mật an toàn.',
       [{ text: 'Đồng ý' }, { text: 'Hủy', style: 'cancel' }]
     );

@@ -93,7 +93,7 @@ export default function ReviewStaffScreen() {
         {/* Staff & Service Header Card */}
         <View style={styles.staffCard}>
           <Image source={{ uri: staff?.avatar }} style={styles.staffAvatar} />
-          <Text style={styles.staffName}>{staff?.fullName || 'Nhân viên HomeCare'}</Text>
+          <Text style={styles.staffName}>{staff?.fullName || 'Nhân viên CleanMaster'}</Text>
           <Text style={styles.serviceName}>
             {service?.name} • Mã đơn: {booking.bookingCode}
           </Text>

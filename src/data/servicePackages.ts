@@ -428,7 +428,7 @@ export const getPackagesByServiceId = (serviceId: string): ServicePackage[] => {
       id: `pkg-${serviceId}-default`,
       serviceId,
       name: 'Gói dịch vụ tiêu chuẩn',
-      description: 'Dịch vụ chất lượng cao chuẩn HomeCare 5 sao',
+      description: 'Dịch vụ chất lượng cao chuẩn CleanMaster 5 sao',
       price: 200000,
       originalPrice: 250000,
       durationMinutes: 120,

@@ -11,6 +11,7 @@ import {
   NativeScrollEvent,
   Modal,
   Alert,
+  LayoutAnimation,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -103,6 +104,12 @@ export default function HomeScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+
+  const handleToggleCategories = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsCategoriesExpanded((prev) => !prev);
+  };
   const bannerScrollRef = useRef<ScrollView>(null);
   const activeIndexRef = useRef(0);
   const isInteractingRef = useRef(false);
@@ -455,27 +462,46 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* 16 SERVICE CATEGORIES GRID */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Danh mục dịch vụ</Text>
-            <Pressable onPress={() => router.push('/(tabs)/services')}>
-              <Text style={styles.seeAllText}>Xem tất cả 16 nhóm →</Text>
-            </Pressable>
-          </View>
+          {/* SERVICE CATEGORIES GRID (2 rows default, expandable) */}
+          <View style={styles.categorySectionCard}>
+            <View style={styles.categorySectionHeader}>
+              <Text style={styles.categorySectionTitle}>Danh mục dịch vụ</Text>
+              <Pressable onPress={handleToggleCategories}>
+                <Text style={styles.categorySectionSeeAll}>
+                  {isCategoriesExpanded ? 'Thu gọn danh mục ↑' : 'Xem tất cả 16 nhóm →'}
+                </Text>
+              </Pressable>
+            </View>
 
-          <View style={styles.categoriesGrid}>
-            {SERVICE_CATEGORIES.map((cat) => (
-              <ServiceCategoryCard
-                key={cat.id}
-                category={cat}
-                onPress={() => {
-                  router.push({
-                    pathname: '/(tabs)/services',
-                    params: { category: cat.id },
-                  });
-                }}
-              />
-            ))}
+            <View style={styles.categoriesGrid}>
+              {(isCategoriesExpanded ? SERVICE_CATEGORIES : SERVICE_CATEGORIES.slice(0, 8)).map((cat) => (
+                <ServiceCategoryCard
+                  key={cat.id}
+                  category={cat}
+                  onPress={() => {
+                    const service = mockServices.find((item) => item.categoryId === cat.id);
+                    if (service) {
+                      router.push(`/service/${service.id}`);
+                    }
+                  }}
+                />
+              ))}
+            </View>
+
+            {/* Expand / Collapse Button with arrow */}
+            <Pressable
+              style={styles.expandCategoriesButton}
+              onPress={handleToggleCategories}
+              hitSlop={8}>
+              <Text style={styles.expandCategoriesText}>
+                {isCategoriesExpanded ? 'Thu gọn danh mục' : 'Xem thêm 8 nhóm dịch vụ'}
+              </Text>
+              <View style={styles.expandCategoriesArrowBox}>
+                <Text style={styles.expandCategoriesArrow}>
+                  {isCategoriesExpanded ? '▲' : '▼'}
+                </Text>
+              </View>
+            </Pressable>
           </View>
 
           {/* POPULAR SERVICES SECTION */}
@@ -1132,12 +1158,76 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: BrandColors.primary,
   },
+  categorySectionCard: {
+    marginHorizontal: Spacing.three,
+    backgroundColor: '#DEF2E9',
+    borderRadius: 24,
+    paddingTop: 18,
+    paddingBottom: 8,
+    paddingHorizontal: 10,
+    marginBottom: Spacing.three,
+  },
+  categorySectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 6,
+  },
+  categorySectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#133E2B',
+    letterSpacing: -0.3,
+  },
+  categorySectionSeeAll: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#059669',
+  },
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    marginBottom: Spacing.two,
+    marginBottom: 4,
+  },
+  expandCategoriesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: BorderRadius.full,
+    marginTop: 4,
+    marginBottom: 4,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#CBE7DA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  expandCategoriesText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  expandCategoriesArrowBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#E8F5EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandCategoriesArrow: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#15803D',
   },
   popularCard: {
     width: 160,

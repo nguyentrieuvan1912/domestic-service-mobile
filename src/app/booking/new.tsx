@@ -598,7 +598,7 @@ export default function NewBookingScreen() {
                 <View style={styles.bannerTagPill}>
                   <Text style={styles.bannerTagText}>⚡ ĐẶT NHANH 60 GIÂY</Text>
                 </View>
-                <Text style={styles.entryBannerHeading}>Nhà Sạch Mát Lành</Text>
+                <Text style={styles.entryBannerHeading}>CleanMaster Mát Lành</Text>
                 <Text style={styles.entryBannerSubtitle}>
                   Dịch vụ dọn dẹp chuyên nghiệp, minh bạch & tận tâm
                 </Text>

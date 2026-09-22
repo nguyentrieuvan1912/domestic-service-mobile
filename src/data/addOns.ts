@@ -90,7 +90,7 @@ export const mockAddOns: AddOn[] = [
     id: 'addon-008',
     serviceId: 'srv-001',
     name: 'Nhân viên tự mang dụng cụ & hóa chất',
-    description: 'Nhân viên mang xô, cây lau, khăn vi sợi, hóa chất vệ sinh chuẩn HomeCare.',
+    description: 'Nhân viên mang xô, cây lau, khăn vi sợi, hóa chất vệ sinh chuẩn CleanMaster.',
     image: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?w=500&auto=format&fit=crop&q=80',
     price: 30000,
     estimatedMinutes: 0,

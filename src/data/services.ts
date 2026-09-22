@@ -1,22 +1,23 @@
 import { Service, CategoryInfo } from '../types/service';
+import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 
 export const SERVICE_CATEGORIES: CategoryInfo[] = [
-  { id: 'CLEANING_HOURLY', name: 'Vệ sinh theo giờ', icon: '🧹', description: 'Lau dọn nhanh chóng, linh hoạt 2 - 4h', group: 'CLEANING' },
-  { id: 'CLEANING_DEEP', name: 'Tổng vệ sinh', icon: '✨', description: 'Làm sạch sâu toàn diện nhà ở, căn hộ', group: 'CLEANING' },
-  { id: 'CLEANING_UPHOLSTERY', name: 'Sofa, Nệm & Rèm', icon: '🛋️', description: 'Giặt hơi nước nóng, diệt khuẩn 99%', group: 'CLEANING' },
-  { id: 'AC_CLEANING', name: 'Vệ sinh máy lạnh', icon: '❄️', description: 'Xịt rửa dàn nóng, dàn lạnh, khử mùi', group: 'APPLIANCES' },
-  { id: 'AC_MAINTENANCE', name: 'Bảo dưỡng máy lạnh', icon: '🔧', description: 'Kiểm tra gas, block máy, bảo dưỡng sâu', group: 'APPLIANCES' },
-  { id: 'WASHING_MACHINE', name: 'Vệ sinh máy giặt', icon: '🧺', description: 'Tháo lồng giặt, đánh bay cặn bẩn lâu năm', group: 'APPLIANCES' },
-  { id: 'DRYER_CLEANING', name: 'Vệ sinh máy sấy', icon: '♨️', description: 'Vệ sinh lồng sấy, lưới lọc xơ vải', group: 'APPLIANCES' },
-  { id: 'REFRIGERATOR_CLEANING', name: 'Vệ sinh tủ lạnh', icon: '🧊', description: 'Khử khuẩn, vệ sinh khay kệ, ngăn đông', group: 'APPLIANCES' },
-  { id: 'CHILD_CARE', name: 'Chăm sóc trẻ em', icon: '👶', description: 'Bảo mẫu chu đáo, chơi cùng và trông trẻ', group: 'CARE' },
-  { id: 'ELDERLY_CARE', name: 'Chăm sóc người già', icon: '👵', description: 'Hỗ trợ sinh hoạt, trò chuyện, chăm sóc', group: 'CARE' },
-  { id: 'COOKING', name: 'Nấu ăn gia đình', icon: '🍳', description: 'Nấu cơm gia đình chuẩn vị ấm cúng', group: 'HOME_TASKS' },
-  { id: 'LAUNDRY', name: 'Giặt ủi tiện lợi', icon: '👔', description: 'Phân loại, giặt sấy và ủi phẳng tươm tất', group: 'HOME_TASKS' },
-  { id: 'GROCERY_SHOPPING', name: 'Đi chợ hộ', icon: '🛒', description: 'Mua thực phẩm tươi ngon, hóa đơn minh bạch', group: 'HOME_TASKS' },
-  { id: 'PET_CARE', name: 'Chăm sóc thú cưng', icon: '🐶', description: 'Dắt thú dạo, cho ăn, tắm sấy sạch sẽ', group: 'CARE' },
-  { id: 'PLANT_CARE', name: 'Chăm sóc cây cảnh', icon: '🌱', description: 'Tưới cây, cắt tỉa, bón phân ban công & vườn', group: 'HOME_TASKS' },
-  { id: 'OTHER_SERVICES', name: 'Dịch vụ khác', icon: '🛡️', description: 'Phun khử khuẩn, khử mùi ẩm mốc gia đình', group: 'HOME_TASKS' },
+  { id: 'CLEANING_HOURLY', name: 'Vệ sinh theo giờ', icon: '🧹', image: CATEGORY_ICONS.CLEANING_HOURLY, description: 'Lau dọn nhanh chóng, linh hoạt 2 - 4h', group: 'CLEANING' },
+  { id: 'CLEANING_DEEP', name: 'Tổng vệ sinh', icon: '✨', image: CATEGORY_ICONS.CLEANING_DEEP, description: 'Lau dọn sâu toàn diện nhà ở, căn hộ', group: 'CLEANING' },
+  { id: 'CLEANING_UPHOLSTERY', name: 'Sofa, Nệm & Rèm', icon: '🛋️', image: CATEGORY_ICONS.CLEANING_UPHOLSTERY, description: 'Giặt hơi nước nóng, diệt khuẩn 99%', group: 'CLEANING' },
+  { id: 'AC_CLEANING', name: 'Vệ sinh máy lạnh', icon: '❄️', image: CATEGORY_ICONS.AC_CLEANING, description: 'Xịt rửa dàn nóng, dàn lạnh, khử mùi', group: 'APPLIANCES' },
+  { id: 'AC_MAINTENANCE', name: 'Bảo dưỡng máy lạnh', icon: '🔧', image: CATEGORY_ICONS.AC_MAINTENANCE, description: 'Kiểm tra gas, block máy, bảo dưỡng sâu', group: 'APPLIANCES' },
+  { id: 'WASHING_MACHINE', name: 'Vệ sinh máy giặt', icon: '🧺', image: CATEGORY_ICONS.WASHING_MACHINE, description: 'Tháo lồng giặt, đánh bay cặn bẩn lâu năm', group: 'APPLIANCES' },
+  { id: 'DRYER_CLEANING', name: 'Vệ sinh máy sấy', icon: '♨️', image: CATEGORY_ICONS.DRYER_CLEANING, description: 'Vệ sinh lồng sấy, lưới lọc xơ vải', group: 'APPLIANCES' },
+  { id: 'REFRIGERATOR_CLEANING', name: 'Vệ sinh tủ lạnh', icon: '🧊', image: CATEGORY_ICONS.REFRIGERATOR_CLEANING, description: 'Khử khuẩn, vệ sinh khay kệ, ngăn đông', group: 'APPLIANCES' },
+  { id: 'CHILD_CARE', name: 'Chăm sóc trẻ em', icon: '👶', image: CATEGORY_ICONS.CHILD_CARE, description: 'Bảo mẫu chu đáo, chơi cùng và trông trẻ', group: 'CARE' },
+  { id: 'ELDERLY_CARE', name: 'Chăm sóc người già', icon: '👵', image: CATEGORY_ICONS.ELDERLY_CARE, description: 'Hỗ trợ sinh hoạt, trò chuyện, chăm sóc', group: 'CARE' },
+  { id: 'COOKING', name: 'Nấu ăn gia đình', icon: '🍳', image: CATEGORY_ICONS.COOKING, description: 'Nấu cơm gia đình chuẩn vị ấm cúng', group: 'HOME_TASKS' },
+  { id: 'LAUNDRY', name: 'Giặt ủi tiện lợi', icon: '👔', image: CATEGORY_ICONS.LAUNDRY, description: 'Phân loại, giặt sấy và ủi phẳng tươm tất', group: 'HOME_TASKS' },
+  { id: 'GROCERY_SHOPPING', name: 'Đi chợ hộ', icon: '🛒', image: CATEGORY_ICONS.GROCERY_SHOPPING, description: 'Mua thực phẩm tươi ngon, hóa đơn minh bạch', group: 'HOME_TASKS' },
+  { id: 'PET_CARE', name: 'Chăm sóc thú cưng', icon: '🐶', image: CATEGORY_ICONS.PET_CARE, description: 'Dắt thú dạo, cho ăn, tắm sấy sạch sẽ', group: 'CARE' },
+  { id: 'PLANT_CARE', name: 'Chăm sóc cây cảnh', icon: '🌱', image: CATEGORY_ICONS.PLANT_CARE, description: 'Tưới cây, cắt tỉa, bón phân ban công & vườn', group: 'HOME_TASKS' },
+  { id: 'OTHER_SERVICES', name: 'Dịch vụ khác', icon: '🛡️', image: CATEGORY_ICONS.OTHER_SERVICES, description: 'Phun khử khuẩn, khử mùi ẩm mốc gia đình', group: 'HOME_TASKS' },
 ];
 
 export const mockServices: Service[] = [

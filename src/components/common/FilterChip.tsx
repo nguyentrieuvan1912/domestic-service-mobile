@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
+import { Pressable, Text, StyleSheet, Image } from 'react-native';
 import { BrandColors, BorderRadius } from '@/constants/theme';
 
 interface FilterChipProps {
@@ -7,6 +7,7 @@ interface FilterChipProps {
   isSelected: boolean;
   onPress: () => void;
   icon?: string;
+  image?: any;
 }
 
 export const FilterChip: React.FC<FilterChipProps> = ({
@@ -14,12 +15,17 @@ export const FilterChip: React.FC<FilterChipProps> = ({
   isSelected,
   onPress,
   icon,
+  image,
 }) => {
   return (
     <Pressable
       style={[styles.chip, isSelected && styles.chipSelected]}
       onPress={onPress}>
-      {icon ? <Text style={styles.icon}>{icon}</Text> : null}
+      {image ? (
+        <Image source={image} style={styles.imageIcon} resizeMode="contain" />
+      ) : icon ? (
+        <Text style={styles.icon}>{icon}</Text>
+      ) : null}
       <Text style={[styles.label, isSelected && styles.labelSelected]}>{label}</Text>
     </Pressable>
   );
@@ -44,6 +50,10 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 13,
+  },
+  imageIcon: {
+    width: 16,
+    height: 16,
   },
   label: {
     fontSize: 13,

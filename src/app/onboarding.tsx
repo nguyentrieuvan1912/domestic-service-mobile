@@ -73,7 +73,7 @@ export default function OnboardingScreen() {
       <View style={styles.topBar}>
         <View style={styles.logoRow}>
           <Text style={{ fontSize: 24 }}>🏡</Text>
-          <Text style={styles.logoText}>HomeCare</Text>
+          <Text style={styles.logoText}>CleanMaster</Text>
         </View>
         <Pressable onPress={handleComplete}>
           <Text style={styles.skipText}>Bỏ qua</Text>

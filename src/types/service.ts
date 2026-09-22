@@ -24,6 +24,7 @@ export interface CategoryInfo {
   id: ServiceCategory;
   name: string;
   icon: string; // Emoji hoặc Icon name
+  image?: any; // Category illustrated icon
   description: string;
   group: 'CLEANING' | 'APPLIANCES' | 'CARE' | 'HOME_TASKS';
 }

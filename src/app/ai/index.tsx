@@ -25,7 +25,7 @@ const QUICK_PROMPTS = [
   'Tìm bảo mẫu trông bé 2 tuổi bán thời gian',
   'Nhà 70m2 nên đặt gói dọn dẹp nào?',
   'Khuyến mãi & mã giảm giá hôm nay có gì?',
-  'Chính sách bảo hiểm hư hại của HomeCare',
+  'Chính sách bảo hiểm hư hại của CleanMaster',
 ];
 
 export default function AIAssistantScreen() {
@@ -91,7 +91,7 @@ export default function AIAssistantScreen() {
           conversationId: 'ai-conv-001',
           role: 'ASSISTANT',
           content:
-            'Với nhu cầu trông bé, HomeCare có đội ngũ **Bảo mẫu mầm non** đã qua kiểm tra lý lịch tư pháp số 2 và có chứng chỉ sư phạm mầm non. Bạn có thể chọn ca 4 giờ hoặc ca nguyên ngày 8 giờ.',
+            'Với nhu cầu trông bé, CleanMaster có đội ngũ **Bảo mẫu mầm non** đã qua kiểm tra lý lịch tư pháp số 2 và có chứng chỉ sư phạm mầm non. Bạn có thể chọn ca 4 giờ hoặc ca nguyên ngày 8 giờ.',
           suggestions: [
             {
               type: 'SERVICE',
@@ -162,7 +162,7 @@ export default function AIAssistantScreen() {
           conversationId: 'ai-conv-001',
           role: 'ASSISTANT',
           content:
-            'Em là HomeCare AI. Nền tảng hiện cung cấp đầy đủ 16 dịch vụ gia đình: vệ sinh nhà, điện lạnh, máy giặt, chăm sóc trẻ em, người già, thú cưng, nấu ăn, đi chợ hộ. Bạn cần em tư vấn dịch vụ nào ạ?',
+            'Em là CleanMaster AI. Nền tảng hiện cung cấp đầy đủ 16 dịch vụ gia đình: vệ sinh nhà, điện lạnh, máy giặt, chăm sóc trẻ em, người già, thú cưng, nấu ăn, đi chợ hộ. Bạn cần em tư vấn dịch vụ nào ạ?',
           suggestions: [
             {
               type: 'SERVICE',
@@ -213,7 +213,7 @@ export default function AIAssistantScreen() {
             style={styles.headerAvatar}
           />
           <View>
-            <Text style={styles.headerTitle}>Trợ lý HomeCare AI</Text>
+            <Text style={styles.headerTitle}>Trợ lý CleanMaster AI</Text>
             <View style={styles.onlineBadge}>
               <View style={styles.onlineDot} />
               <Text style={styles.onlineText}>Luôn sẵn sàng tư vấn 24/7</Text>
@@ -248,7 +248,7 @@ export default function AIAssistantScreen() {
           {/* Typing indicator */}
           {isTyping && (
             <View style={styles.typingBox}>
-              <Text style={styles.typingText}>🤖 HomeCare AI đang suy nghĩ câu trả lời...</Text>
+              <Text style={styles.typingText}>🤖 CleanMaster AI đang suy nghĩ câu trả lời...</Text>
             </View>
           )}
         </ScrollView>

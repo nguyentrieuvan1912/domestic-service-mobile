@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { CategoryInfo } from '@/types/service';
+import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 
 interface ServiceCategoryCardProps {
   category: CategoryInfo;
@@ -16,12 +17,18 @@ export const ServiceCategoryCard: React.FC<ServiceCategoryCardProps> = ({
   isSelected,
   compact = false,
 }) => {
+  const iconSource = category.image || CATEGORY_ICONS[category.id];
+
   if (compact) {
     return (
       <Pressable
         style={[styles.compactContainer, isSelected && styles.compactSelected]}
         onPress={onPress}>
-        <Text style={styles.compactIcon}>{category.icon}</Text>
+        {iconSource ? (
+          <Image source={iconSource} style={styles.compactImage} resizeMode="contain" />
+        ) : (
+          <Text style={styles.compactIcon}>{category.icon}</Text>
+        )}
         <Text
           numberOfLines={1}
           style={[styles.compactName, isSelected && styles.compactNameSelected]}>
@@ -36,7 +43,11 @@ export const ServiceCategoryCard: React.FC<ServiceCategoryCardProps> = ({
       style={[styles.cardContainer, isSelected && styles.cardSelected]}
       onPress={onPress}>
       <View style={styles.iconCircle}>
-        <Text style={styles.iconText}>{category.icon}</Text>
+        {iconSource ? (
+          <Image source={iconSource} style={styles.iconImage} resizeMode="contain" />
+        ) : (
+          <Text style={styles.iconText}>{category.icon}</Text>
+        )}
       </View>
       <Text numberOfLines={2} style={styles.categoryName}>
         {category.name}
@@ -55,10 +66,10 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.05 }],
   },
   iconCircle: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: 18,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
@@ -66,9 +77,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3.5,
+  },
+  iconImage: {
+    width: 52,
+    height: 52,
   },
   iconText: {
     fontSize: 26,
@@ -99,6 +114,10 @@ const styles = StyleSheet.create({
   },
   compactIcon: {
     fontSize: 16,
+  },
+  compactImage: {
+    width: 18,
+    height: 18,
   },
   compactName: {
     fontSize: 12,

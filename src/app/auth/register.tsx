@@ -55,7 +55,7 @@ export default function RegisterScreen() {
       return;
     }
     if (!agreeTerms) {
-      setErrorMessage('Vui lòng đồng ý với Điều khoản sử dụng của HomeCare.');
+      setErrorMessage('Vui lòng đồng ý với Điều khoản sử dụng của CleanMaster.');
       return;
     }
 
@@ -64,7 +64,7 @@ export default function RegisterScreen() {
       setIsLoading(false);
       Alert.alert(
         'Đăng ký thành công!',
-        `Chào mừng ${fullName} đến với nền tảng HomeCare. Bạn đã nhận được mã ưu đãi FLASH50K cho đơn dịch vụ đầu tiên.`,
+        `Chào mừng ${fullName} đến với nền tảng CleanMaster. Bạn đã nhận được mã ưu đãi FLASH50K cho đơn dịch vụ đầu tiên.`,
         [
           {
             text: 'Bắt đầu sử dụng',
@@ -179,7 +179,7 @@ export default function RegisterScreen() {
               <Text style={{ fontSize: 18 }}>{agreeTerms ? '☑' : '☐'}</Text>
               <Text style={styles.termsText}>
                 Tôi đồng ý với <Text style={styles.termsHighlight}>Điều khoản sử dụng</Text> và{' '}
-                <Text style={styles.termsHighlight}>Chính sách bảo mật</Text> của HomeCare
+                <Text style={styles.termsHighlight}>Chính sách bảo mật</Text> của CleanMaster
               </Text>
             </Pressable>
 

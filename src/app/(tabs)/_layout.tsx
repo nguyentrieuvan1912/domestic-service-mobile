@@ -70,11 +70,11 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 2. Khám phá */}
+      {/* 2. Cộng đồng */}
       <Tabs.Screen
         name="services"
         options={{
-          title: 'Khám phá',
+          title: 'Cộng đồng',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="services" focused={focused} size={22} />
           ),
@@ -124,4 +124,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-

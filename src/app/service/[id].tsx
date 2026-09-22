@@ -637,7 +637,7 @@ export default function ServiceDetailScreen() {
             ))}
 
             <Text style={[styles.sectionHeading, { marginTop: Spacing.four }]}>
-              Quyền lợi khi đặt qua HomeCare
+              Quyền lợi khi đặt qua CleanMaster
             </Text>
             {service.benefits?.map((b, idx) => (
               <View key={idx} style={styles.benefitRow}>

@@ -48,7 +48,7 @@ export default function BookingDetailScreen() {
   const handleCallStaff = () => {
     Alert.alert(
       'Cuộc gọi thoại bảo mật',
-      'Đang kết nối qua tổng đài mã hóa của HomeCare. Số điện thoại cá nhân của bạn được bảo mật tuyệt đối.',
+      'Đang kết nối qua tổng đài mã hóa của CleanMaster. Số điện thoại cá nhân của bạn được bảo mật tuyệt đối.',
       [{ text: 'Đồng ý gọi' }, { text: 'Hủy', style: 'cancel' }]
     );
   };

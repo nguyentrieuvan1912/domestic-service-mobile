@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
@@ -35,18 +36,24 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tài khoản</Text>
-      </View>
+    <LinearGradient
+      colors={BrandColors.softBgGradient}
+      locations={BrandColors.softBgGradientLocations}
+      style={styles.gradientContainer}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Tài khoản</Text>
+        </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
 
         {/* Customer Profile Card */}
-        <View style={styles.userCard}>
+        <Pressable
+          style={styles.userCard}
+          onPress={() => router.push('/account/personal-info')}>
           <Image
             source={{
               uri:
@@ -63,7 +70,7 @@ export default function ProfileScreen() {
             <Text style={styles.userPhone}>📱 {currentCustomer?.phone || '0901234001'}</Text>
             <Text style={styles.userEmail}>✉️ {currentCustomer?.email || 'khachhang@homecare.vn'}</Text>
           </View>
-        </View>
+        </Pressable>
 
         {/* Quick Stats Grid */}
         <View style={styles.statsGrid}>
@@ -176,7 +183,7 @@ export default function ProfileScreen() {
             <View style={styles.menuLeft}>
               <Text style={styles.menuIcon}>🤖</Text>
               <View>
-                <Text style={styles.menuLabel}>Trợ lý AI HomeCare 24/7</Text>
+                <Text style={styles.menuLabel}>Trợ lý AI CleanMaster 24/7</Text>
                 <Text style={styles.menuSub}>Giải đáp tức thì mọi thắc mắc</Text>
               </View>
             </View>
@@ -187,7 +194,7 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() =>
               Alert.alert(
-                'Tổng đài hỗ trợ HomeCare',
+                'Tổng đài hỗ trợ CleanMaster',
                 'Hotline miễn phí: 1900 6868 (8:00 - 21:00 hàng ngày)\nEmail: cskh@homecare.vn'
               )
             }>
@@ -206,7 +213,7 @@ export default function ProfileScreen() {
             onPress={() =>
               Alert.alert(
                 'Điều khoản sử dụng & Bảo mật',
-                'Nền tảng HomeCare cam kết bảo mật 100% dữ liệu cá nhân khách hàng. Toàn bộ nhân viên cung cấp dịch vụ đều được xác minh danh tính và kiểm tra tư pháp.'
+                'Nền tảng CleanMaster cam kết bảo mật 100% dữ liệu cá nhân khách hàng. Toàn bộ nhân viên cung cấp dịch vụ đều được xác minh danh tính và kiểm tra tư pháp.'
               )
             }>
             <View style={styles.menuLeft}>
@@ -227,37 +234,37 @@ export default function ProfileScreen() {
           <Text style={styles.logoutBtnText}>Đăng xuất tài khoản</Text>
         </Pressable>
 
-        <Text style={styles.versionText}>HomeCare App v1.0.0 • Nền tảng Đa Dịch Vụ Gia Đình</Text>
+        <Text style={styles.versionText}>CleanMaster v1.0.0 • Nền tảng Đa Dịch Vụ Gia Đình</Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Logout confirmation modal */}
-      <ConfirmModal
-        visible={showLogoutModal}
-        title="Đăng xuất"
-        message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản khách hàng không?"
-        confirmText="Đăng xuất"
-        cancelText="Hủy"
-        isDestructive
-        onConfirm={handleLogout}
-        onCancel={() => setShowLogoutModal(false)}
-      />
-    </SafeAreaView>
+        <ConfirmModal
+          visible={showLogoutModal}
+          title="Đăng xuất"
+          message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản khách hàng không?"
+          confirmText="Đăng xuất"
+          cancelText="Hủy"
+          isDestructive
+          onConfirm={handleLogout}
+          onCancel={() => setShowLogoutModal(false)}
+        />
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradientContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   header: {
     paddingHorizontal: Spacing.three,
     paddingVertical: 12,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
     fontSize: 20,
