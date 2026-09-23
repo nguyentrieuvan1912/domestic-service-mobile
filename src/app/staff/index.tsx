@@ -1,77 +1,590 @@
-import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Image,
+  Switch,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-
-const OPEN_SHIFTS = [
-  { id: 'shift-1', service: 'Vệ sinh nhà theo giờ', time: 'Hôm nay · 14:00 - 17:00', area: 'Bình Thạnh, TP.HCM', income: '288.000đ', distance: '1,8 km' },
-  { id: 'shift-2', service: 'Tổng vệ sinh căn hộ', time: 'Ngày mai · 08:00 - 12:00', area: 'Quận 7, TP.HCM', income: '560.000đ', distance: '4,2 km' },
-];
+import { StaffService, StaffJobItem } from '@/data/staffService';
+import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 
 export default function StaffDashboard() {
   const router = useRouter();
-  const { currentStaff, logout } = useAuth();
-  const [acceptedShiftIds, setAcceptedShiftIds] = useState<string[]>([]);
-  const staffName = currentStaff?.fullName || 'Nhân viên';
+  const { currentStaff } = useAuth();
+  const [isOnline, setIsOnline] = useState(true);
+  const [openShifts, setOpenShifts] = useState<StaffJobItem[]>([]);
+  const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
+  const [wallet, setWallet] = useState(StaffService.getWallet());
 
-  const acceptShift = (id: string) => {
-    setAcceptedShiftIds((current) => [...current, id]);
-    Alert.alert('Đã gửi yêu cầu nhận ca', 'Hệ thống sẽ xác nhận ca này ngay khi còn khả dụng.');
+  const staffName = currentStaff?.fullName || 'Nguyễn Thị Hoa';
+  const staffAvatar =
+    currentStaff?.avatar ||
+    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80';
+
+  useEffect(() => {
+    const updateData = () => {
+      setOpenShifts(StaffService.getOpenShifts());
+      setActiveJob(StaffService.getActiveJob() || StaffService.getUpcomingJobs()[0]);
+      setWallet(StaffService.getWallet());
+    };
+    updateData();
+    const unsubscribe = StaffService.subscribe(updateData);
+    return unsubscribe;
+  }, []);
+
+  const handleToggleOnline = (val: boolean) => {
+    setIsOnline(val);
+    Alert.alert(
+      val ? 'Đã bật Trực tuyến' : 'Đã tạm nghỉ',
+      val
+        ? 'Hồ sơ của bạn đã sẵn sàng nhận các ca làm việc mới phù hợp.'
+        : 'Hệ thống sẽ không gửi ca mới cho bạn trong thời gian tạm nghỉ.'
+    );
   };
 
-  return <LinearGradient colors={['#ECFDF5', '#F8FAFC', '#FFFFFF']} style={styles.gradient}>
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View><Text style={styles.greeting}>Chào {staffName.split(' ').slice(-1)[0]} 👋</Text><Text style={styles.subGreeting}>Sẵn sàng cho một ngày làm việc hiệu quả</Text></View>
-          <Pressable style={styles.notification}><IconSymbol name="bell" size={20} color={BrandColors.gray700} /><View style={styles.notificationDot} /></Pressable>
-        </View>
+  const handleClaimShift = (shift: StaffJobItem) => {
+    Alert.alert(
+      'Xác nhận nhận ca',
+      `Bạn có chắc muốn nhận ca "${shift.serviceName}" tại ${shift.district} (${shift.timeSlot})?\nThu nhập dự kiến: ${shift.netIncome.toLocaleString('vi-VN')}đ`,
+      [
+        { text: 'Suy nghĩ lại', style: 'cancel' },
+        {
+          text: 'Nhận ca ngay',
+          onPress: () => {
+            const success = StaffService.claimOpenShift(shift.id);
+            if (success) {
+              Alert.alert(
+                'Nhận ca thành công! 🎉',
+                'Ca làm việc đã được chuyển vào mục "Ca làm việc của tôi". Bạn có thể mở xem chi tiết ngay bây giờ.',
+                [
+                  { text: 'Để sau' },
+                  {
+                    text: 'Xem chi tiết',
+                    onPress: () => router.push({ pathname: '/staff/job-detail', params: { id: shift.id } }),
+                  },
+                ]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
-        <LinearGradient colors={['#0F766E', '#059669']} style={styles.availabilityCard}>
-          <View style={styles.availabilityHeader}><View style={styles.onlineRow}><View style={styles.onlineDot} /><Text style={styles.onlineText}>Đang sẵn sàng nhận ca</Text></View><Text style={styles.verified}>Đã xác thực ✓</Text></View>
-          <Text style={styles.availabilityTitle}>Hồ sơ của bạn đang hiển thị tại TP.HCM</Text>
-          <Text style={styles.availabilityMeta}>Khu vực: Bình Thạnh · Quận 1 · Quận 3</Text>
-          <Pressable style={styles.manageAvailability}><Text style={styles.manageAvailabilityText}>Quản lý lịch rảnh</Text><Text style={styles.manageAvailabilityArrow}>›</Text></Pressable>
-        </LinearGradient>
+  return (
+    <View style={styles.screen}>
+      <LinearGradient colors={['#ECFDF5', '#F8FAFC', '#FFFFFF']} style={styles.gradient}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Pressable
+                style={styles.profileRow}
+                onPress={() => router.push('/staff/profile')}
+              >
+                <Image source={{ uri: staffAvatar }} style={styles.avatar} />
+                <View>
+                  <View style={styles.nameBadgeRow}>
+                    <Text style={styles.greeting}>{staffName}</Text>
+                    <View style={styles.verifiedBadge}>
+                      <Text style={styles.verifiedText}>✓ Đã xác thực</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình 5★</Text>
+                </View>
+              </Pressable>
 
-        <View style={styles.metrics}>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>Thu nhập tuần này</Text><Text style={styles.metricValue}>2,48tr</Text><Text style={styles.metricTrend}>↑ 12% so với tuần trước</Text></View>
-          <View style={styles.metricCard}><Text style={styles.metricLabel}>Giờ đã làm</Text><Text style={styles.metricValue}>18,5h</Text><Text style={styles.metricTrend}>6 ca đã hoàn thành</Text></View>
-        </View>
+              <Pressable
+                style={styles.notificationBtn}
+                onPress={() => router.push('/notifications')}
+              >
+                <IconSymbol name="bell" size={20} color={BrandColors.gray700} />
+                <View style={styles.notificationDot} />
+              </Pressable>
+            </View>
 
-        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Ca phù hợp với bạn</Text><Text style={styles.sectionSubtitle}>Dựa trên khu vực và kỹ năng đã đăng ký</Text></View><Text style={styles.countPill}>{OPEN_SHIFTS.length} ca mới</Text></View>
-        {OPEN_SHIFTS.map((shift) => {
-          const accepted = acceptedShiftIds.includes(shift.id);
-          return <View key={shift.id} style={styles.shiftCard}>
-            <View style={styles.shiftTop}><View style={styles.serviceIcon}><IconSymbol name="clean" size={20} color="#047857" /></View><View style={styles.shiftTitleWrap}><Text style={styles.shiftService}>{shift.service}</Text><Text style={styles.shiftTime}>{shift.time}</Text></View><Text style={styles.shiftIncome}>{shift.income}</Text></View>
-            <View style={styles.shiftDetails}><Text style={styles.shiftDetail}>📍 {shift.area}</Text><Text style={styles.shiftDetail}>🚶 Cách bạn {shift.distance}</Text></View>
-            <Pressable disabled={accepted} onPress={() => acceptShift(shift.id)} style={[styles.acceptButton, accepted && styles.acceptedButton]}><Text style={[styles.acceptButtonText, accepted && styles.acceptedButtonText]}>{accepted ? 'Đã gửi yêu cầu nhận ca' : 'Nhận ca này'}</Text></Pressable>
-          </View>;
-        })}
+            {/* Online/Offline Status Banner */}
+            <LinearGradient
+              colors={isOnline ? ['#0F766E', '#059669'] : ['#475569', '#334155']}
+              style={styles.statusBanner}
+            >
+              <View style={styles.statusTopRow}>
+                <View style={styles.statusIndicator}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: isOnline ? '#34D399' : '#94A3B8' },
+                    ]}
+                  />
+                  <Text style={styles.statusText}>
+                    {isOnline ? 'Đang sẵn sàng nhận ca' : 'Đang tạm dừng nhận việc'}
+                  </Text>
+                </View>
 
-        <Text style={styles.sectionTitle}>Công việc của tôi</Text>
-        <View style={styles.quickGrid}>
-          <Pressable style={styles.quickItem}><IconSymbol name="calendar" size={23} color="#2563EB" /><Text style={styles.quickTitle}>Lịch làm việc</Text><Text style={styles.quickSubtitle}>2 ca sắp tới</Text></Pressable>
-          <Pressable style={styles.quickItem}><IconSymbol name="wallet" size={23} color="#D97706" /><Text style={styles.quickTitle}>Thu nhập</Text><Text style={styles.quickSubtitle}>Thưởng & đối soát</Text></Pressable>
-          <Pressable style={styles.quickItem}><IconSymbol name="location" size={23} color="#7C3AED" /><Text style={styles.quickTitle}>Khu vực hoạt động</Text><Text style={styles.quickSubtitle}>3 khu vực đã chọn</Text></Pressable>
-          <Pressable style={styles.quickItem} onPress={() => { logout(); router.replace('/auth/login'); }}><IconSymbol name="user" size={23} color="#475569" /><Text style={styles.quickTitle}>Tài khoản</Text><Text style={styles.quickSubtitle}>Thông tin cá nhân</Text></Pressable>
-        </View>
+                <View style={styles.switchWrapper}>
+                  <Switch
+                    value={isOnline}
+                    onValueChange={handleToggleOnline}
+                    trackColor={{ false: '#64748B', true: '#10B981' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              </View>
 
-        <View style={styles.policyNote}><IconSymbol name="shield" size={18} color="#0369A1" /><Text style={styles.policyText}>Thông tin liên hệ khách hàng chỉ được mở trong chat của ca đã xác nhận.</Text></View>
-      </ScrollView>
-    </SafeAreaView>
-  </LinearGradient>;
+              <Text style={styles.statusTitle}>
+                {isOnline
+                  ? 'Bán kính quét việc: 10 km quanh Bình Thạnh'
+                  : 'Bật trực tuyến để tiếp tục nhận ca làm việc mới'}
+              </Text>
+
+              <View style={styles.statusFooter}>
+                <Text style={styles.statusMeta}>
+                  {isOnline ? 'Khu vực: Bình Thạnh · Q.1 · Q.2 · Q.3' : 'Chế độ nghỉ ngơi'}
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/staff/availability')}
+                  style={styles.editAreaBtn}
+                >
+                  <Text style={styles.editAreaText}>Đăng ký lịch làm</Text>
+                  <Text style={styles.editAreaArrow}>›</Text>
+                </Pressable>
+              </View>
+            </LinearGradient>
+
+            {/* Active / Current Urgent Shift Banner */}
+            {activeJob && (
+              <View style={styles.activeJobContainer}>
+                <View style={styles.activeJobHeader}>
+                  <View style={styles.urgentBadge}>
+                    <Text style={styles.urgentDot}>●</Text>
+                    <Text style={styles.urgentText}>
+                      {activeJob.status === 'IN_PROGRESS'
+                        ? 'CA ĐANG LÀM VIỆC'
+                        : activeJob.status === 'EN_ROUTE'
+                        ? 'ĐANG DI CHUYỂN'
+                        : 'CA TIẾP THEO'}
+                    </Text>
+                  </View>
+                  <Text style={styles.activeJobCode}>{activeJob.bookingCode}</Text>
+                </View>
+
+                <View style={styles.activeJobBody}>
+                  <View style={styles.activeJobInfo}>
+                    <Text style={styles.activeJobService}>{activeJob.serviceName}</Text>
+                    <Text style={styles.activeJobTime}>⏱️ {activeJob.timeSlot}</Text>
+                    <Text style={styles.activeJobAddress} numberOfLines={1}>
+                      📍 {activeJob.address}
+                    </Text>
+                    <Text style={styles.activeJobCustomer}>
+                      👤 Khách: <Text style={styles.boldText}>{activeJob.customerName}</Text> •{' '}
+                      {activeJob.distanceKm} km
+                    </Text>
+                  </View>
+
+                  <View style={styles.activeJobActionColumn}>
+                    <Text style={styles.activeJobIncome}>
+                      +{activeJob.netIncome.toLocaleString('vi-VN')}đ
+                    </Text>
+                    <Pressable
+                      style={styles.activeJobBtn}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/staff/job-detail',
+                          params: { id: activeJob.id },
+                        })
+                      }
+                    >
+                      <Text style={styles.activeJobBtnText}>Vào chi tiết</Text>
+                      <Text style={styles.activeJobBtnArrow}>→</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Quick Metrics */}
+            <View style={styles.metricsRow}>
+              <Pressable
+                style={styles.metricCard}
+                onPress={() => router.push('/staff/wallet')}
+              >
+                <Text style={styles.metricLabel}>Số dư khả dụng</Text>
+                <Text style={styles.metricValue}>
+                  {(wallet.balance.available / 1000000).toFixed(2)}tr
+                </Text>
+                <Text style={styles.metricSub}>Rút tiền ngay ›</Text>
+              </Pressable>
+
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>Đánh giá đối tác</Text>
+                <View style={styles.ratingRow}>
+                  <Text style={styles.metricValue}>4.92</Text>
+                  <Text style={styles.metricStar}>★</Text>
+                </View>
+                <Text style={styles.metricSub}>248 lượt khen ngợi</Text>
+              </View>
+
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>Tỷ lệ hoàn thành</Text>
+                <Text style={styles.metricValue}>99%</Text>
+                <Text style={styles.metricSub}>312 ca thành công</Text>
+              </View>
+            </View>
+
+            {/* Available Shifts Section */}
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>Việc mới quanh bạn</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Dựa trên kỹ năng và khu vực bạn đã đăng ký
+                </Text>
+              </View>
+              <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open' } })}>
+                <Text style={styles.seeAllText}>Xem tất cả ({openShifts.length}) ›</Text>
+              </Pressable>
+            </View>
+
+            {openShifts.length === 0 ? (
+              <View style={styles.emptyOpenShifts}>
+                <Text style={styles.emptyOpenShiftsTitle}>Hiện không có ca trống quanh khu vực</Text>
+                <Text style={styles.emptyOpenShiftsSub}>
+                  Bạn có thể mở rộng bán kính hoạt động trong cài đặt để nhận thêm nhiều việc.
+                </Text>
+              </View>
+            ) : (
+              openShifts.slice(0, 3).map((shift) => (
+                <View key={shift.id} style={styles.shiftCard}>
+                  <View style={styles.shiftHeader}>
+                    <View style={styles.shiftBadge}>
+                      <IconSymbol name={shift.serviceIcon || 'clean'} size={16} color="#047857" />
+                      <Text style={styles.shiftServiceTitle}>{shift.serviceName}</Text>
+                    </View>
+                    <Text style={styles.shiftIncome}>
+                      +{shift.netIncome.toLocaleString('vi-VN')}đ
+                    </Text>
+                  </View>
+
+                  <Text style={styles.shiftPackage}>{shift.packageTitle}</Text>
+
+                  <View style={styles.shiftMetaList}>
+                    <View style={styles.shiftMetaItem}>
+                      <Text style={styles.shiftMetaText}>⏱️ {shift.date} • {shift.timeSlot}</Text>
+                    </View>
+                    <View style={styles.shiftMetaItem}>
+                      <Text style={styles.shiftMetaText} numberOfLines={1}>
+                        📍 {shift.address} ({shift.district})
+                      </Text>
+                    </View>
+                    <View style={styles.shiftMetaItem}>
+                      <Text style={styles.shiftDistanceText}>🚶 Cách bạn {shift.distanceKm} km</Text>
+                    </View>
+                  </View>
+
+                  {shift.notes ? (
+                    <View style={styles.shiftNoteBox}>
+                      <Text style={styles.shiftNoteText} numberOfLines={2}>
+                        💬 Ghi chú: {shift.notes}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.shiftActionRow}>
+                    <Pressable
+                      style={styles.detailBtn}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/staff/job-detail',
+                          params: { id: shift.id },
+                        })
+                      }
+                    >
+                      <Text style={styles.detailBtnText}>Chi tiết</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.claimBtn}
+                      onPress={() => handleClaimShift(shift)}
+                    >
+                      <Text style={styles.claimBtnText}>Nhận ca ngay</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* Safety & Support Banner */}
+            <View style={styles.supportCard}>
+              <IconSymbol name="shield" size={20} color="#0369A1" />
+              <View style={styles.supportContent}>
+                <Text style={styles.supportTitle}>Tổng đài hỗ trợ đối tác 24/7</Text>
+                <Text style={styles.supportText}>
+                  Nếu gặp sự cố tại điểm làm việc, vui lòng gọi ngay hotline 1900 6868 để được trợ giúp khẩn cấp.
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+
+      {/* Persistent Staff Bottom Nav */}
+      <StaffBottomNav activeTab="home" />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 }, safeArea: { flex: 1 }, content: { padding: Spacing.four, paddingBottom: 34, gap: 14 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }, greeting: { color: BrandColors.gray900, fontSize: 23, fontWeight: '900' }, subGreeting: { color: BrandColors.gray600, fontSize: 12, marginTop: 3 }, notification: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' }, notificationDot: { position: 'absolute', right: 9, top: 8, width: 7, height: 7, borderRadius: 4, backgroundColor: '#EF4444' },
-  availabilityCard: { borderRadius: 20, padding: 17, shadowColor: '#047857', shadowOpacity: 0.22, shadowRadius: 12, elevation: 4 }, availabilityHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }, onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#A7F3D0' }, onlineText: { color: '#ECFDF5', fontSize: 12, fontWeight: '800' }, verified: { color: '#D1FAE5', fontSize: 11, fontWeight: '700' }, availabilityTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 17 }, availabilityMeta: { color: '#D1FAE5', fontSize: 12, marginTop: 5 }, manageAvailability: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.22)' }, manageAvailabilityText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' }, manageAvailabilityArrow: { color: '#FFFFFF', fontSize: 24, lineHeight: 25 },
-  metrics: { flexDirection: 'row', gap: 11 }, metricCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 15, padding: 13, borderWidth: 1, borderColor: '#E2E8F0' }, metricLabel: { color: BrandColors.gray500, fontSize: 11, fontWeight: '700' }, metricValue: { color: BrandColors.gray900, fontSize: 21, fontWeight: '900', marginTop: 6 }, metricTrend: { color: '#059669', fontSize: 10, marginTop: 5, fontWeight: '700' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 5 }, sectionTitle: { color: BrandColors.gray900, fontSize: 17, fontWeight: '900' }, sectionSubtitle: { color: BrandColors.gray500, fontSize: 11, marginTop: 3 }, countPill: { color: '#047857', backgroundColor: '#D1FAE5', paddingVertical: 5, paddingHorizontal: 8, borderRadius: 8, fontSize: 10, fontWeight: '800' },
-  shiftCard: { backgroundColor: '#FFFFFF', borderRadius: 17, padding: 14, borderWidth: 1, borderColor: '#DDEBE6' }, shiftTop: { flexDirection: 'row', alignItems: 'center', gap: 9 }, serviceIcon: { width: 39, height: 39, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' }, shiftTitleWrap: { flex: 1 }, shiftService: { color: BrandColors.gray900, fontSize: 14, fontWeight: '900' }, shiftTime: { color: BrandColors.gray600, fontSize: 11, marginTop: 3 }, shiftIncome: { color: '#047857', fontSize: 14, fontWeight: '900' }, shiftDetails: { gap: 4, marginTop: 12 }, shiftDetail: { color: BrandColors.gray600, fontSize: 11 }, acceptButton: { marginTop: 13, minHeight: 39, borderRadius: 10, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center' }, acceptButtonText: { color: '#047857', fontSize: 12, fontWeight: '900' }, acceptedButton: { backgroundColor: '#F1F5F9' }, acceptedButtonText: { color: '#64748B' },
-  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, quickItem: { width: '48.5%', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 15, padding: 13, minHeight: 104 }, quickTitle: { color: BrandColors.gray800, fontSize: 12, fontWeight: '900', marginTop: 10 }, quickSubtitle: { color: BrandColors.gray500, fontSize: 10, marginTop: 4 }, policyNote: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12, backgroundColor: '#F0F9FF', alignItems: 'flex-start' }, policyText: { flex: 1, color: '#075985', fontSize: 11, lineHeight: 16 },
+  screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  gradient: { flex: 1 },
+  safeArea: { flex: 1 },
+  content: { padding: Spacing.four, paddingBottom: 24, gap: 14 },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+  },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: '#10B981' },
+  nameBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  greeting: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900' },
+  verifiedBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  verifiedText: { color: '#047857', fontSize: 10, fontWeight: '800' },
+  subGreeting: { color: BrandColors.gray500, fontSize: 12, marginTop: 2 },
+  notificationBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  notificationDot: {
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+
+  statusBanner: {
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#047857',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  statusTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusText: { color: '#ECFDF5', fontSize: 14, fontWeight: '800' },
+  switchWrapper: { transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] },
+  statusTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', marginTop: 12 },
+  statusFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  statusMeta: { color: '#D1FAE5', fontSize: 12 },
+  editAreaBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editAreaText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  editAreaArrow: { color: '#FFFFFF', fontSize: 18, lineHeight: 18 },
+
+  activeJobContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    shadowColor: '#059669',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  activeJobHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 8,
+  },
+  urgentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  urgentDot: { color: '#EF4444', fontSize: 10 },
+  urgentText: { color: '#DC2626', fontSize: 11, fontWeight: '900' },
+  activeJobCode: { color: BrandColors.gray500, fontSize: 12, fontWeight: '700' },
+  activeJobBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  activeJobInfo: { flex: 1, gap: 4 },
+  activeJobService: { color: BrandColors.gray900, fontSize: 15, fontWeight: '900' },
+  activeJobTime: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  activeJobAddress: { color: BrandColors.gray600, fontSize: 12 },
+  activeJobCustomer: { color: BrandColors.gray500, fontSize: 11 },
+  boldText: { fontWeight: '700', color: BrandColors.gray800 },
+  activeJobActionColumn: { alignItems: 'flex-end', gap: 6 },
+  activeJobIncome: { color: '#047857', fontSize: 15, fontWeight: '900' },
+  activeJobBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#047857',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    gap: 4,
+  },
+  activeJobBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  activeJobBtnArrow: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+
+  metricsRow: { flexDirection: 'row', gap: 8 },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  metricLabel: { color: BrandColors.gray500, fontSize: 10, fontWeight: '700' },
+  metricValue: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900', marginTop: 4 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metricStar: { color: '#F59E0B', fontSize: 16, fontWeight: '900' },
+  metricSub: { color: '#059669', fontSize: 10, fontWeight: '700', marginTop: 4 },
+
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  sectionTitle: { color: BrandColors.gray900, fontSize: 16, fontWeight: '900' },
+  sectionSubtitle: { color: BrandColors.gray500, fontSize: 11, marginTop: 2 },
+  seeAllText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+
+  emptyOpenShifts: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyOpenShiftsTitle: { color: BrandColors.gray700, fontSize: 13, fontWeight: '800' },
+  emptyOpenShiftsSub: {
+    color: BrandColors.gray500,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  shiftCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  shiftHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  shiftBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  shiftServiceTitle: { color: '#047857', fontSize: 13, fontWeight: '900' },
+  shiftIncome: { color: '#047857', fontSize: 16, fontWeight: '900' },
+  shiftPackage: { color: BrandColors.gray900, fontSize: 14, fontWeight: '800' },
+  shiftMetaList: { gap: 3 },
+  shiftMetaItem: { flexDirection: 'row', alignItems: 'center' },
+  shiftMetaText: { color: BrandColors.gray600, fontSize: 12 },
+  shiftDistanceText: { color: '#2563EB', fontSize: 11, fontWeight: '700' },
+  shiftNoteBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#059669',
+  },
+  shiftNoteText: { color: BrandColors.gray600, fontSize: 11, fontStyle: 'italic' },
+  shiftActionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  detailBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailBtnText: { color: BrandColors.gray700, fontSize: 12, fontWeight: '800' },
+  claimBtn: {
+    flex: 2,
+    backgroundColor: '#047857',
+    borderRadius: 10,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  claimBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+
+  supportCard: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F0F9FF',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  supportContent: { flex: 1 },
+  supportTitle: { color: '#0369A1', fontSize: 12, fontWeight: '900' },
+  supportText: { color: '#0C4A6E', fontSize: 11, lineHeight: 16, marginTop: 2 },
 });
