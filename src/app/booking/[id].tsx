@@ -7,747 +7,713 @@ import {
   Pressable,
   Image,
   Alert,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
-import { Header } from '@/components/common/Header';
-import { Badge, formatVND } from '@/components/common/Badge';
-import { RatingStars } from '@/components/common/RatingStars';
-import { VerticalTimeline, TimelineStep } from '@/components/common/StepIndicator';
 import { IconSymbol } from '@/components/common/IconSymbol';
-import { useAuth } from '@/context/AuthContext';
-import { mockBookings } from '@/data/bookings';
-import { getServiceById, getStaffById } from '@/data';
+import { BookingStatusBadge } from '@/components/common/BookingStatusBadge';
+import { RatingStars } from '@/components/common/RatingStars';
+import { PriceSummary } from '@/components/common/PriceSummary';
+import { formatVND } from '@/components/common/Badge';
+import {
+  getBookingById,
+  getServiceById,
+  getStaffById,
+  getCustomerById,
+  getAddressesByCustomerId,
+  getInvoiceByBookingId,
+  mockBookings,
+} from '@/data';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { currentRole } = useAuth();
-  const isStaff = currentRole === 'STAFF';
 
-  // Find booking or default
   const [booking, setBooking] = useState(
-    mockBookings.find((b) => b.id === id) || mockBookings[0]
+    getBookingById(id || 'bk-001') || mockBookings[0]
   );
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const service = getServiceById(booking.serviceId);
-  // Assigned staff lookup
-  const staff = getStaffById('staff-001');
+  const staff = booking.staffId ? getStaffById(booking.staffId) : getStaffById('staff-001');
+  const invoice = getInvoiceByBookingId(booking.id);
 
-  // Privacy: Check if communication is locked (Section 17: locked after completed/cancelled/absent)
-  const isCommunicationLocked = ['COMPLETED', 'CANCELLED', 'ABSENT'].includes(
+  const isCompleted = booking.status === 'COMPLETED';
+  const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
 
-  const handleSecureCall = () => {
-    if (isCommunicationLocked) {
-      Alert.alert(
-        'Đã kết thúc liên lạc',
-        'Cuộc gọi qua nền tảng đã khóa sau khi đơn hàng hoàn tất/đóng theo quy định bảo mật thông tin cá nhân.'
-      );
-      return;
-    }
+  const handleCallStaff = () => {
     Alert.alert(
-      'Cuộc gọi bảo mật HomeCare',
-      'Đang kết nối qua tổng đài thoại của nền tảng. Số điện thoại cá nhân và email của đôi bên được bảo mật tuyệt đối.',
-      [{ text: 'Đồng ý kết nối' }, { text: 'Hủy', style: 'cancel' }]
+      'Cuộc gọi thoại bảo mật',
+      'Đang kết nối qua tổng đài mã hóa của CleanMaster. Số điện thoại cá nhân của bạn được bảo mật tuyệt đối.',
+      [{ text: 'Đồng ý gọi' }, { text: 'Hủy', style: 'cancel' }]
     );
   };
 
-  const handleOpenChat = () => {
-    if (isCommunicationLocked) {
-      Alert.alert(
-        'Đã đóng kênh chat',
-        'Kênh chat trong ứng dụng đã khóa tự động sau khi kết thúc đơn để bảo vệ quyền riêng tư của hai bên.'
-      );
-      return;
-    }
-    router.push('/chat/conv-001');
-  };
-
-  // Staff action: Report absent (Section 16: waited 30 mins, earns 1h pay, no customer penalty)
-  const handleReportAbsent = () => {
+  const handleCancelBooking = () => {
     Alert.alert(
-      'Xác nhận khách vắng mặt',
-      'Bạn đã đến nơi và chờ khách đủ 30 phút mà không thể liên hệ? Hệ thống sẽ chuyển đơn sang trạng thái "Vắng mặt" và tính 1 giờ làm việc cho bạn.',
+      'Xác nhận hủy đơn',
+      'Đơn hàng hủy trước 12h sẽ được hoàn 100% tiền về phương thức ban đầu. Bạn có muốn tiếp tục?',
       [
-        { text: 'Hủy', style: 'cancel' },
+        { text: 'Giữ lại đơn', style: 'cancel' },
         {
-          text: 'Xác nhận vắng mặt',
+          text: 'Xác nhận hủy',
+          style: 'destructive',
           onPress: () => {
             setBooking({
               ...booking,
-              status: 'ABSENT',
-              notes: 'Nhân viên đã chờ 30 phút, không liên lạc được với khách hàng.',
+              status: 'CANCELLED',
+              cancellationReason: 'Khách hàng hủy đơn chủ động',
             });
-            Alert.alert('Thành công', 'Đã cập nhật trạng thái: Khách vắng mặt (Ghi nhận 1h công).');
+            Alert.alert('Đã hủy', 'Đơn hàng đã được chuyển sang trạng thái Đã hủy.');
           },
         },
       ]
     );
   };
-
-  // Staff action: Complete booking
-  const handleCompleteBooking = () => {
-    Alert.alert(
-      'Nghiệm thu hoàn thành',
-      'Bạn đã hoàn thành công việc và dọn dẹp sạch sẽ? Khách hàng sẽ thanh toán và đánh giá dịch vụ.',
-      [
-        { text: 'Chưa', style: 'cancel' },
-        {
-          text: 'Đã hoàn thành',
-          onPress: () => {
-            setBooking({
-              ...booking,
-              status: 'COMPLETED',
-              completedAt: new Date().toISOString(),
-            });
-            Alert.alert('Chúc mừng!', 'Đơn hàng đã hoàn thành. 80% thu nhập đã được cộng vào tài khoản.');
-          },
-        },
-      ]
-    );
-  };
-
-  // Timeline steps
-  const timelineSteps: TimelineStep[] = [
-    {
-      key: 'step-1',
-      title: 'Đã tạo đơn',
-      subtitle: booking.mode === 'MODE_A' ? 'Khách đã chỉ định nhân viên' : 'Đơn treo trên hệ thống',
-      timestamp: `${booking.startTime} ${booking.bookingDate}`,
-      isCompleted: true,
-      isActive: false,
-    },
-    {
-      key: 'step-2',
-      title: 'Xác nhận tiếp nhận',
-      subtitle: staff ? `Nhân viên ${staff.fullName} đã tiếp nhận` : 'Chờ nhân viên nhận đơn',
-      timestamp: `${booking.startTime} ${booking.bookingDate}`,
-      isCompleted: !['PENDING', 'MATCHING'].includes(booking.status),
-      isActive: ['ASSIGNED', 'ACCEPTED'].includes(booking.status),
-    },
-    {
-      key: 'step-3',
-      title: 'Thực hiện dịch vụ',
-      subtitle:
-        booking.status === 'ABSENT'
-          ? 'Khách vắng mặt (Đã chờ 30 phút)'
-          : 'Nhân viên đang tiến hành công việc',
-      timestamp: `${booking.startTime} ${booking.bookingDate}`,
-      isCompleted: ['COMPLETED', 'ABSENT'].includes(booking.status),
-      isActive: booking.status === 'IN_PROGRESS',
-    },
-    {
-      key: 'step-4',
-      title: 'Hoàn tất & Đóng đơn',
-      subtitle:
-        booking.status === 'ABSENT'
-          ? 'Đơn đóng: Khách vắng mặt (Tính 1h công)'
-          : booking.status === 'CANCELLED'
-          ? `Đã hủy bởi ${booking.cancelledBy || 'hệ thống'}`
-          : 'Dịch vụ đã hoàn tất và nghiệm thu',
-      timestamp: booking.completedAt
-        ? new Date(booking.completedAt).toLocaleTimeString('vi-VN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : booking.status === 'COMPLETED'
-        ? 'Hoàn thành'
-        : 'Đang xử lý',
-      isCompleted: ['COMPLETED', 'ABSENT', 'CANCELLED'].includes(booking.status),
-      isActive: false,
-    },
-  ];
-
-  const getStatusBadge = () => {
-    switch (booking.status) {
-      case 'IN_PROGRESS':
-        return { label: 'Đang thực hiện', variant: 'primary' as const, bg: '#ECFDF5' };
-      case 'COMPLETED':
-        return { label: 'Đã hoàn thành', variant: 'success' as const, bg: '#F0FDF4' };
-      case 'ACCEPTED':
-      case 'ASSIGNED':
-        return { label: 'Đã xác nhận', variant: 'info' as const, bg: '#EFF6FF' };
-      case 'ABSENT':
-        return { label: 'Khách vắng mặt', variant: 'warning' as const, bg: '#FFFBEB' };
-      case 'CANCELLED':
-        return { label: 'Đã hủy đơn', variant: 'danger' as const, bg: '#FEF2F2' };
-      case 'PENDING':
-      case 'MATCHING':
-        return { label: 'Chờ nhận đơn', variant: 'neutral' as const, bg: '#F3F4F6' };
-      default:
-        return { label: booking.status, variant: 'neutral' as const, bg: '#F3F4F6' };
-    }
-  };
-
-  const statusBadge = getStatusBadge();
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header title="Chi tiết đơn dịch vụ" onBack={() => router.back()} />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Top Header */}
+      <View style={styles.header}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+          <IconSymbol name="back" size={20} color={BrandColors.gray800} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
+        <Pressable
+          style={styles.invoiceBtn}
+          onPress={() => setShowInvoiceModal(true)}>
+          <Text style={styles.invoiceBtnText}>🧾 Hóa đơn</Text>
+        </Pressable>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
 
-        {/* Status Hero Banner */}
-        <View style={[styles.statusBanner, { backgroundColor: statusBadge.bg }]}>
-          <View style={styles.statusPulseDotRow}>
-            {booking.status === 'IN_PROGRESS' && <View style={styles.livePulseDot} />}
-            <Badge label={statusBadge.label} variant={statusBadge.variant} size="md" />
+        {/* Status Card & Code */}
+        <View style={styles.statusCard}>
+          <View style={styles.statusTopRow}>
+            <View>
+              <Text style={styles.bookingCodeText}>{booking.bookingCode}</Text>
+              <Text style={styles.bookingDateText}>
+                Đặt ngày: {new Date(booking.createdAt).toLocaleDateString('vi-VN')}
+              </Text>
+            </View>
+            <BookingStatusBadge status={booking.status} />
           </View>
-          <Text style={styles.statusBannerTitle}>
-            {booking.status === 'IN_PROGRESS' && 'Dịch vụ đang diễn ra'}
-            {booking.status === 'COMPLETED' && 'Đơn hàng hoàn tất'}
-            {booking.status === 'ABSENT' && 'Đơn kết thúc: Khách vắng mặt'}
-            {booking.status === 'CANCELLED' && 'Đơn hàng đã bị hủy'}
-            {['PENDING', 'MATCHING'].includes(booking.status) && 'Đang điều phối nhân viên'}
-            {['ASSIGNED', 'ACCEPTED'].includes(booking.status) && 'Nhân viên đã tiếp nhận'}
-          </Text>
-          <Text style={styles.statusBannerSubtitle}>
-            {booking.status === 'ABSENT'
-              ? 'Nhân viên đã đến và chờ 30 phút. Ghi nhận 1 giờ công cho nhân viên. Không phạt khách hàng.'
-              : booking.status === 'CANCELLED'
-              ? `Người hủy: ${booking.cancelledBy || 'Hệ thống'} • Lý do: ${booking.cancellationReason || 'Không có'}`
-              : `Mã đơn: ${booking.bookingCode} • Đóng băng giá dịch vụ`}
-          </Text>
+
+          {booking.status === 'MATCHING' && (
+            <View style={styles.matchingNotice}>
+              <Text style={styles.matchingNoticeText}>
+                ⚡ Đang tìm nhân viên phù hợp gần bạn trong bán kính 5km...
+              </Text>
+            </View>
+          )}
+
+          {booking.status === 'CANCELLED' && booking.cancellationReason && (
+            <View style={styles.cancelNotice}>
+              <Text style={styles.cancelNoticeText}>
+                Lý do hủy: {booking.cancellationReason}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Privacy Notice Bar */}
-        <View style={styles.privacyNoticeBar}>
-          <IconSymbol name="shield" size={14} color={BrandColors.primary} />
-          <Text style={styles.privacyNoticeText}>
-            {isCommunicationLocked
-              ? '🔒 Tính năng gọi thoại và nhắn tin đã khóa sau khi kết thúc đơn để bảo vệ thông tin riêng tư.'
-              : '🛡️ Mọi liên lạc thực hiện qua hệ thống. Tuyệt đối không giao dịch ngoài nền tảng.'}
-          </Text>
+        {/* Service Info Block */}
+        <View style={styles.sectionBox}>
+          <Text style={styles.sectionHeading}>Dịch vụ đã đặt</Text>
+          <View style={styles.serviceRow}>
+            <Image source={{ uri: service?.image }} style={styles.serviceThumb} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.serviceName}>{service?.name}</Text>
+              <Text style={styles.packageLabel}>
+                {booking.mode === 'MODE_A' ? 'Tự chọn thợ' : 'Hệ thống điều phối'} • {booking.requiredStaffCount} thợ
+              </Text>
+              <Text style={styles.scheduleText}>
+                🕒 {booking.bookingDate} • {booking.startTime} - {booking.endTime}
+              </Text>
+            </View>
+          </View>
+
+          {/* Add-ons list */}
+          {booking.addOns && booking.addOns.length > 0 && (
+            <View style={styles.addonSection}>
+              <Text style={styles.subHeading}>Dịch vụ bổ sung kèm theo:</Text>
+              {booking.addOns.map((add, idx) => (
+                <View key={idx} style={styles.addonLine}>
+                  <Text style={styles.addonName}>+ {add.addOnName} (x{add.quantity})</Text>
+                  <Text style={styles.addonPrice}>{formatVND(add.price * add.quantity)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Assigned Staff Info Card */}
-        {staff && (
-          <View style={styles.cardSection}>
-            <Text style={styles.cardSectionTitle}>Nhân viên phụ trách</Text>
+        {/* Staff Card (If assigned) */}
+        {staff && booking.status !== 'MATCHING' && booking.status !== 'NO_STAFF_FOUND' && (
+          <View style={styles.sectionBox}>
+            <Text style={styles.sectionHeading}>Nhân viên phụ trách</Text>
             <View style={styles.staffRow}>
               <Image source={{ uri: staff.avatar }} style={styles.staffAvatar} />
-              <View style={styles.staffDetails}>
-                <Text style={styles.staffFullName}>{staff.fullName}</Text>
-                <Text style={styles.staffRoleText}>
-                  Đối tác tự do • {staff.experienceYears} năm kinh nghiệm
-                </Text>
-                <RatingStars
-                  rating={staff.rating}
-                  reviewCount={staff.reviewCount}
-                  size={12}
-                />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.staffName}>{staff.fullName}</Text>
+                <RatingStars rating={staff.rating} size={12} reviewCount={staff.reviewCount} />
+                <Text style={styles.staffExp}>{staff.experienceYears} năm kinh nghiệm • Đã xác minh</Text>
               </View>
+            </View>
 
-              {/* Call & Chat Action Buttons (Masked / In-platform) */}
-              <View style={styles.staffActions}>
-                <Pressable
-                  style={[
-                    styles.actionCircleBtn,
-                    isCommunicationLocked && styles.actionCircleBtnDisabled,
-                  ]}
-                  onPress={handleSecureCall}>
-                  <IconSymbol
-                    name="phone"
-                    size={16}
-                    color={isCommunicationLocked ? BrandColors.gray400 : BrandColors.primary}
-                  />
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.actionCircleBtn,
-                    styles.chatCircleBtn,
-                    isCommunicationLocked && styles.chatCircleBtnDisabled,
-                  ]}
-                  onPress={handleOpenChat}>
-                  <IconSymbol
-                    name="chat"
-                    size={16}
-                    color={isCommunicationLocked ? BrandColors.gray400 : BrandColors.white}
-                  />
-                </Pressable>
-              </View>
+            <View style={styles.staffContactRow}>
+              <Pressable style={styles.contactBtn} onPress={handleCallStaff}>
+                <Text style={styles.contactBtnText}>📞 Gọi bảo mật</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.contactBtn, styles.contactBtnPrimary]}
+                onPress={() => router.push('/chat/conv-001')}>
+                <Text style={styles.contactBtnTextPrimary}>💬 Nhắn tin</Text>
+              </Pressable>
             </View>
           </View>
         )}
 
-        {/* Timeline Stepper */}
-        <View style={styles.cardSection}>
-          <Text style={styles.cardSectionTitle}>Tiến trình đơn hàng</Text>
-          <VerticalTimeline steps={timelineSteps} />
-        </View>
-
-        {/* Booking Details Card */}
-        <View style={styles.cardSection}>
-          <Text style={styles.cardSectionTitle}>Thông tin đặt dịch vụ</Text>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Mã đơn hàng</Text>
-            <Text style={styles.detailValueBold}>{booking.bookingCode}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Dịch vụ chính</Text>
-            <Text style={styles.detailValue}>{service?.name || 'Vệ sinh gia đình'}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Khung giờ</Text>
-            <Text style={styles.detailValue}>
-              {booking.startTime} – {booking.endTime} (Trước 20:00)
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Ngày thực hiện</Text>
-            <Text style={styles.detailValue}>{booking.bookingDate}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Hình thức</Text>
-            <Text style={styles.detailValue}>
-              {booking.mode === 'MODE_A'
-                ? 'Mode A: Khách chỉ định nhân viên'
-                : 'Mode B: Hệ thống treo đơn tự nhận'}
-            </Text>
-          </View>
-
-          {booking.notes ? (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Ghi chú</Text>
-              <Text style={styles.detailValue}>{booking.notes}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Financial Breakdown Card (Section 19: 80% Staff, 20% Platform) */}
-        <View style={styles.cardSection}>
-          <Text style={styles.cardSectionTitle}>Thanh toán & Phí dịch vụ</Text>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Giá gói chính</Text>
-            <Text style={styles.detailValue}>{formatVND(booking.packagePrice)}</Text>
-          </View>
-
-          {booking.addOnsTotal > 0 && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Dịch vụ phụ trợ (Add-on)</Text>
-              <Text style={styles.detailValue}>+{formatVND(booking.addOnsTotal)}</Text>
-            </View>
-          )}
-
-          {booking.discountAmount > 0 && (
-            <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: BrandColors.primary }]}>
-                Khuyến mãi ({booking.promotionCode})
-              </Text>
-              <Text style={[styles.detailValue, { color: BrandColors.primary }]}>
-                -{formatVND(booking.discountAmount)}
-              </Text>
-            </View>
-          )}
-
-          <View style={[styles.detailRow, styles.totalDetailRow]}>
-            <Text style={styles.totalDetailLabel}>Tổng thanh toán khách trả</Text>
-            <Text style={styles.totalDetailValue}>{formatVND(booking.totalAmount)}</Text>
-          </View>
-
-          {isStaff && (
-            <View style={styles.staffIncomeBreakdown}>
-              <Text style={styles.staffIncomeTitle}>Chi tiết thu nhập nhân viên (Quy định Section 19):</Text>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Nhân viên nhận (80%):</Text>
-                <Text style={styles.staffIncomeHighlight}>
-                  {formatVND(booking.totalAmount * 0.8)}
-                </Text>
+        {/* Timeline Progress */}
+        <View style={styles.sectionBox}>
+          <Text style={styles.sectionHeading}>Tiến trình đơn hàng</Text>
+          <View style={styles.timelineList}>
+            <View style={styles.timelineStep}>
+              <View style={styles.timelineDotActive} />
+              <View style={styles.timelineCol}>
+                <Text style={styles.timelineStepTitle}>Đã tạo đơn thành công</Text>
+                <Text style={styles.timelineStepTime}>Hệ thống ghi nhận đơn và lưu mã đặt lịch</Text>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Phí nền tảng (20%):</Text>
-                <Text style={styles.detailValue}>
-                  {formatVND(booking.totalAmount * 0.2)}
-                </Text>
-              </View>
-              <Text style={styles.tipNote}>
-                💡 100% tiền Tip (nếu có) thuộc về nhân viên và không tính vào 20% phí nền tảng.
-              </Text>
             </View>
-          )}
+
+            <View style={styles.timelineStep}>
+              <View
+                style={[
+                  styles.timelineDot,
+                  ['CONFIRMED', 'STAFF_ASSIGNED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.status) &&
+                    styles.timelineDotActive,
+                ]}
+              />
+              <View style={styles.timelineCol}>
+                <Text style={styles.timelineStepTitle}>Điều phối & Phân công thợ</Text>
+                <Text style={styles.timelineStepTime}>Thợ nhận việc và chuẩn bị di chuyển</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineStep}>
+              <View
+                style={[
+                  styles.timelineDot,
+                  ['IN_PROGRESS', 'COMPLETED'].includes(booking.status) && styles.timelineDotActive,
+                ]}
+              />
+              <View style={styles.timelineCol}>
+                <Text style={styles.timelineStepTitle}>Thực hiện dịch vụ</Text>
+                <Text style={styles.timelineStepTime}>Nhân viên làm việc theo quy trình 5 sao</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineStep}>
+              <View
+                style={[
+                  styles.timelineDot,
+                  booking.status === 'COMPLETED' && styles.timelineDotActive,
+                ]}
+              />
+              <View style={styles.timelineCol}>
+                <Text style={styles.timelineStepTitle}>Nghiệm thu & Hoàn tất</Text>
+                <Text style={styles.timelineStepTime}>Bàn giao sạch sẽ, thanh toán và đánh giá</Text>
+              </View>
+            </View>
+          </View>
         </View>
+
+        {/* Price & Payment Summary */}
+        <PriceSummary
+          packagePrice={booking.packagePrice}
+          addOns={booking.addOns?.map((a) => ({
+            name: a.addOnName,
+            price: a.price,
+            quantity: a.quantity,
+          }))}
+          staffCount={booking.requiredStaffCount}
+          discountAmount={booking.discountAmount}
+          voucherCode={booking.promotionCode}
+          totalAmount={booking.totalAmount}
+        />
+
+        {/* Action Buttons */}
+        <View style={styles.bottomActions}>
+          {isCompleted && (
+            <Pressable
+              style={styles.rateBtn}
+              onPress={() =>
+                router.push({
+                  pathname: '/booking/review',
+                  params: { bookingId: booking.id },
+                })
+              }>
+              <Text style={styles.rateBtnText}>⭐ Đánh giá nhân viên</Text>
+            </Pressable>
+          )}
+
+          {canCancel && (
+            <Pressable style={styles.cancelBtn} onPress={handleCancelBooking}>
+              <Text style={styles.cancelBtnText}>Hủy đơn dịch vụ</Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            style={styles.rebookBtn}
+            onPress={() =>
+              router.push({
+                pathname: '/booking/new',
+                params: {
+                  rebook: 'true',
+                  serviceId: booking.serviceId,
+                  packageId: booking.packageId,
+                  staffId: booking.staffId,
+                  addressId: booking.addressId,
+                  mode: booking.staffId ? 'MODE_A' : 'MODE_B',
+                },
+              })
+            }>
+            <Text style={styles.rebookBtnText}>
+              {booking.staffId && staff ? `🔄 Đặt lại với ${staff.fullName}` : '🔄 Đặt lại dịch vụ này'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Action Footer Bar */}
-      <View style={styles.footerBar}>
-        {/* Customer Actions */}
-        {!isStaff && (
-          <>
+      {/* VAT / PAYMENT INVOICE MODAL */}
+      <Modal
+        visible={showInvoiceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInvoiceModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.invoiceModalBox}>
+            <View style={styles.invoiceModalHeader}>
+              <Text style={styles.invoiceModalTitle}>Hóa đơn dịch vụ điện tử</Text>
+              <Pressable onPress={() => setShowInvoiceModal(false)}>
+                <IconSymbol name="close" size={20} color={BrandColors.gray800} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              <Text style={styles.invCode}>Số hóa đơn: {invoice?.invoiceNumber || `HD-2026-${booking.id}`}</Text>
+              <Text style={styles.invDate}>Ngày lập: {new Date().toLocaleDateString('vi-VN')}</Text>
+
+              <View style={styles.invDivider} />
+
+              <Text style={styles.invCompany}>ĐƠN VỊ CUNG CẤP: HOMECARE PLATFORM</Text>
+              <Text style={styles.invSub}>Mã số thuế: 0312345678</Text>
+              <Text style={styles.invSub}>Dịch vụ: {service?.name}</Text>
+
+              <View style={styles.invDivider} />
+
+              <View style={styles.invRow}>
+                <Text style={styles.invItem}>Giá dịch vụ</Text>
+                <Text style={styles.invVal}>{formatVND(booking.packagePrice)}</Text>
+              </View>
+              {booking.addOnsTotal > 0 && (
+                <View style={styles.invRow}>
+                  <Text style={styles.invItem}>Dịch vụ thêm</Text>
+                  <Text style={styles.invVal}>{formatVND(booking.addOnsTotal)}</Text>
+                </View>
+              )}
+              {booking.discountAmount > 0 && (
+                <View style={styles.invRow}>
+                  <Text style={[styles.invItem, { color: '#059669' }]}>Chiết khấu khuyến mãi</Text>
+                  <Text style={[styles.invVal, { color: '#059669' }]}>-{formatVND(booking.discountAmount)}</Text>
+                </View>
+              )}
+
+              <View style={styles.invDivider} />
+
+              <View style={styles.invRow}>
+                <Text style={styles.invTotalLabel}>Tổng thanh toán:</Text>
+                <Text style={styles.invTotalVal}>{formatVND(booking.totalAmount)}</Text>
+              </View>
+              <Text style={styles.invPaidStatus}>Trạng thái: Đã thanh toán hợp lệ</Text>
+            </ScrollView>
+
             <Pressable
-              style={[
-                styles.contactBtn,
-                isCommunicationLocked && styles.contactBtnDisabled,
-              ]}
-              onPress={handleOpenChat}>
-              <IconSymbol
-                name="chat"
-                size={16}
-                color={isCommunicationLocked ? BrandColors.gray400 : BrandColors.gray800}
-              />
-              <Text
-                style={[
-                  styles.contactBtnText,
-                  isCommunicationLocked && styles.contactBtnTextDisabled,
-                ]}>
-                {isCommunicationLocked ? 'Đã khóa chat' : 'Nhắn tin'}
-              </Text>
+              style={styles.closeInvoiceBtn}
+              onPress={() => setShowInvoiceModal(false)}>
+              <Text style={styles.closeInvoiceText}>Đóng hóa đơn</Text>
             </Pressable>
-
-            {booking.status === 'COMPLETED' ? (
-              <Pressable
-                style={[styles.primaryActionBtn, styles.reviewBtn]}
-                onPress={() =>
-                  Alert.alert('Đánh giá nhân viên', 'Đánh giá 5★ và để lại nhận xét sau ca làm việc.')
-                }>
-                <Text style={styles.primaryActionBtnText}>Đánh giá dịch vụ</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                style={styles.primaryActionBtn}
-                onPress={handleSecureCall}>
-                <Text style={styles.primaryActionBtnText}>Gọi điện thoại</Text>
-              </Pressable>
-            )}
-          </>
-        )}
-
-        {/* Staff Actions */}
-        {isStaff && (
-          <View style={styles.staffActionFooter}>
-            {booking.status === 'IN_PROGRESS' && (
-              <>
-                <Pressable
-                  style={styles.absentBtn}
-                  onPress={handleReportAbsent}>
-                  <Text style={styles.absentBtnText}>Khách vắng mặt (30p)</Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.completeBtn}
-                  onPress={handleCompleteBooking}>
-                  <Text style={styles.completeBtnText}>Hoàn thành ca</Text>
-                </Pressable>
-              </>
-            )}
-
-            {booking.status === 'COMPLETED' && (
-              <View style={styles.doneNoticeBox}>
-                <Text style={styles.doneNoticeText}>✓ Ca làm việc đã hoàn tất thành công</Text>
-              </View>
-            )}
-
-            {booking.status === 'ABSENT' && (
-              <View style={styles.doneNoticeBox}>
-                <Text style={styles.doneNoticeText}>Đã đóng: Khách vắng mặt • Đã tính 1h công</Text>
-              </View>
-            )}
           </View>
-        )}
-      </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: BrandColors.white,
+    backgroundColor: '#F8FAFC',
   },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  statusBanner: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: BrandColors.gray100,
-  },
-  statusPulseDotRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  livePulseDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: BrandColors.primary,
-  },
-  statusBannerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: BrandColors.gray900,
-    marginTop: 4,
-  },
-  statusBannerSubtitle: {
-    fontSize: 12,
-    color: BrandColors.gray600,
-    marginTop: 2,
-    textAlign: 'center',
-    lineHeight: 16,
-    paddingHorizontal: Spacing.two,
-  },
-  privacyNoticeBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F0FDF4',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#DCFCE7',
+    borderBottomColor: '#E2E8F0',
   },
-  privacyNoticeText: {
-    flex: 1,
-    fontSize: 11,
-    color: BrandColors.primaryDark,
-    lineHeight: 15,
-  },
-
-  // Card Sections
-  cardSection: {
-    marginHorizontal: Spacing.three,
-    marginTop: Spacing.three,
-    backgroundColor: BrandColors.white,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.gray200,
-  },
-  cardSectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: BrandColors.gray900,
-    marginBottom: Spacing.two,
-  },
-
-  // Staff Row
-  staffRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  staffAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: Spacing.two,
-  },
-  staffDetails: {
-    flex: 1,
-  },
-  staffFullName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: BrandColors.gray900,
-  },
-  staffRoleText: {
-    fontSize: 11,
-    color: BrandColors.gray500,
-    marginTop: 1,
-    marginBottom: 2,
-  },
-  staffActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionCircleBtn: {
+  backBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BrandColors.primary,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: BrandColors.white,
   },
-  actionCircleBtnDisabled: {
-    borderColor: BrandColors.gray300,
-    backgroundColor: BrandColors.gray100,
-  },
-  chatCircleBtn: {
-    backgroundColor: BrandColors.primary,
-  },
-  chatCircleBtnDisabled: {
-    backgroundColor: BrandColors.gray200,
-    borderColor: BrandColors.gray200,
-  },
-
-  // Details Row
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: BrandColors.gray500,
-  },
-  detailValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.gray900,
-    maxWidth: '65%',
-    textAlign: 'right',
-  },
-  detailValueBold: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: BrandColors.primary,
-  },
-  totalDetailRow: {
-    borderTopWidth: 1,
-    borderTopColor: BrandColors.gray200,
-    paddingTop: 8,
-    marginTop: 4,
-  },
-  totalDetailLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: BrandColors.gray900,
-  },
-  totalDetailValue: {
+  headerTitle: {
     fontSize: 16,
     fontWeight: '800',
+    color: BrandColors.gray900,
+  },
+  invoiceBtn: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.md,
+  },
+  invoiceBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: BrandColors.primary,
   },
-
-  // Staff income breakdown
-  staffIncomeBreakdown: {
-    marginTop: Spacing.two,
-    paddingTop: Spacing.two,
-    borderTopWidth: 1,
-    borderTopColor: BrandColors.gray200,
-    backgroundColor: '#F8FAFC',
-    padding: Spacing.two,
-    borderRadius: BorderRadius.sm,
+  scrollContent: {
+    padding: Spacing.three,
+    gap: 12,
   },
-  staffIncomeTitle: {
+  statusCard: {
+    backgroundColor: '#FFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bookingCodeText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: BrandColors.gray900,
+  },
+  bookingDateText: {
     fontSize: 11,
+    color: BrandColors.gray400,
+    marginTop: 2,
+  },
+  matchingNotice: {
+    backgroundColor: '#EDE9FE',
+    padding: 10,
+    borderRadius: BorderRadius.md,
+    marginTop: 10,
+  },
+  matchingNoticeText: {
+    fontSize: 12,
+    color: '#7C3AED',
+    fontWeight: '600',
+  },
+  cancelNotice: {
+    backgroundColor: '#FEE2E2',
+    padding: 10,
+    borderRadius: BorderRadius.md,
+    marginTop: 10,
+  },
+  cancelNoticeText: {
+    fontSize: 12,
+    color: BrandColors.danger,
+    fontWeight: '600',
+  },
+  sectionBox: {
+    backgroundColor: '#FFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sectionHeading: {
+    fontSize: 14,
     fontWeight: '700',
+    color: BrandColors.gray900,
+    marginBottom: Spacing.two,
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  serviceThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: BorderRadius.md,
+  },
+  serviceName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BrandColors.gray900,
+  },
+  packageLabel: {
+    fontSize: 12,
+    color: BrandColors.gray500,
+    marginVertical: 2,
+  },
+  scheduleText: {
+    fontSize: 12,
+    color: BrandColors.primary,
+    fontWeight: '600',
+  },
+  addonSection: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  subHeading: {
+    fontSize: 12,
+    fontWeight: '600',
     color: BrandColors.gray700,
     marginBottom: 4,
   },
-  staffIncomeHighlight: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: BrandColors.primary,
+  addonLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
   },
-  tipNote: {
-    fontSize: 10,
-    color: BrandColors.gray500,
-    marginTop: 4,
-    fontStyle: 'italic',
+  addonName: {
+    fontSize: 12,
+    color: BrandColors.gray600,
   },
-
-  // Action Footer Bar
-  footerBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  addonPrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.gray800,
+  },
+  staffRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    backgroundColor: BrandColors.white,
+    gap: 12,
+  },
+  staffAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  staffName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BrandColors.gray900,
+    marginBottom: 2,
+  },
+  staffExp: {
+    fontSize: 11,
+    color: BrandColors.gray500,
+    marginTop: 2,
+  },
+  staffContactRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: BrandColors.gray200,
-    gap: Spacing.two,
+    borderTopColor: '#F1F5F9',
   },
   contactBtn: {
-    flexDirection: 'row',
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 8,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: BrandColors.gray300,
-    backgroundColor: BrandColors.white,
-  },
-  contactBtnDisabled: {
-    borderColor: BrandColors.gray200,
-    backgroundColor: BrandColors.gray100,
   },
   contactBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: BrandColors.gray700,
+  },
+  contactBtnPrimary: {
+    backgroundColor: '#ECFDF5',
+  },
+  contactBtnTextPrimary: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: BrandColors.primary,
+  },
+  timelineList: {
+    gap: 12,
+  },
+  timelineStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#CBD5E1',
+    marginTop: 4,
+  },
+  timelineDotActive: {
+    backgroundColor: BrandColors.primary,
+  },
+  timelineCol: {
+    flex: 1,
+  },
+  timelineStepTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: BrandColors.gray800,
   },
-  contactBtnTextDisabled: {
+  timelineStepTime: {
+    fontSize: 11,
     color: BrandColors.gray400,
+    marginTop: 2,
   },
-  primaryActionBtn: {
-    flex: 1,
+  bottomActions: {
+    gap: 10,
+    marginTop: 6,
+  },
+  rateBtn: {
+    backgroundColor: '#FEF3C7',
     paddingVertical: 12,
-    borderRadius: BorderRadius.md,
-    backgroundColor: BrandColors.primary,
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
   },
-  reviewBtn: {
-    backgroundColor: '#D97706',
-  },
-  primaryActionBtnText: {
+  rateBtnText: {
     fontSize: 14,
     fontWeight: '800',
-    color: BrandColors.white,
+    color: '#D97706',
   },
-
-  // Staff Footer Actions
-  staffActionFooter: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  absentBtn: {
-    flex: 1,
+  cancelBtn: {
+    backgroundColor: '#FEE2E2',
     paddingVertical: 12,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: BrandColors.warning,
-    backgroundColor: '#FFFBEB',
+    borderRadius: BorderRadius.xl,
     alignItems: 'center',
   },
-  absentBtnText: {
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: BrandColors.danger,
+  },
+  rebookBtn: {
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingVertical: 12,
+    borderRadius: BorderRadius.xl,
+    alignItems: 'center',
+  },
+  rebookBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#B45309',
+    color: BrandColors.gray700,
   },
-  completeBtn: {
+  modalOverlay: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: BorderRadius.md,
-    backgroundColor: BrandColors.primary,
-    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: Spacing.four,
   },
-  completeBtnText: {
-    fontSize: 13,
+  invoiceModalBox: {
+    backgroundColor: '#FFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.four,
+  },
+  invoiceModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.three,
+  },
+  invoiceModalTitle: {
+    fontSize: 16,
     fontWeight: '800',
-    color: BrandColors.white,
+    color: BrandColors.gray900,
   },
-  doneNoticeBox: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: BrandColors.gray100,
-    borderRadius: BorderRadius.md,
-  },
-  doneNoticeText: {
+  invCode: {
     fontSize: 12,
     fontWeight: '700',
+    color: BrandColors.gray800,
+  },
+  invDate: {
+    fontSize: 11,
+    color: BrandColors.gray500,
+    marginTop: 2,
+  },
+  invDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 10,
+  },
+  invCompany: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: BrandColors.gray900,
+  },
+  invSub: {
+    fontSize: 11,
     color: BrandColors.gray600,
+    marginTop: 2,
+  },
+  invRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  invItem: {
+    fontSize: 12,
+    color: BrandColors.gray700,
+  },
+  invVal: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.gray900,
+  },
+  invTotalLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: BrandColors.gray900,
+  },
+  invTotalVal: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: BrandColors.primary,
+  },
+  invPaidStatus: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  closeInvoiceBtn: {
+    backgroundColor: BrandColors.primary,
+    paddingVertical: 12,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    marginTop: Spacing.four,
+  },
+  closeInvoiceText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

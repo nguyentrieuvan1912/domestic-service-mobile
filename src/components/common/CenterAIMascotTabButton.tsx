@@ -175,7 +175,7 @@ export const CenterAIMascotTabButton: React.FC<CenterAIMascotTabButtonProps> = (
           onPressOut={handlePressOut}
           style={styles.touchable}
           accessibilityRole="button"
-          accessibilityLabel="Trợ lý AI HomeCare">
+          accessibilityLabel="Trợ lý AI CleanMaster">
           <Animated.View
             style={[
               styles.floatingMascotWrapper,

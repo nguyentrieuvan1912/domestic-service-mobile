@@ -1,412 +1,150 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  Pressable,
-  Image,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { BorderRadius, BrandColors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types/user';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+type LoginRole = 'CUSTOMER' | 'STAFF';
+
+const ROLE_CONTENT: Record<LoginRole, { title: string; description: string; demo: string; account: string; icon: string }> = {
+  CUSTOMER: { title: 'Khách hàng', description: 'Đặt dịch vụ, theo dõi đơn và quản lý ngôi nhà của bạn.', demo: 'Trải nghiệm tài khoản khách hàng mẫu', account: '0901234001', icon: '🏠' },
+  STAFF: { title: 'Nhân viên', description: 'Nhận ca phù hợp, quản lý lịch làm và theo dõi thu nhập.', demo: 'Trải nghiệm tài khoản nhân viên mẫu', account: '0912001001', icon: '🧹' },
+};
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login, quickLoginAsCustomer, quickLoginAsStaff } = useAuth();
-
-  const [selectedRole, setSelectedRole] = useState<UserRole>('CUSTOMER');
-  const [account, setAccount] = useState('0901234001'); // Default demo account
+  const [role, setRole] = useState<LoginRole>('CUSTOMER');
+  const [account, setAccount] = useState(ROLE_CONTENT.CUSTOMER.account);
   const [password, setPassword] = useState('123456');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const content = ROLE_CONTENT[role];
+
+  const selectRole = (nextRole: LoginRole) => {
+    setRole(nextRole);
+    setAccount(ROLE_CONTENT[nextRole].account);
+    setPassword('123456');
+    setErrorMessage('');
+  };
+
+  const goToRoleFlow = () => {
+    if (role === 'STAFF') router.replace('/staff' as never);
+    else router.replace('/(tabs)');
+  };
 
   const handleLogin = () => {
+    setErrorMessage('');
     if (!account.trim() || !password.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ số điện thoại/email và mật khẩu.');
+      setErrorMessage('Vui lòng nhập đầy đủ số điện thoại/email và mật khẩu.');
       return;
     }
-
-    const success = login(account, selectedRole);
-    if (success) {
-      router.replace('/(tabs)');
-    } else {
-      Alert.alert(
-        'Đăng nhập không thành công',
-        `Không tìm thấy tài khoản ${selectedRole === 'CUSTOMER' ? 'Khách hàng' : 'Nhân viên'} tương ứng. Vui lòng bấm vào nút đăng nhập nhanh bên dưới.`
-      );
-    }
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      if (login(account.trim(), role)) goToRoleFlow();
+      else setErrorMessage(`Tài khoản này không thuộc nhóm ${content.title.toLowerCase()}. Hãy chọn đúng vai trò hoặc dùng tài khoản mẫu.`);
+    }, 450);
   };
 
-  const handleDemoCustomer = () => {
-    quickLoginAsCustomer('cust-001');
-    router.replace('/(tabs)');
-  };
-
-  const handleDemoStaff = () => {
-    quickLoginAsStaff('staff-001');
-    Alert.alert(
-      'Đăng nhập Nhân viên',
-      'Đã đăng nhập tài khoản Nhân viên Nguyễn Văn An. Bạn có thể kiểm tra danh sách việc làm và thu nhập tại trang cá nhân.',
-      [{ text: 'Vào ứng dụng', onPress: () => router.replace('/(tabs)') }]
-    );
+  const handleDemo = () => {
+    if (role === 'STAFF') quickLoginAsStaff('staff-001');
+    else quickLoginAsCustomer('cust-001');
+    goToRoleFlow();
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}>
-          {/* Logo & Brand Header */}
-          <View style={styles.brandHeader}>
-            <View style={styles.logoCircle}>
-              <Text style={{ fontSize: 36 }}>🏡</Text>
+    <LinearGradient colors={['#ECFDF5', '#F8FAFC', '#FFFFFF']} style={styles.gradient}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+            <View style={styles.brandHeader}>
+              <View style={styles.logoCircle}><Text style={styles.logoText}>✦</Text></View>
+              <Text style={styles.brandName}>CleanMaster</Text>
+              <Text style={styles.brandSlogan}>Dịch vụ gia đình tin cậy, chuyên nghiệp</Text>
             </View>
-            <Text style={styles.brandName}>HomeCare</Text>
-            <Text style={styles.brandSlogan}>Sạch nhà, nhẹ lo</Text>
-          </View>
 
-          {/* Role Selection Segmented Bar */}
-          <View style={styles.roleSegment}>
-            <Pressable
-              style={[
-                styles.roleTab,
-                selectedRole === 'CUSTOMER' && styles.roleTabActive,
-              ]}
-              onPress={() => {
-                setSelectedRole('CUSTOMER');
-                setAccount('0901234001');
-              }}>
-              <Text
-                style={[
-                  styles.roleTabText,
-                  selectedRole === 'CUSTOMER' && styles.roleTabTextActive,
-                ]}>
-                Khách hàng
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.roleTab,
-                selectedRole === 'STAFF' && styles.roleTabActive,
-              ]}
-              onPress={() => {
-                setSelectedRole('STAFF');
-                setAccount('0912001001');
-              }}>
-              <Text
-                style={[
-                  styles.roleTabText,
-                  selectedRole === 'STAFF' && styles.roleTabTextActive,
-                ]}>
-                Nhân viên đối tác
-              </Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.welcomeText}>
-            Chào mừng {selectedRole === 'CUSTOMER' ? 'Khách hàng' : 'Đối tác'} trở lại!
-          </Text>
-          <Text style={styles.welcomeSub}>
-            {selectedRole === 'CUSTOMER'
-              ? 'Đăng nhập để đặt dịch vụ giúp việc nhanh chóng'
-              : 'Đăng nhập để nhận đơn và theo dõi thu nhập hàng ngày'}
-          </Text>
-
-          {/* Form Fields */}
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Số điện thoại hoặc Email</Text>
-            <View style={styles.inputBox}>
-              <IconSymbol name="user" size={16} color={BrandColors.gray400} />
-              <TextInput
-                value={account}
-                onChangeText={setAccount}
-                placeholder="Nhập số điện thoại hoặc email..."
-                placeholderTextColor={BrandColors.gray400}
-                style={styles.textInput}
-                autoCapitalize="none"
-              />
+            <View style={styles.roleSwitch}>
+              {(Object.keys(ROLE_CONTENT) as LoginRole[]).map((item) => {
+                const selected = role === item;
+                return <Pressable key={item} onPress={() => selectRole(item)} style={[styles.roleOption, selected && styles.roleOptionActive]}>
+                  <Text style={styles.roleEmoji}>{ROLE_CONTENT[item].icon}</Text>
+                  <View style={styles.roleCopy}>
+                    <Text style={[styles.roleTitle, selected && styles.roleTitleActive]}>{ROLE_CONTENT[item].title}</Text>
+                    <Text style={[styles.roleHint, selected && styles.roleHintActive]}>{item === 'CUSTOMER' ? 'Đặt dịch vụ' : 'Nhận và làm ca'}</Text>
+                  </View>
+                  {selected && <View style={styles.roleCheck}><Text style={styles.roleCheckText}>✓</Text></View>}
+                </Pressable>;
+              })}
             </View>
-          </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Mật khẩu</Text>
-            <View style={styles.inputBox}>
-              <IconSymbol name="shield" size={16} color={BrandColors.gray400} />
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Nhập mật khẩu..."
-                placeholderTextColor={BrandColors.gray400}
-                secureTextEntry={!showPassword}
-                style={styles.textInput}
-              />
-              <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
-                <Text style={styles.showPassText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Remember me & Forgot pass */}
-          <View style={styles.optionsRow}>
-            <Pressable
-              style={styles.checkboxRow}
-              onPress={() => setRememberMe(!rememberMe)}>
-              <View
-                style={[
-                  styles.checkbox,
-                  rememberMe && styles.checkboxActive,
-                ]}>
-                {rememberMe && <Text style={styles.checkIcon}>✓</Text>}
+            <View style={styles.formCard}>
+              <View style={styles.formHeading}>
+                <View style={styles.formIcon}><Text>{content.icon}</Text></View>
+                <View style={styles.formHeadingCopy}>
+                  <Text style={styles.formTitle}>Đăng nhập {content.title}</Text>
+                  <Text style={styles.formSubtitle}>{content.description}</Text>
+                </View>
               </View>
-              <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
-            </Pressable>
 
-            <Pressable
-              onPress={() =>
-                Alert.alert('Quên mật khẩu', 'Mã OTP đặt lại mật khẩu sẽ gửi về số điện thoại của bạn.')
-              }>
-              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-            </Pressable>
-          </View>
+              {errorMessage ? <View style={styles.errorBox}><Text style={styles.errorText}>⚠️ {errorMessage}</Text></View> : null}
 
-          {/* Login Button */}
-          <Pressable style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginBtnText}>Đăng nhập</Text>
-          </Pressable>
+              <Text style={styles.inputLabel}>Số điện thoại hoặc email</Text>
+              <View style={styles.inputWrapper}>
+                <IconSymbol name="phone" size={18} color={BrandColors.gray400} />
+                <TextInput style={styles.input} value={account} onChangeText={(value) => { setAccount(value); setErrorMessage(''); }} placeholder={role === 'STAFF' ? '0912 001 001' : '0901 234 001'} placeholderTextColor={BrandColors.gray400} keyboardType="email-address" autoCapitalize="none" />
+              </View>
 
-          {/* Quick Demo Login Helper Box */}
-          <View style={styles.demoBox}>
-            <Text style={styles.demoTitle}>Tài khoản Demo thử nghiệm nhanh:</Text>
-            <View style={styles.demoButtonsRow}>
-              <Pressable style={styles.demoBtn} onPress={handleDemoCustomer}>
-                <Text style={styles.demoBtnText}>👤 Vào vai Khách hàng</Text>
+              <Text style={[styles.inputLabel, styles.passwordLabel]}>Mật khẩu</Text>
+              <View style={styles.inputWrapper}>
+                <IconSymbol name="lock" size={18} color={BrandColors.gray400} />
+                <TextInput style={styles.input} value={password} onChangeText={(value) => { setPassword(value); setErrorMessage(''); }} placeholder="Nhập mật khẩu" placeholderTextColor={BrandColors.gray400} secureTextEntry={!showPassword} />
+                <Pressable onPress={() => setShowPassword((current) => !current)} hitSlop={8}><Text style={styles.showPassword}>{showPassword ? 'Ẩn' : 'Hiện'}</Text></Pressable>
+              </View>
+
+              <View style={styles.optionsRow}>
+                <Pressable style={styles.rememberRow} onPress={() => setRememberMe((current) => !current)}>
+                  <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>{rememberMe && <Text style={styles.checkboxText}>✓</Text>}</View>
+                  <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+                </Pressable>
+                <Pressable onPress={() => Alert.alert('Quên mật khẩu', 'Tính năng khôi phục mật khẩu sẽ gửi mã xác thực tới thông tin tài khoản đã đăng ký.')}><Text style={styles.forgotText}>Quên mật khẩu?</Text></Pressable>
+              </View>
+
+              <Pressable style={[styles.submitButton, isLoading && styles.buttonLoading]} onPress={handleLogin} disabled={isLoading}>
+                {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.submitButtonText}>Đăng nhập {content.title}</Text><Text style={styles.submitArrow}>›</Text></>}
               </Pressable>
-              <Pressable
-                style={[styles.demoBtn, styles.demoBtnStaff]}
-                onPress={handleDemoStaff}>
-                <Text style={[styles.demoBtnText, styles.demoBtnTextStaff]}>
-                  👷 Vào vai Nhân viên
-                </Text>
+
+              <Pressable style={styles.demoButton} onPress={handleDemo}>
+                <Text style={styles.demoSparkle}>✦</Text><Text style={styles.demoButtonText}>{content.demo}</Text>
               </Pressable>
+
+              {role === 'CUSTOMER' ? <View style={styles.registerRow}>
+                <Text style={styles.registerText}>Chưa có tài khoản? </Text>
+                <Pressable onPress={() => router.push('/auth/register')}><Text style={styles.registerLink}>Đăng ký ngay</Text></Pressable>
+              </View> : <View style={styles.staffNotice}>
+                <IconSymbol name="shield" size={16} color="#0369A1" />
+                <Text style={styles.staffNoticeText}>Tài khoản nhân viên do công ty tạo và cấp sau khi hồ sơ được xét duyệt.</Text>
+              </View>}
             </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BrandColors.white,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-  },
-  brandHeader: {
-    alignItems: 'center',
-    marginVertical: Spacing.three,
-  },
-  logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: BrandColors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.two,
-  },
-  brandName: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: BrandColors.primaryDark,
-  },
-  brandSlogan: {
-    fontSize: 13,
-    color: BrandColors.gray500,
-    marginTop: 2,
-  },
-
-  // Role Segment
-  roleSegment: {
-    flexDirection: 'row',
-    backgroundColor: BrandColors.gray100,
-    borderRadius: BorderRadius.lg,
-    padding: 4,
-    marginVertical: Spacing.two,
-  },
-  roleTab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: BorderRadius.md,
-  },
-  roleTabActive: {
-    backgroundColor: BrandColors.white,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  roleTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: BrandColors.gray500,
-  },
-  roleTabTextActive: {
-    color: BrandColors.primary,
-    fontWeight: '800',
-  },
-
-  welcomeText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: BrandColors.gray900,
-    marginTop: Spacing.two,
-  },
-  welcomeSub: {
-    fontSize: 12,
-    color: BrandColors.gray500,
-    marginTop: 4,
-    marginBottom: Spacing.three,
-  },
-  formGroup: {
-    marginBottom: Spacing.three,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.gray700,
-    marginBottom: 6,
-  },
-  inputBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: BrandColors.gray50,
-    borderWidth: 1.5,
-    borderColor: BrandColors.gray200,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.two,
-    height: 48,
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 14,
-    color: BrandColors.gray900,
-  },
-  showPassText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BrandColors.primary,
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.four,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: BrandColors.gray300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: BrandColors.primary,
-    borderColor: BrandColors.primary,
-  },
-  checkIcon: {
-    color: BrandColors.white,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  rememberText: {
-    fontSize: 12,
-    color: BrandColors.gray600,
-  },
-  forgotText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.primary,
-  },
-  loginBtn: {
-    backgroundColor: BrandColors.primary,
-    borderRadius: BorderRadius.full,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: Spacing.four,
-    elevation: 3,
-    shadowColor: BrandColors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-  },
-  loginBtnText: {
-    color: BrandColors.white,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-
-  // Demo Fast Box
-  demoBox: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.gray200,
-  },
-  demoTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: BrandColors.gray500,
-    marginBottom: Spacing.two,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  demoButtonsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  demoBtn: {
-    flex: 1,
-    backgroundColor: BrandColors.primaryLight,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  demoBtnStaff: {
-    backgroundColor: '#EFF6FF',
-  },
-  demoBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: BrandColors.primaryDark,
-  },
-  demoBtnTextStaff: {
-    color: '#1D4ED8',
-  },
+  gradient: { flex: 1 }, safeArea: { flex: 1 }, keyboardView: { flex: 1 }, content: { flexGrow: 1, padding: Spacing.four, paddingVertical: 28 },
+  brandHeader: { alignItems: 'center', marginBottom: 22 }, logoCircle: { width: 66, height: 66, borderRadius: 23, backgroundColor: BrandColors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 14, elevation: 5 }, logoText: { color: '#FFFFFF', fontSize: 32 }, brandName: { color: BrandColors.gray900, fontSize: 27, fontWeight: '900', marginTop: 10 }, brandSlogan: { color: BrandColors.gray600, fontSize: 13, marginTop: 3 },
+  roleSwitch: { flexDirection: 'row', gap: 10, marginBottom: 14 }, roleOption: { flex: 1, minHeight: 82, borderWidth: 1, borderColor: '#DCE5E8', backgroundColor: 'rgba(255,255,255,0.72)', borderRadius: BorderRadius.lg, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 7 }, roleOptionActive: { borderColor: BrandColors.primary, backgroundColor: '#F0FDFA', shadowColor: BrandColors.primary, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2 }, roleEmoji: { fontSize: 22 }, roleCopy: { flex: 1 }, roleTitle: { fontSize: 13, fontWeight: '800', color: BrandColors.gray700 }, roleTitleActive: { color: '#047857' }, roleHint: { fontSize: 10, color: BrandColors.gray500, marginTop: 3, lineHeight: 13 }, roleHintActive: { color: '#059669' }, roleCheck: { width: 18, height: 18, borderRadius: 9, backgroundColor: BrandColors.primary, alignItems: 'center', justifyContent: 'center' }, roleCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  formCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 18, elevation: 4 }, formHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }, formIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' }, formHeadingCopy: { flex: 1 }, formTitle: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900' }, formSubtitle: { color: BrandColors.gray600, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  errorBox: { backgroundColor: '#FEF2F2', borderRadius: 10, padding: 10, marginBottom: 14 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 }, inputLabel: { color: BrandColors.gray700, fontSize: 12, fontWeight: '800', marginBottom: 7 }, passwordLabel: { marginTop: 14 }, inputWrapper: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderColor: '#D7E0E8', backgroundColor: '#F8FAFC', borderRadius: 13, paddingHorizontal: 12 }, input: { flex: 1, color: BrandColors.gray900, fontSize: 14 }, showPassword: { color: BrandColors.primary, fontSize: 12, fontWeight: '800' },
+  optionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 18 }, rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 7 }, checkbox: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: '#94A3B8', alignItems: 'center', justifyContent: 'center' }, checkboxActive: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary }, checkboxText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' }, rememberText: { color: BrandColors.gray600, fontSize: 11 }, forgotText: { color: BrandColors.primary, fontSize: 11, fontWeight: '800' },
+  submitButton: { minHeight: 52, borderRadius: 14, backgroundColor: BrandColors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3 }, buttonLoading: { opacity: 0.75 }, submitButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' }, submitArrow: { color: '#FFFFFF', fontSize: 27, lineHeight: 28 }, demoButton: { minHeight: 44, marginTop: 11, borderRadius: 13, borderWidth: 1, borderColor: '#99F6E4', backgroundColor: '#F0FDFA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }, demoSparkle: { color: '#0F766E', fontSize: 15 }, demoButtonText: { color: '#0F766E', fontSize: 12, fontWeight: '800' },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 17 }, registerText: { color: BrandColors.gray600, fontSize: 12 }, registerLink: { color: BrandColors.primary, fontSize: 12, fontWeight: '900' }, staffNotice: { flexDirection: 'row', gap: 7, alignItems: 'flex-start', marginTop: 15, padding: 10, borderRadius: 10, backgroundColor: '#F0F9FF' }, staffNoticeText: { flex: 1, color: '#075985', fontSize: 11, lineHeight: 16 },
 });

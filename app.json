@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "domestic-service-mobile",
-    "slug": "domestic-service-mobile",
+    "name": "CleanMaster",
+    "slug": "cleanmaster",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "domesticservicemobile",
+    "scheme": "cleanmaster",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -32,7 +32,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

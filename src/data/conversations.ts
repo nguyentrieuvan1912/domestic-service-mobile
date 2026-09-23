@@ -102,7 +102,7 @@ export const mockConversations: Conversation[] = [
     staffName: 'Phạm Thị Lan',
     staffAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     serviceName: 'Giúp việc theo giờ',
-    lastMessage: 'Chào anh Thắng, sáng mai 9h em sẽ có mặt đúng giờ tại Ruby 2 Goldmark City nhé.',
+    lastMessage: 'Chào anh Thắng, sáng mai 9h em sẽ có mặt đúng giờ tại Ruby 2 Cityland Park Hills nhé.',
     lastMessageTime: '2024-06-12T08:30:00Z',
     unreadCountCustomer: 0,
     unreadCountStaff: 0,

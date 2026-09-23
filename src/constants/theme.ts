@@ -4,7 +4,7 @@ export const BrandColors = {
   primary: '#00B074', // Emerald Green brand
   primaryDark: '#008C5C',
   primaryLight: '#E6F8F1',
-  primaryGradient: ['#00B074', '#009663'],
+  primaryGradient: ['#00B074', '#009663'] as const,
   secondary: '#1F2937',
   accent: '#FFB800', // Gold/Amber for Stars & Ratings
   accentLight: '#FEF3C7',

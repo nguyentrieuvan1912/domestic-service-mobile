@@ -581,14 +581,14 @@ export const mockBookings: Booking[] = [
   },
 
   // bk-023: IN_PROGRESS (Test case 5) - Staff An, Mode A, Customer Huy
-  // Matches mockup: "Đang thực hiện - Giúp việc theo giờ 15:00 - 19:00, 123 Nguyễn Văn Cừ"
+  // Matches mockup: "Đang thực hiện - Giúp việc theo giờ 15:00 - 19:00, 123 Mai Chí Thọ"
   {
     id: 'bk-023',
     bookingCode: 'BK-2024-023',
     customerId: 'cust-004',
     serviceId: 'srv-001',
     packageId: 'pkg-002', // Gói 4 giờ (320.000đ)
-    addressId: 'addr-006', // 123 Nguyễn Văn Cừ
+    addressId: 'addr-006', // 123 Mai Chí Thọ
     mode: 'MODE_A',
     requiredStaffCount: 1,
     bookingDate: '2024-06-12',
@@ -648,7 +648,7 @@ export const mockBookings: Booking[] = [
     startTime: '09:00',
     endTime: '13:00',
     status: 'ACCEPTED',
-    notes: 'Dọn dẹp chung cư Goldmark City',
+    notes: 'Dọn dẹp chung cư Cityland Park Hills',
     packagePrice: 320000,
     addOnsTotal: 80000, // Cửa kính ban công
     discountAmount: 0,
@@ -889,4 +889,141 @@ export const mockBookings: Booking[] = [
     createdAt: '2024-06-12T16:30:00Z',
     updatedAt: '2024-06-12T16:35:00Z',
   },
+
+  // bk-035: CONFIRMED - Đã xác nhận đơn hàng
+  {
+    id: 'bk-035',
+    bookingCode: 'BK-2026-035',
+    customerId: 'cust-001',
+    serviceId: 'srv-004', // Vệ sinh máy lạnh
+    packageId: 'pkg-013',
+    addressId: 'addr-001',
+    mode: 'MODE_B',
+    requiredStaffCount: 1,
+    bookingDate: '2026-10-18',
+    startTime: '09:00',
+    endTime: '10:30',
+    status: 'CONFIRMED',
+    notes: 'Vệ sinh 2 máy lạnh tại phòng khách và phòng ngủ master',
+    packagePrice: 270000,
+    addOnsTotal: 0,
+    discountAmount: 30000,
+    totalAmount: 240000,
+    promotionCode: 'FLASH50K',
+    addOns: [],
+    createdAt: '2026-10-15T09:00:00Z',
+    updatedAt: '2026-10-15T09:05:00Z',
+  },
+
+  // bk-036: STAFF_ASSIGNED - Đã phân công nhân viên
+  {
+    id: 'bk-036',
+    bookingCode: 'BK-2026-036',
+    customerId: 'cust-001',
+    serviceId: 'srv-004', // Vệ sinh máy lạnh
+    packageId: 'pkg-013',
+    addressId: 'addr-001',
+    mode: 'MODE_B',
+    requiredStaffCount: 1,
+    bookingDate: '2026-10-19',
+    startTime: '14:00',
+    endTime: '15:30',
+    status: 'STAFF_ASSIGNED',
+    staffId: 'staff-005',
+    notes: 'Kỹ thuật viên Đỗ Văn Tuấn đã nhận đơn và chuẩn bị đến',
+    packagePrice: 270000,
+    addOnsTotal: 50000,
+    discountAmount: 0,
+    totalAmount: 320000,
+    addOns: [{ addOnId: 'addon-ac-01', addOnName: 'Khử khuẩn Nano Bạc', price: 50000, quantity: 1 }],
+    createdAt: '2026-10-16T10:00:00Z',
+    updatedAt: '2026-10-16T10:15:00Z',
+  },
+
+  // bk-037: NO_STAFF_FOUND - Không tìm thấy nhân viên phù hợp
+  {
+    id: 'bk-037',
+    bookingCode: 'BK-2026-037',
+    customerId: 'cust-001',
+    serviceId: 'srv-006', // Vệ sinh máy giặt
+    packageId: 'pkg-016',
+    addressId: 'addr-001',
+    mode: 'MODE_B',
+    requiredStaffCount: 1,
+    bookingDate: '2026-10-14',
+    startTime: '21:00',
+    endTime: '22:30',
+    status: 'NO_STAFF_FOUND',
+    notes: 'Đặt lịch khung giờ muộn, không có nhân viên rảnh trong bán kính 10km',
+    packagePrice: 220000,
+    addOnsTotal: 0,
+    discountAmount: 0,
+    totalAmount: 220000,
+    addOns: [],
+    createdAt: '2026-10-14T20:00:00Z',
+    updatedAt: '2026-10-14T20:30:00Z',
+  },
+
+  // bk-038: REFUNDING - Đang hoàn tiền
+  {
+    id: 'bk-038',
+    bookingCode: 'BK-2026-038',
+    customerId: 'cust-001',
+    serviceId: 'srv-009', // Chăm sóc trẻ em
+    packageId: 'pkg-021',
+    addressId: 'addr-001',
+    mode: 'MODE_A',
+    requiredStaffCount: 1,
+    bookingDate: '2026-10-12',
+    startTime: '08:00',
+    endTime: '12:00',
+    status: 'REFUNDING',
+    notes: 'Khách hàng hủy trước 24h, hệ thống đang hoàn tiền ví MoMo',
+    packagePrice: 480000,
+    addOnsTotal: 0,
+    discountAmount: 0,
+    totalAmount: 480000,
+    addOns: [],
+    cancelledAt: '2026-10-11T09:00:00Z',
+    cancellationReason: 'Bé đổi lịch đi học nên gia đình hủy ca trông',
+    cancelledBy: 'CUSTOMER',
+    createdAt: '2026-10-10T14:00:00Z',
+    updatedAt: '2026-10-11T09:10:00Z',
+  },
+
+  // bk-039: REFUNDED - Đã hoàn tiền thành công
+  {
+    id: 'bk-039',
+    bookingCode: 'BK-2026-039',
+    customerId: 'cust-001',
+    serviceId: 'srv-003', // Sofa nệm
+    packageId: 'pkg-011',
+    addressId: 'addr-001',
+    mode: 'MODE_B',
+    requiredStaffCount: 1,
+    bookingDate: '2026-10-05',
+    startTime: '10:00',
+    endTime: '11:30',
+    status: 'REFUNDED',
+    notes: 'Hoàn tiền 100% 350.000đ về thẻ ATM / VNPAY thành công',
+    packagePrice: 350000,
+    addOnsTotal: 0,
+    discountAmount: 0,
+    totalAmount: 350000,
+    addOns: [],
+    cancelledAt: '2026-10-04T15:00:00Z',
+    cancellationReason: 'Không tìm thấy nhân viên phù hợp khu vực',
+    cancelledBy: 'SYSTEM',
+    createdAt: '2026-10-04T14:00:00Z',
+    updatedAt: '2026-10-04T16:00:00Z',
+  },
 ];
+
+export const getBookingById = (id: string): Booking | undefined => {
+  return mockBookings.find((b) => b.id === id);
+};
+
+export const getBookingsByCustomerId = (customerId: string): Booking[] => {
+  return mockBookings.filter((b) => b.customerId === customerId);
+};
+

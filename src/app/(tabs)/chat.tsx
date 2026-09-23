@@ -42,7 +42,7 @@ export default function ChatListScreen() {
           </View>
           <View style={styles.aiInfo}>
             <View style={styles.aiTitleRow}>
-              <Text style={styles.aiTitle}>Trợ lý HomeCare AI</Text>
+              <Text style={styles.aiTitle}>Trợ lý CleanMaster AI</Text>
               <View style={styles.aiOnlineBadge}>
                 <View style={styles.greenDot} />
                 <Text style={styles.aiOnlineText}>Online 24/7</Text>

@@ -159,7 +159,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-003',
     role: 'ASSISTANT',
     content:
-      'Chào anh! HomeCare có dịch vụ **Giặt sấy sofa & đệm rèm** chuyên xử lý các trường hợp này bằng công nghệ phun hút hơi nước nóng 140°C kết hợp hóa chất khử khuẩn sinh học.\n\nQuy trình bao gồm:\n1. Hút sâu lông thú cưng bám trong từng kẽ nỉ\n2. Phun dung dịch enzym sinh học phân hủy mùi hôi\n3. Chà vết bẩn và hút sạch nước bẩn ra ngoài\n4. Phun tinh dầu khử khuẩn và sấy khô 80%',
+      'Chào anh! CleanMaster có dịch vụ **Giặt sấy sofa & đệm rèm** chuyên xử lý các trường hợp này bằng công nghệ phun hút hơi nước nóng 140°C kết hợp hóa chất khử khuẩn sinh học.\n\nQuy trình bao gồm:\n1. Hút sâu lông thú cưng bám trong từng kẽ nỉ\n2. Phun dung dịch enzym sinh học phân hủy mùi hôi\n3. Chà vết bẩn và hút sạch nước bẩn ra ngoài\n4. Phun tinh dầu khử khuẩn và sấy khô 80%',
     suggestions: [
       {
         type: 'PACKAGE',
@@ -216,7 +216,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-004',
     role: 'ASSISTANT',
     content:
-      'Chính sách hủy đơn của HomeCare được thiết kế minh bạch để bảo vệ quyền lợi cả khách hàng và nhân viên đối tác:\n\n1. **Hủy trước ≥ 12 giờ so với giờ hẹn**: Miễn phí 100%. Nếu đã thanh toán trực tuyến (VNPAY/MOMO/ZALOPAY), tiền sẽ hoàn 100% về tài khoản ví trong 15-30 phút.\n\n2. **Hủy từ 2 đến dưới 12 giờ**: Phí hủy là 20% giá trị đơn hàng để hỗ trợ chi phí chuẩn bị của nhân viên.\n\n3. **Hủy dưới 2 giờ hoặc khi nhân viên đã đến nơi**: Phí hủy là 50% giá trị đơn hàng.',
+      'Chính sách hủy đơn của CleanMaster được thiết kế minh bạch để bảo vệ quyền lợi cả khách hàng và nhân viên đối tác:\n\n1. **Hủy trước ≥ 12 giờ so với giờ hẹn**: Miễn phí 100%. Nếu đã thanh toán trực tuyến (VNPAY/MOMO/ZALOPAY), tiền sẽ hoàn 100% về tài khoản ví trong 15-30 phút.\n\n2. **Hủy từ 2 đến dưới 12 giờ**: Phí hủy là 20% giá trị đơn hàng để hỗ trợ chi phí chuẩn bị của nhân viên.\n\n3. **Hủy dưới 2 giờ hoặc khi nhân viên đã đến nơi**: Phí hủy là 50% giá trị đơn hàng.',
     createdAt: '2024-06-09T17:20:00Z',
   },
   {
@@ -248,7 +248,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-005',
     role: 'ASSISTANT',
     content:
-      'Dạ chào bạn, HomeCare có đội ngũ nhân sự chuyên biệt cho mảng **Chăm sóc người cao tuổi** đã được xác thực chứng chỉ điều dưỡng và sơ cấp cứu gia đình.\n\nBạn có thể sử dụng tính năng **Tự chọn nhân viên (Mode A)** để chọn đích danh các nhân viên xuất sắc như:\n- **Phạm Thị Lan**: 6 năm kinh nghiệm, 4.9 sao, có chứng chỉ điều dưỡng gia đình, rất khéo léo trong phục hồi vận động.\n- **Phan Thị Mai Phương**: 3 năm kinh nghiệm, 4.85 sao, chuyên chăm sóc người cao tuổi phục hồi chức năng.',
+      'Dạ chào bạn, CleanMaster có đội ngũ nhân sự chuyên biệt cho mảng **Chăm sóc người cao tuổi** đã được xác thực chứng chỉ điều dưỡng và sơ cấp cứu gia đình.\n\nBạn có thể sử dụng tính năng **Tự chọn nhân viên (Mode A)** để chọn đích danh các nhân viên xuất sắc như:\n- **Phạm Thị Lan**: 6 năm kinh nghiệm, 4.9 sao, có chứng chỉ điều dưỡng gia đình, rất khéo léo trong phục hồi vận động.\n- **Phan Thị Mai Phương**: 3 năm kinh nghiệm, 4.85 sao, chuyên chăm sóc người cao tuổi phục hồi chức năng.',
     suggestions: [
       {
         type: 'SERVICE',
@@ -289,7 +289,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-006',
     role: 'ASSISTANT',
     content:
-      'HomeCare cung cấp 2 chế độ đặt dịch vụ linh hoạt:\n\n1. **Mode A (Khách hàng tự chọn nhân viên)**:\n- Bạn được xem danh sách tất cả nhân viên phù hợp trong khu vực.\n- Xem chi tiết hồ sơ: số năm kinh nghiệm, tỷ lệ hài lòng, điểm đánh giá sao và các nhận xét từ khách hàng trước.\n- Bạn chủ động bấm chọn người mình ưng ý nhất.\n\n2. **Mode B (Hệ thống tự động Matching)**:\n- Bạn chỉ cần chọn giờ và địa chỉ.\n- Thuật toán thông minh sẽ quét và chỉ định ngay nhân viên có điểm uy tín cao nhất đang ở gần bạn nhất (trong vòng 3-5 phút).\n- Rất thích hợp khi bạn cần đặt việc nhanh chóng!',
+      'CleanMaster cung cấp 2 chế độ đặt dịch vụ linh hoạt:\n\n1. **Mode A (Khách hàng tự chọn nhân viên)**:\n- Bạn được xem danh sách tất cả nhân viên phù hợp trong khu vực.\n- Xem chi tiết hồ sơ: số năm kinh nghiệm, tỷ lệ hài lòng, điểm đánh giá sao và các nhận xét từ khách hàng trước.\n- Bạn chủ động bấm chọn người mình ưng ý nhất.\n\n2. **Mode B (Hệ thống tự động Matching)**:\n- Bạn chỉ cần chọn giờ và địa chỉ.\n- Thuật toán thông minh sẽ quét và chỉ định ngay nhân viên có điểm uy tín cao nhất đang ở gần bạn nhất (trong vòng 3-5 phút).\n- Rất thích hợp khi bạn cần đặt việc nhanh chóng!',
     createdAt: '2024-06-04T09:08:00Z',
   },
   {
@@ -370,7 +370,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-008',
     role: 'ASSISTANT',
     content:
-      'Chào bạn! HomeCare cung cấp hóa đơn điện tử VAT hợp pháp cho 100% doanh nghiệp sử dụng dịch vụ Vệ sinh văn phòng.\n\nỞ bước thanh toán hoặc trong mục Thông tin công ty tại hồ sơ, bạn chỉ cần điền:\n- Tên công ty\n- Mã số thuế (MST)\n- Địa chỉ trụ sở và Email nhận hóa đơn\n\nHóa đơn điện tử sẽ được gửi tự động qua email ngay sau khi ca làm việc kết thúc!',
+      'Chào bạn! CleanMaster cung cấp hóa đơn điện tử VAT hợp pháp cho 100% doanh nghiệp sử dụng dịch vụ Vệ sinh văn phòng.\n\nỞ bước thanh toán hoặc trong mục Thông tin công ty tại hồ sơ, bạn chỉ cần điền:\n- Tên công ty\n- Mã số thuế (MST)\n- Địa chỉ trụ sở và Email nhận hóa đơn\n\nHóa đơn điện tử sẽ được gửi tự động qua email ngay sau khi ca làm việc kết thúc!',
     suggestions: [
       {
         type: 'SERVICE',
@@ -394,7 +394,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-008',
     role: 'ASSISTANT',
     content:
-      'Dạ với khách hàng doanh nghiệp ký hợp đồng định kỳ từ 3 tháng trở lên, HomeCare hỗ trợ hình thức thanh toán công nợ cuối tháng chuyển khoản ngân hàng và xuất hóa đơn gộp tháng rất tiện lợi ạ.',
+      'Dạ với khách hàng doanh nghiệp ký hợp đồng định kỳ từ 3 tháng trở lên, CleanMaster hỗ trợ hình thức thanh toán công nợ cuối tháng chuyển khoản ngân hàng và xuất hóa đơn gộp tháng rất tiện lợi ạ.',
     createdAt: '2024-06-03T10:10:00Z',
   },
 
@@ -457,7 +457,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-010',
     role: 'ASSISTANT',
     content:
-      'Chào mừng bạn đến với đại gia đình HomeCare! Quy trình đặt dịch vụ cực kỳ đơn giản chỉ với 4 bước:\n\n1. **Chọn dịch vụ**: Giúp việc theo giờ, Tổng vệ sinh, Nấu ăn...\n2. **Chọn gói & thời gian**: Chọn ngày và khung giờ bạn muốn nhân viên đến.\n3. **Chọn địa chỉ & phương thức**: Nhập địa chỉ nhà và chọn thanh toán Online hoặc Tiền mặt sau khi hoàn thành.\n4. **Xác nhận**: Nhân viên sẽ có mặt đúng giờ và bạn có thể theo dõi tiến độ trực tiếp trên ứng dụng!',
+      'Chào mừng bạn đến với đại gia đình CleanMaster! Quy trình đặt dịch vụ cực kỳ đơn giản chỉ với 4 bước:\n\n1. **Chọn dịch vụ**: Giúp việc theo giờ, Tổng vệ sinh, Nấu ăn...\n2. **Chọn gói & thời gian**: Chọn ngày và khung giờ bạn muốn nhân viên đến.\n3. **Chọn địa chỉ & phương thức**: Nhập địa chỉ nhà và chọn thanh toán Online hoặc Tiền mặt sau khi hoàn thành.\n4. **Xác nhận**: Nhân viên sẽ có mặt đúng giờ và bạn có thể theo dõi tiến độ trực tiếp trên ứng dụng!',
     suggestions: [
       {
         type: 'PROMOTION',
@@ -480,7 +480,7 @@ export const mockAIMessages: AIMessage[] = [
     conversationId: 'ai-conv-010',
     role: 'ASSISTANT',
     content:
-      'Bạn hoàn toàn có thể yên tâm làm việc hoặc ra ngoài! 100% nhân viên HomeCare đều được xác thực danh tính căn cước công dân và ký cam kết bảo đảm tài sản. Ngoài ra ứng dụng có tính năng định vị thời gian đến và bấm giờ làm việc minh bạch để bạn theo dõi từ xa.',
+      'Bạn hoàn toàn có thể yên tâm làm việc hoặc ra ngoài! 100% nhân viên CleanMaster đều được xác thực danh tính căn cước công dân và ký cam kết bảo đảm tài sản. Ngoài ra ứng dụng có tính năng định vị thời gian đến và bấm giờ làm việc minh bạch để bạn theo dõi từ xa.',
     createdAt: '2024-06-01T12:30:00Z',
   },
 

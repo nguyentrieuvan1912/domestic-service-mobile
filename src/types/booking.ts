@@ -3,11 +3,16 @@ export type BookingMode = 'MODE_A' | 'MODE_B'; // MODE_A: Customer selects staff
 export type BookingStatus =
   | 'PENDING'
   | 'MATCHING'
+  | 'CONFIRMED'
+  | 'STAFF_ASSIGNED'
   | 'ASSIGNED'
   | 'ACCEPTED'
   | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'CANCELLED'
+  | 'REFUNDING'
+  | 'REFUNDED'
+  | 'NO_STAFF_FOUND'
   | 'ABSENT'
   | 'REJECTED';
 
@@ -42,6 +47,10 @@ export interface Booking {
 
   // Selected add-ons snapshot
   addOns: BookingAddOnItem[];
+
+  // Staff and dynamic data
+  staffId?: string;
+  customServiceData?: Record<string, any>;
 
   // Execution meta
   startedAt?: string;

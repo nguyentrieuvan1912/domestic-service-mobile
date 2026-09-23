@@ -22,15 +22,23 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="auth/login" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="auth/register" options={{ headerShown: false }} />
+          <Stack.Screen name="staff/index" options={{ headerShown: false }} />
           <Stack.Screen name="service/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="booking/new" options={{ headerShown: false }} />
           <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="booking/matching" options={{ presentation: 'card', headerShown: false }} />
+          <Stack.Screen name="booking/review" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="ai/index" options={{ presentation: 'card', headerShown: false }} />
+          <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
+          <Stack.Screen name="account/addresses" options={{ headerShown: false }} />
+          <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>
+
   );
 }

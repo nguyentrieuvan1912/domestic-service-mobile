@@ -5,9 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/theme';
 import { TabImageIcon } from '@/components/common/TabImageIcon';
 import { CenterAIMascotTabButton } from '@/components/common/CenterAIMascotTabButton';
+import { useAuth } from '@/context/AuthContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { currentRole } = useAuth();
+  const isStaff = currentRole === 'STAFF';
 
   // Compact, lowered padding for mobile screens
   const tabBottomPadding = Platform.select({
@@ -67,34 +70,35 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 2. Dịch vụ */}
+      {/* 2. Cộng đồng */}
       <Tabs.Screen
         name="services"
         options={{
-          title: 'Dịch vụ',
+          title: 'Cộng đồng',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="services" focused={focused} size={22} />
           ),
         }}
       />
 
-      {/* 3. Trung tâm: Robot Mascot 3D chuyển động linh hoạt */}
-      <Tabs.Screen
-        name="ai"
-        options={{
-          title: '',
-          tabBarLabel: () => null,
-          tabBarButton: (props) => <CenterAIMascotTabButton {...props} />,
-        }}
-      />
-
-      {/* 4. Đơn hàng */}
+      {/* 3. Đơn hàng */}
       <Tabs.Screen
         name="bookings"
         options={{
           title: 'Đơn hàng',
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="bookings" focused={focused} size={22} />
+          ),
+        }}
+      />
+
+      {/* 4. Tin nhắn */}
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Tin nhắn',
+          tabBarIcon: ({ focused }) => (
+            <TabImageIcon name="chat" focused={focused} size={22} />
           ),
         }}
       />
@@ -110,9 +114,9 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Ẩn route Chat khỏi tab bar */}
+      {/* Ẩn route AI khỏi tab bar (được kích hoạt từ nút nổi Trang chủ và thanh nhanh) */}
       <Tabs.Screen
-        name="chat"
+        name="ai"
         options={{
           href: null,
         }}
