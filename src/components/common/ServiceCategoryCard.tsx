@@ -93,8 +93,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: BrandColors.gray800,
     textAlign: 'center',
-    lineHeight: 14,
-    height: 28,
+    lineHeight: 15,
+    minHeight: 30,
+    paddingHorizontal: 2,
   },
   compactContainer: {
     flexDirection: 'row',

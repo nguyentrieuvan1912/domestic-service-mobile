@@ -15,15 +15,15 @@ export default function TabLayout() {
   // Compact, lowered padding for mobile screens
   const tabBottomPadding = Platform.select({
     ios: Math.min(insets.bottom, 16),
-    web: 4,
-    default: Math.min(insets.bottom, 6),
+    web: 8,
+    default: Math.min(insets.bottom, 8),
   });
 
-  // Slim, sleek tab height lowered down for phones
+  // Sleek tab height with comfortable breathing room
   const tabHeight = Platform.select({
-    ios: 54 + tabBottomPadding,
-    web: 56,
-    default: 54 + tabBottomPadding,
+    ios: 58 + tabBottomPadding,
+    web: 64,
+    default: 58 + tabBottomPadding,
   });
 
   return (

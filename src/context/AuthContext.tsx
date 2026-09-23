@@ -15,6 +15,7 @@ interface AuthContextType {
   quickLoginAsStaff: (staffId?: string) => void;
   switchRole: (newRole: UserRole) => void;
   updateCustomerProfile: (profile: Pick<Customer, 'fullName' | 'phone' | 'email' | 'avatar'>) => void;
+  updateStaffProfile: (profile: Pick<Staff, 'phone' | 'email' | 'bio'>) => void;
   logout: () => void;
 }
 
@@ -83,6 +84,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser((user) => (user ? { ...user, ...profile } : user));
   };
 
+  const updateStaffProfile = (profile: Pick<Staff, 'phone' | 'email' | 'bio'>) => {
+    setCurrentStaff((staff) => (staff ? { ...staff, ...profile } : staff));
+    setCurrentUser((user) => (user ? { ...user, phone: profile.phone, email: profile.email } : user));
+  };
+
   const logout = () => {
     setCurrentUser(null);
     setCurrentCustomer(null);
@@ -102,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         quickLoginAsStaff,
         switchRole,
         updateCustomerProfile,
+        updateStaffProfile,
         logout,
       }}>
       {children}

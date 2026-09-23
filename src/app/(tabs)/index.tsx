@@ -104,7 +104,7 @@ export default function HomeScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(false);
+  const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(true);
 
   const handleToggleCategories = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -216,52 +216,52 @@ export default function HomeScreen() {
       locations={BrandColors.softBgGradientLocations}
       style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* TOP HEADER: User Greeting, Address, Notifications */}
-        <View style={styles.topHeader}>
-          <Pressable
-            style={styles.profileRow}
-            onPress={() => router.push('/(tabs)/profile')}>
-            <Image
-              source={{
-                uri:
-                  currentCustomer?.avatar ||
-                  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
-              }}
-              style={styles.userAvatar}
-            />
-            <View style={styles.userMeta}>
-              <Text style={styles.greetingText}>Xin chào bạn,</Text>
-              <Text style={styles.userName}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
-            </View>
-          </Pressable>
-
-          <View style={styles.headerActions}>
-            <Pressable
-              style={styles.notifBtn}
-              onPress={() => router.push('/notifications' as any)}>
-              <IconSymbol name="bell" size={22} color={BrandColors.gray800} />
-              <View style={styles.notifBadge} />
-            </Pressable>
-
-          </View>
-        </View>
-
-        {/* Address Selector Pill */}
-        <Pressable
-          style={styles.addressBar}
-          onPress={() => router.push('/account/addresses')}>
-          <IconSymbol name="location" size={16} color={BrandColors.primary} />
-          <Text numberOfLines={1} style={styles.addressText}>
-            {defaultAddress
-              ? `${defaultAddress.title}: ${defaultAddress.streetAddress}, ${defaultAddress.district}`
-              : 'Chọn địa chỉ phục vụ của bạn...'}
-          </Text>
-          <IconSymbol name="chevronRight" size={14} color={BrandColors.gray400} />
-        </Pressable>
-
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}>
+          {/* TOP HEADER: User Greeting, Address, Notifications */}
+          <View style={styles.topHeader}>
+            <Pressable
+              style={styles.profileRow}
+              onPress={() => router.push('/(tabs)/profile')}>
+              <Image
+                source={{
+                  uri:
+                    currentCustomer?.avatar ||
+                    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+                }}
+                style={styles.userAvatar}
+              />
+              <View style={styles.userMeta}>
+                <Text style={styles.greetingText}>Xin chào bạn,</Text>
+                <Text style={styles.userName}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.headerActions}>
+              <Pressable
+                style={styles.notifBtn}
+                onPress={() => router.push('/notifications' as any)}>
+                <IconSymbol name="bell" size={22} color={BrandColors.gray800} />
+                <View style={styles.notifBadge} />
+              </Pressable>
+
+            </View>
+          </View>
+
+          {/* Address Selector Pill */}
+          <Pressable
+            style={styles.addressBar}
+            onPress={() => router.push('/account/addresses')}>
+            <IconSymbol name="location" size={16} color={BrandColors.primary} />
+            <Text numberOfLines={1} style={styles.addressText}>
+              {defaultAddress
+                ? `${defaultAddress.title}: ${defaultAddress.streetAddress}, ${defaultAddress.district}`
+                : 'Chọn địa chỉ phục vụ của bạn...'}
+            </Text>
+            <IconSymbol name="chevronRight" size={14} color={BrandColors.gray400} />
+          </Pressable>
+
           {/* SEARCH BAR */}
           <View style={styles.searchSection}>
             <SearchBar
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 110,
   },
   topHeader: {
     flexDirection: 'row',
@@ -1160,12 +1160,19 @@ const styles = StyleSheet.create({
   },
   categorySectionCard: {
     marginHorizontal: Spacing.three,
-    backgroundColor: '#DEF2E9',
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     paddingTop: 18,
-    paddingBottom: 8,
+    paddingBottom: 12,
     paddingHorizontal: 10,
     marginBottom: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   categorySectionHeader: {
     flexDirection: 'row',
@@ -1177,7 +1184,7 @@ const styles = StyleSheet.create({
   categorySectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#133E2B',
+    color: BrandColors.gray900,
     letterSpacing: -0.3,
   },
   categorySectionSeeAll: {
@@ -1320,7 +1327,7 @@ const styles = StyleSheet.create({
   },
   floatingAIBtn: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 74,
     right: 16,
     borderRadius: BorderRadius.full,
     elevation: 8,

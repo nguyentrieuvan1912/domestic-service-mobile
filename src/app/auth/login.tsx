@@ -1,6 +1,9 @@
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { BorderRadius, BrandColors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { StaffWelcomeOverlay } from '@/components/common/StaffWelcomeOverlay';
+import { WelcomeSweepOverlay } from '@/components/common/WelcomeSweepOverlay';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -24,6 +27,7 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showWelcome, setShowWelcome] = useState(false);
   const content = ROLE_CONTENT[role];
 
   const selectRole = (nextRole: LoginRole) => {
@@ -47,7 +51,7 @@ export default function LoginScreen() {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      if (login(account.trim(), role)) goToRoleFlow();
+      if (login(account.trim(), role)) setShowWelcome(true);
       else setErrorMessage(`Tài khoản này không thuộc nhóm ${content.title.toLowerCase()}. Hãy chọn đúng vai trò hoặc dùng tài khoản mẫu.`);
     }, 450);
   };
@@ -55,7 +59,7 @@ export default function LoginScreen() {
   const handleDemo = () => {
     if (role === 'STAFF') quickLoginAsStaff('staff-001');
     else quickLoginAsCustomer('cust-001');
-    goToRoleFlow();
+    setShowWelcome(true);
   };
 
   return (
@@ -64,7 +68,7 @@ export default function LoginScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
             <View style={styles.brandHeader}>
-              <View style={styles.logoCircle}><Text style={styles.logoText}>✦</Text></View>
+              <View style={styles.logoCircle}><BrandLogo size={60} /></View>
               <Text style={styles.brandName}>CleanMaster</Text>
               <Text style={styles.brandSlogan}>Dịch vụ gia đình tin cậy, chuyên nghiệp</Text>
             </View>
@@ -134,13 +138,16 @@ export default function LoginScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {showWelcome && (role === 'STAFF'
+        ? <StaffWelcomeOverlay onComplete={goToRoleFlow} />
+        : <WelcomeSweepOverlay onComplete={goToRoleFlow} />)}
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 }, safeArea: { flex: 1 }, keyboardView: { flex: 1 }, content: { flexGrow: 1, padding: Spacing.four, paddingVertical: 28 },
-  brandHeader: { alignItems: 'center', marginBottom: 22 }, logoCircle: { width: 66, height: 66, borderRadius: 23, backgroundColor: BrandColors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 14, elevation: 5 }, logoText: { color: '#FFFFFF', fontSize: 32 }, brandName: { color: BrandColors.gray900, fontSize: 27, fontWeight: '900', marginTop: 10 }, brandSlogan: { color: BrandColors.gray600, fontSize: 13, marginTop: 3 },
+  brandHeader: { alignItems: 'center', marginBottom: 22 }, logoCircle: { width: 70, height: 70, borderRadius: 24, backgroundColor: '#E8FFF7', alignItems: 'center', justifyContent: 'center', shadowColor: BrandColors.primary, shadowOpacity: 0.18, shadowRadius: 14, elevation: 5 }, brandName: { color: BrandColors.gray900, fontSize: 27, fontWeight: '900', marginTop: 10 }, brandSlogan: { color: BrandColors.gray600, fontSize: 13, marginTop: 3 },
   roleSwitch: { flexDirection: 'row', gap: 10, marginBottom: 14 }, roleOption: { flex: 1, minHeight: 82, borderWidth: 1, borderColor: '#DCE5E8', backgroundColor: 'rgba(255,255,255,0.72)', borderRadius: BorderRadius.lg, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 7 }, roleOptionActive: { borderColor: BrandColors.primary, backgroundColor: '#F0FDFA', shadowColor: BrandColors.primary, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2 }, roleEmoji: { fontSize: 22 }, roleCopy: { flex: 1 }, roleTitle: { fontSize: 13, fontWeight: '800', color: BrandColors.gray700 }, roleTitleActive: { color: '#047857' }, roleHint: { fontSize: 10, color: BrandColors.gray500, marginTop: 3, lineHeight: 13 }, roleHintActive: { color: '#059669' }, roleCheck: { width: 18, height: 18, borderRadius: 9, backgroundColor: BrandColors.primary, alignItems: 'center', justifyContent: 'center' }, roleCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   formCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 18, elevation: 4 }, formHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }, formIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' }, formHeadingCopy: { flex: 1 }, formTitle: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900' }, formSubtitle: { color: BrandColors.gray600, fontSize: 12, lineHeight: 17, marginTop: 2 },
   errorBox: { backgroundColor: '#FEF2F2', borderRadius: 10, padding: 10, marginBottom: 14 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 }, inputLabel: { color: BrandColors.gray700, fontSize: 12, fontWeight: '800', marginBottom: 7 }, passwordLabel: { marginTop: 14 }, inputWrapper: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderColor: '#D7E0E8', backgroundColor: '#F8FAFC', borderRadius: 13, paddingHorizontal: 12 }, input: { flex: 1, color: BrandColors.gray900, fontSize: 14 }, showPassword: { color: BrandColors.primary, fontSize: 12, fontWeight: '800' },

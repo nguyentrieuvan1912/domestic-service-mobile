@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 const SLIDES = [
   {
@@ -72,7 +73,7 @@ export default function OnboardingScreen() {
       {/* Top bar with Skip button */}
       <View style={styles.topBar}>
         <View style={styles.logoRow}>
-          <Text style={{ fontSize: 24 }}>🏡</Text>
+          <BrandLogo size={29} />
           <Text style={styles.logoText}>CleanMaster</Text>
         </View>
         <Pressable onPress={handleComplete}>
