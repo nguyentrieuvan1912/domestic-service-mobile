@@ -102,7 +102,7 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => router.push('/account/addresses')}>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>📍</Text>
+              <IconSymbol name="📍" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Sổ địa chỉ</Text>
                 <Text numberOfLines={1} style={styles.menuSub}>
@@ -117,7 +117,7 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => router.push('/(tabs)/bookings')}>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>📋</Text>
+              <IconSymbol name="📋" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Lịch sử đơn dịch vụ</Text>
                 <Text style={styles.menuSub}>Theo dõi tiến trình & hóa đơn</Text>
@@ -130,7 +130,7 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => router.push('/notifications' as any)}>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>🔔</Text>
+              <IconSymbol name="🔔" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Thông báo của tôi</Text>
                 <Text style={styles.menuSub}>Cập nhật đơn và khuyến mãi</Text>
@@ -150,7 +150,7 @@ export default function ProfileScreen() {
               Alert.alert('Phương thức thanh toán', 'Bạn đang liên kết Ví MoMo và Thẻ ATM nội địa Napas.')
             }>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>💳</Text>
+              <IconSymbol name="💳" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Phương thức thanh toán</Text>
                 <Text style={styles.menuSub}>Ví MoMo, VNPAY, Thẻ liên kết</Text>
@@ -163,7 +163,7 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => router.push('/(tabs)/services')}>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>🎟️</Text>
+              <IconSymbol name="🎟️" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Kho voucher ưu đãi</Text>
                 <Text style={styles.menuSub}>FLASH50K, SUMMER20 đang sẵn có</Text>
@@ -181,7 +181,7 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => router.push('/ai')}>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>🤖</Text>
+              <IconSymbol name="🤖" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Trợ lý AI CleanMaster 24/7</Text>
                 <Text style={styles.menuSub}>Giải đáp tức thì mọi thắc mắc</Text>
@@ -199,7 +199,7 @@ export default function ProfileScreen() {
               )
             }>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>📞</Text>
+              <IconSymbol name="📞" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Trung tâm hỗ trợ khách hàng</Text>
                 <Text style={styles.menuSub}>Hotline: 1900 6868 (8:00 - 21:00)</Text>
@@ -217,7 +217,7 @@ export default function ProfileScreen() {
               )
             }>
             <View style={styles.menuLeft}>
-              <Text style={styles.menuIcon}>📄</Text>
+              <IconSymbol name="📄" style={styles.menuIcon} />
               <View>
                 <Text style={styles.menuLabel}>Điều khoản & Chính sách bảo mật</Text>
                 <Text style={styles.menuSub}>Bảo hiểm hư hại, quyền riêng tư</Text>

@@ -45,7 +45,7 @@ export default function StaffAccountDetailsScreen() {
 
         {section === 'badges' && <View style={styles.card}>
           {BADGES.map((badge) => <View key={badge.label} style={styles.badgeRow}>
-            <View style={styles.badgeIcon}><Text style={styles.badgeEmoji}>{badge.icon}</Text></View>
+            <View style={styles.badgeIcon}><IconSymbol name={badge.icon} size={20} /></View>
             <View style={styles.detailCopy}><Text style={styles.detailTitle}>{badge.label}</Text><Text style={styles.detailSub}>Được khách hàng khen {badge.count} lần</Text></View>
             <Text style={styles.badgeCount}>{badge.count}</Text>
           </View>)}

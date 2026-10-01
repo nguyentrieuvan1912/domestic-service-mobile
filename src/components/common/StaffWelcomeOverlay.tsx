@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/common/IconSymbol';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -72,7 +73,7 @@ export function StaffWelcomeOverlay({ onComplete }: { onComplete?: () => void })
       <Animated.View style={[styles.profileCard, cardStyle]}>
         <View style={styles.avatar}><BrandLogo size={68} /></View>
         <View style={styles.cardLines}><View style={styles.lineStrong} /><View style={styles.lineSoft} /><View style={styles.lineSoftShort} /></View>
-        <View style={styles.cardTools}><Text>🧹</Text><Text>🧴</Text><Text>✦</Text></View>
+        <View style={styles.cardTools}><IconSymbol name="🧹" /><IconSymbol name="🧴" /><IconSymbol name="✦" /></View>
       </Animated.View>
       <Animated.View style={copyStyle}>
         <Text style={styles.brandName}>CleanMaster</Text>

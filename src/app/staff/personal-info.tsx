@@ -46,7 +46,7 @@ export default function StaffPersonalInfoScreen() {
           <View style={styles.inputRow}><IconSymbol name="phone" size={17} color={BrandColors.gray500} /><TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Nhập số điện thoại" /></View>
 
           <Text style={styles.fieldLabel}>Email</Text>
-          <View style={styles.inputRow}><Text style={styles.inputIcon}>✉️</Text><TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" style={styles.input} placeholder="Nhập email" /></View>
+          <View style={styles.inputRow}><IconSymbol name="✉️" style={styles.inputIcon} /><TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" style={styles.input} placeholder="Nhập email" /></View>
 
           <Text style={styles.fieldLabel}>Giới thiệu bản thân</Text>
           <TextInput value={bio} onChangeText={setBio} multiline textAlignVertical="top" style={[styles.inputRow, styles.bioInput]} placeholder="Giới thiệu ngắn về bạn" />

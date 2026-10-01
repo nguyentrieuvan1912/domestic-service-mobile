@@ -128,7 +128,7 @@ export default function MatchingStaffScreen() {
               <View style={styles.radarCircleOuter}>
                 <View style={styles.radarCircleMid}>
                   <View style={styles.radarCircleInner}>
-                    <Text style={{ fontSize: 32 }}>📡</Text>
+                    <IconSymbol name="📡" style={{ fontSize: 32 }} />
                   </View>
                 </View>
               </View>
@@ -159,7 +159,7 @@ export default function MatchingStaffScreen() {
           {matchingState === 'FOUND_SINGLE' && (
             <View style={styles.stateContentBox}>
               <View style={styles.successBadgeRow}>
-                <Text style={{ fontSize: 20 }}>🎉</Text>
+                <IconSymbol name="🎉" style={{ fontSize: 20 }} />
                 <Text style={styles.foundTitle}>Đã tìm thấy nhân viên phù hợp!</Text>
               </View>
               <Text style={styles.foundSub}>
@@ -207,7 +207,7 @@ export default function MatchingStaffScreen() {
           {matchingState === 'NO_STAFF' && (
             <View style={styles.stateCenterBox}>
               <View style={[styles.radarCircleInner, { backgroundColor: '#FFE4E6' }]}>
-                <Text style={{ fontSize: 36 }}>⚠️</Text>
+                <IconSymbol name="⚠️" style={{ fontSize: 36 }} />
               </View>
               <Text style={styles.statusHeading}>Hiện chưa có thợ nhận đơn</Text>
               <Text style={styles.statusDescription}>
@@ -233,7 +233,7 @@ export default function MatchingStaffScreen() {
           {matchingState === 'STAFF_REJECTED' && (
             <View style={styles.stateCenterBox}>
               <View style={[styles.radarCircleInner, { backgroundColor: '#FEF3C7' }]}>
-                <Text style={{ fontSize: 36 }}>⏳</Text>
+                <IconSymbol name="⏳" style={{ fontSize: 36 }} />
               </View>
               <Text style={styles.statusHeading}>Thợ trước đó bận đột xuất</Text>
               <Text style={styles.statusDescription}>
@@ -252,7 +252,7 @@ export default function MatchingStaffScreen() {
           {matchingState === 'FINDING_REPLACEMENT' && (
             <View style={styles.stateCenterBox}>
               <View style={styles.radarCircleInner}>
-                <Text style={{ fontSize: 32 }}>🔄</Text>
+                <IconSymbol name="🔄" style={{ fontSize: 32 }} />
               </View>
               <Text style={styles.statusHeading}>Đang tìm nhân viên thay thế</Text>
               <Text style={styles.statusDescription}>
@@ -266,7 +266,7 @@ export default function MatchingStaffScreen() {
             <View style={styles.stateContentBox}>
               <View style={styles.acceptedCard}>
                 <View style={styles.acceptedIconCircle}>
-                  <Text style={{ fontSize: 32 }}>✅</Text>
+                  <IconSymbol name="✅" style={{ fontSize: 32 }} />
                 </View>
                 <Text style={styles.acceptedTitle}>Thợ đã nhận đơn thành công!</Text>
                 <Text style={styles.acceptedSub}>
@@ -304,7 +304,7 @@ export default function MatchingStaffScreen() {
           {matchingState === 'CANCELLED' && (
             <View style={styles.stateCenterBox}>
               <View style={[styles.radarCircleInner, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={{ fontSize: 36 }}>❌</Text>
+                <IconSymbol name="❌" style={{ fontSize: 36 }} />
               </View>
               <Text style={styles.statusHeading}>Yêu cầu đặt đơn đã hủy</Text>
               <Text style={styles.statusDescription}>

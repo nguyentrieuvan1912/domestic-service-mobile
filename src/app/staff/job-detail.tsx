@@ -320,7 +320,7 @@ export default function StaffJobDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Thời gian & Địa điểm</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>⏱️</Text>
+            <IconSymbol name="⏱️" style={styles.infoIcon} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Khung giờ làm việc</Text>
               <Text style={styles.infoValue}>
@@ -330,7 +330,7 @@ export default function StaffJobDetailScreen() {
           </View>
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📍</Text>
+            <IconSymbol name="📍" style={styles.infoIcon} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Địa chỉ cụ thể</Text>
               <Text style={styles.infoValue}>{job.address}</Text>

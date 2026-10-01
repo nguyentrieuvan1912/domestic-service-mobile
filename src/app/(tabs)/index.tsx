@@ -340,7 +340,7 @@ export default function HomeScreen() {
                           <Image source={{ uri: srv.image }} style={styles.rebookThumb} />
                         ) : (
                           <View style={styles.rebookThumbPlaceholder}>
-                            <Text style={{ fontSize: 18 }}>🧹</Text>
+                            <IconSymbol name="🧹" style={{ fontSize: 18 }} />
                           </View>
                         )}
                         <View style={{ flex: 1 }}>
@@ -565,7 +565,7 @@ export default function HomeScreen() {
           <View style={[styles.sectionHeaderRow, { marginTop: Spacing.four }]}>
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ fontSize: 18 }}>💡</Text>
+                <IconSymbol name="💡" style={{ fontSize: 18 }} />
                 <Text style={styles.sectionTitle}>Combo Gợi ý thông minh (AI Bundle)</Text>
               </View>
               <Text style={styles.sectionSubtitle}>Kết hợp dịch vụ liên quan • Tiết kiệm đến 20% chi phí</Text>
@@ -1327,7 +1327,7 @@ const styles = StyleSheet.create({
   },
   floatingAIBtn: {
     position: 'absolute',
-    bottom: 74,
+    bottom: 12,
     right: 16,
     borderRadius: BorderRadius.full,
     elevation: 8,

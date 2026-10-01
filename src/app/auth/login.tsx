@@ -77,7 +77,7 @@ export default function LoginScreen() {
               {(Object.keys(ROLE_CONTENT) as LoginRole[]).map((item) => {
                 const selected = role === item;
                 return <Pressable key={item} onPress={() => selectRole(item)} style={[styles.roleOption, selected && styles.roleOptionActive]}>
-                  <Text style={styles.roleEmoji}>{ROLE_CONTENT[item].icon}</Text>
+                  <IconSymbol name={ROLE_CONTENT[item].icon} size={22} />
                   <View style={styles.roleCopy}>
                     <Text style={[styles.roleTitle, selected && styles.roleTitleActive]}>{ROLE_CONTENT[item].title}</Text>
                     <Text style={[styles.roleHint, selected && styles.roleHintActive]}>{item === 'CUSTOMER' ? 'Đặt dịch vụ' : 'Nhận và làm ca'}</Text>
@@ -89,7 +89,7 @@ export default function LoginScreen() {
 
             <View style={styles.formCard}>
               <View style={styles.formHeading}>
-                <View style={styles.formIcon}><Text>{content.icon}</Text></View>
+                <View style={styles.formIcon}><IconSymbol name={content.icon} size={18} /></View>
                 <View style={styles.formHeadingCopy}>
                   <Text style={styles.formTitle}>Đăng nhập {content.title}</Text>
                   <Text style={styles.formSubtitle}>{content.description}</Text>
@@ -124,7 +124,7 @@ export default function LoginScreen() {
               </Pressable>
 
               <Pressable style={styles.demoButton} onPress={handleDemo}>
-                <Text style={styles.demoSparkle}>✦</Text><Text style={styles.demoButtonText}>{content.demo}</Text>
+                <IconSymbol name="✦" style={styles.demoSparkle} /><Text style={styles.demoButtonText}>{content.demo}</Text>
               </Pressable>
 
               {role === 'CUSTOMER' ? <View style={styles.registerRow}>

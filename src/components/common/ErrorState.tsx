@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/common/IconSymbol';
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -14,7 +15,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
-        <Text style={styles.iconText}>⚠️</Text>
+        <IconSymbol name="⚠️" style={styles.iconText} />
       </View>
       <Text style={styles.title}>Không thể kết nối</Text>
       <Text style={styles.message}>{message}</Text>

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { Notification } from '@/types/notification';
+import { IconSymbol } from './IconSymbol';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -34,7 +35,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
       style={[styles.container, !notification.isRead && styles.unreadContainer]}
       onPress={onPress}>
       <View style={[styles.iconBox, { backgroundColor: bg }]}>
-        <Text style={styles.iconText}>{icon}</Text>
+        <IconSymbol name={icon} size={20} />
       </View>
 
       <View style={styles.body}>
