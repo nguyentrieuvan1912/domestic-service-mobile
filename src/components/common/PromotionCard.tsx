@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/common/IconSymbol';
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -18,7 +19,7 @@ export const PromotionCard: React.FC<PromotionCardProps> = ({
   return (
     <View style={[styles.container, isApplied && styles.containerApplied]}>
       <View style={styles.leftStub}>
-        <Text style={styles.ticketIcon}>🎟️</Text>
+        <IconSymbol name="🎟️" style={styles.ticketIcon} />
         <Text style={styles.discountBadge}>
           {promotion.discountType === 'PERCENTAGE'
             ? `-${promotion.discountValue}%`

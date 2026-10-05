@@ -49,7 +49,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           <Image source={{ uri: service.image }} style={styles.serviceImage} />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Text style={{ fontSize: 20 }}>🏡</Text>
+            <IconSymbol name="🏡" style={{ fontSize: 20 }} />
           </View>
         )}
         <View style={styles.serviceInfo}>

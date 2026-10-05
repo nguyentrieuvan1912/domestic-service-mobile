@@ -1358,7 +1358,7 @@ export default function NewBookingScreen() {
                   {relatedServices.length > 0 && (
                     <View style={{ marginTop: Spacing.four, marginBottom: Spacing.two }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <Text style={{ fontSize: 16 }}>💡</Text>
+                        <IconSymbol name="💡" style={{ fontSize: 16 }} />
                         <Text style={styles.sectionHeaderTitle}>Gợi ý kết hợp thông minh (AI Combo)</Text>
                       </View>
                       <Text style={styles.stepSubtitleNote}>
@@ -1982,7 +1982,7 @@ export default function NewBookingScreen() {
                   {relatedServices.length > 0 && (
                     <View style={{ marginTop: Spacing.four, marginBottom: Spacing.two }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <Text style={{ fontSize: 16 }}>💡</Text>
+                        <IconSymbol name="💡" style={{ fontSize: 16 }} />
                         <Text style={styles.sectionHeaderTitle}>Gợi ý kết hợp thông minh (AI Combo)</Text>
                       </View>
                       <Text style={styles.stepSubtitleNote}>

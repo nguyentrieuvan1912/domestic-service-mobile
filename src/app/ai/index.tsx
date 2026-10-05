@@ -287,7 +287,7 @@ export default function AIAssistantScreen() {
               inputText.trim().length > 0 && styles.sendBtnActive,
             ]}
             onPress={() => sendMessage(inputText)}>
-            <Text style={styles.sendIcon}>➤</Text>
+            <IconSymbol name="➤" style={styles.sendIcon} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>

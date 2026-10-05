@@ -87,7 +87,7 @@ export default function PersonalInfoScreen() {
 
             <Text style={styles.fieldLabel}>Email</Text>
             <View style={styles.fieldRow}>
-              <Text style={styles.fieldEmoji}>✉️</Text>
+              <IconSymbol name="✉️" style={styles.fieldEmoji} />
               <TextInput
                 value={email}
                 onChangeText={setEmail}

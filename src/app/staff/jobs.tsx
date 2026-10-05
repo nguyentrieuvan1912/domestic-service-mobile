@@ -247,21 +247,21 @@ export default function StaffJobsScreen() {
                   {/* Customer and timing */}
                   <View style={styles.jobMetaBox}>
                     <View style={styles.jobMetaRow}>
-                      <Text style={styles.metaIcon}>⏱️</Text>
+                      <IconSymbol name="⏱️" style={styles.metaIcon} />
                       <Text style={styles.metaText}>
                         {job.date} • <Text style={styles.metaBold}>{job.timeSlot}</Text>
                       </Text>
                     </View>
 
                     <View style={styles.jobMetaRow}>
-                      <Text style={styles.metaIcon}>📍</Text>
+                      <IconSymbol name="📍" style={styles.metaIcon} />
                       <Text style={styles.metaText} numberOfLines={1}>
                         {job.address} ({job.district})
                       </Text>
                     </View>
 
                     <View style={styles.jobMetaRow}>
-                      <Text style={styles.metaIcon}>👤</Text>
+                      <IconSymbol name="👤" style={styles.metaIcon} />
                       <Text style={styles.metaText}>
                         Khách: {job.customerName} • Cách bạn{' '}
                         <Text style={styles.distanceText}>{job.distanceKm} km</Text>

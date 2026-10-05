@@ -579,7 +579,7 @@ export default function ServiceDetailScreen() {
             {relatedServices.length > 0 && (
               <View style={{ marginTop: Spacing.four }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <Text style={{ fontSize: 16 }}>💡</Text>
+                  <IconSymbol name="💡" style={{ fontSize: 16 }} />
                   <Text style={styles.sectionHeading}>Dịch vụ thường được đặt cùng</Text>
                 </View>
                 <Text style={styles.subHeading}>
@@ -641,7 +641,7 @@ export default function ServiceDetailScreen() {
             </Text>
             {service.benefits?.map((b, idx) => (
               <View key={idx} style={styles.benefitRow}>
-                <Text style={styles.benefitIcon}>🛡️</Text>
+                <IconSymbol name="🛡️" style={styles.benefitIcon} />
                 <Text style={styles.benefitText}>{b}</Text>
               </View>
             ))}

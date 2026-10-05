@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet, Image } from 'react-native';
 import { BrandColors, BorderRadius } from '@/constants/theme';
+import { IconSymbol } from './IconSymbol';
 
 interface FilterChipProps {
   label: string;
@@ -24,7 +25,7 @@ export const FilterChip: React.FC<FilterChipProps> = ({
       {image ? (
         <Image source={image} style={styles.imageIcon} resizeMode="contain" />
       ) : icon ? (
-        <Text style={styles.icon}>{icon}</Text>
+        <IconSymbol name={icon} size={13} />
       ) : null}
       <Text style={[styles.label, isSelected && styles.labelSelected]}>{label}</Text>
     </Pressable>

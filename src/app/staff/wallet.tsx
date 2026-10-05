@@ -295,7 +295,7 @@ export default function StaffWalletScreen() {
                       style={[styles.bankOption, selected && styles.bankOptionActive]}
                       onPress={() => setSelectedBank(bank)}
                     >
-                      <Text style={styles.bankEmoji}>🏦</Text>
+                      <IconSymbol name="🏦" style={styles.bankEmoji} />
                       <Text
                         style={[
                           styles.bankOptionText,

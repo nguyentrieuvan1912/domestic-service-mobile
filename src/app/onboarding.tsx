@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { IconSymbol } from '@/components/common/IconSymbol';
 
 const SLIDES = [
   {
@@ -92,7 +93,7 @@ export default function OnboardingScreen() {
         {SLIDES.map((slide) => (
           <View key={slide.id} style={[styles.slideBox, { width }]}>
             <View style={styles.iconCircle}>
-              <Text style={styles.iconText}>{slide.icon}</Text>
+              <IconSymbol name={slide.icon} size={54} />
             </View>
 
             <View style={styles.badgePill}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { IconSymbol } from './IconSymbol';
 
 interface EmptyStateProps {
   icon?: string;
@@ -20,7 +21,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
-        <Text style={styles.iconText}>{icon}</Text>
+        <IconSymbol name={icon} size={38} />
       </View>
       <Text style={styles.title}>{title}</Text>
       {description ? <Text style={styles.description}>{description}</Text> : null}
