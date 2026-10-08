@@ -20,11 +20,13 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
-import { SearchBar } from '@/components/common/SearchBar';
+import { Staff } from '@/types/user';
 import { ServiceCategoryCard } from '@/components/common/ServiceCategoryCard';
 import { BookingStatusBadge } from '@/components/common/BookingStatusBadge';
 import { PromotionCard } from '@/components/common/PromotionCard';
 import { useAuth } from '@/context/AuthContext';
+import { NotificationBadge } from '@/components/common/NotificationBadge';
+import { useNotifications } from '@/hooks/use-notifications';
 import {
   SERVICE_CATEGORIES,
   mockServices,
@@ -95,6 +97,7 @@ const HERO_BANNERS = [
 export default function HomeScreen() {
   const router = useRouter();
   const { currentCustomer } = useAuth();
+  const { unreadCount } = useNotifications();
   const { width: windowWidth } = useWindowDimensions();
   const bannerGap = 12;
   const bannerSidePadding = 16;
@@ -102,7 +105,6 @@ export default function HomeScreen() {
   const horizontalPadding = Math.max(bannerSidePadding, (windowWidth - bannerWidth) / 2);
   const snapInterval = bannerWidth + bannerGap;
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(true);
 
@@ -228,7 +230,7 @@ export default function HomeScreen() {
                 source={{
                   uri:
                     currentCustomer?.avatar ||
-                    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+                    'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80',
                 }}
                 style={styles.userAvatar}
               />
@@ -241,9 +243,11 @@ export default function HomeScreen() {
             <View style={styles.headerActions}>
               <Pressable
                 style={styles.notifBtn}
-                onPress={() => router.push('/notifications' as any)}>
+                accessibilityRole="button"
+                accessibilityLabel={`Thông báo, ${unreadCount} chưa đọc`}
+                onPress={() => router.push('/notifications')}>
                 <IconSymbol name="bell" size={22} color={BrandColors.gray800} />
-                <View style={styles.notifBadge} />
+                <NotificationBadge count={unreadCount} />
               </Pressable>
 
             </View>
@@ -261,23 +265,6 @@ export default function HomeScreen() {
             </Text>
             <IconSymbol name="chevronRight" size={14} color={BrandColors.gray400} />
           </Pressable>
-
-          {/* SEARCH BAR */}
-          <View style={styles.searchSection}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Tìm máy lạnh, dọn nhà, bảo mẫu, nấu ăn..."
-              onSubmit={() => {
-                if (searchQuery.trim()) {
-                  router.push({
-                    pathname: '/(tabs)/services',
-                    params: { q: searchQuery.trim() },
-                  });
-                }
-              }}
-            />
-          </View>
 
           {/* ACTIVE BOOKING PREVIEW (If exists) */}
           {upcomingBooking && (
@@ -372,6 +359,41 @@ export default function HomeScreen() {
               </ScrollView>
             </View>
           )}
+
+          {/* DEDICATED SECTION: CHỌN NHÂN VIÊN THEO NHU CẦU CỦA RIÊNG BẠN (MODE A) */}
+          <View style={styles.staffModeSection}>
+            <Pressable
+              style={styles.compactStaffBanner}
+              onPress={() =>
+                router.push({
+                  pathname: '/booking/new',
+                  params: { serviceId: 'srv-001', mode: 'MODE_A' },
+                })
+              }>
+              <LinearGradient
+                colors={['#0F766E', '#0D9488']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.compactStaffGradient}>
+                <View style={styles.compactStaffIconBox}>
+                  <IconSymbol name="person" size={22} color="#FFFFFF" />
+                </View>
+
+                <View style={styles.compactStaffTextBox}>
+                  <Text style={styles.compactStaffTitle} numberOfLines={1}>
+                    Chọn nhân viên theo nhu cầu của riêng bạn
+                  </Text>
+                  <Text style={styles.compactStaffSubtitle} numberOfLines={1}>
+                    Chủ động duyệt hồ sơ, xem đánh giá 5★ & chọn thợ
+                  </Text>
+                </View>
+
+                <View style={styles.compactStaffArrow}>
+                  <IconSymbol name="chevronRight" size={16} color="#FFFFFF" />
+                </View>
+              </LinearGradient>
+            </Pressable>
+          </View>
 
           {/* HERO BANNERS CAROUSEL */}
           <View style={styles.bannerContainer}>
@@ -974,17 +996,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  notifBadge: {
-    position: 'absolute',
-    top: 9,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: BrandColors.danger,
-    borderWidth: 1.5,
-    borderColor: '#FFF',
-  },
   addressBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1004,9 +1015,57 @@ const styles = StyleSheet.create({
     color: BrandColors.gray700,
     fontWeight: '500',
   },
-  searchSection: {
-    paddingHorizontal: Spacing.three,
-    marginVertical: Spacing.two,
+    // Dedicated Staff Mode Section (Mode A) - Compact & Elegant
+  staffModeSection: {
+    marginTop: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  compactStaffBanner: {
+    marginHorizontal: Spacing.three,
+    borderRadius: BorderRadius.lg,
+    overflow: 'hidden',
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  compactStaffGradient: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  compactStaffIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactStaffTextBox: {
+    flex: 1,
+  },
+  compactStaffTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  compactStaffSubtitle: {
+    fontSize: 11,
+    color: '#CCFBF1',
+    fontWeight: '500',
+  },
+  compactStaffArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   upcomingBox: {
     marginHorizontal: Spacing.three,

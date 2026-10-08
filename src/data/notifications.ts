@@ -1,6 +1,11 @@
 import { AppNotification } from '../types/notification';
 
 export const mockNotifications: AppNotification[] = [
+  { id: 'notif-hoa-withdraw-pending', userId: 'user-s01', targetRole: 'STAFF', title: 'Yêu cầu rút đang xử lý', content: 'Yêu cầu đang chờ đối soát. Chưa có xác nhận tiền đã chuyển tới tài khoản nhận.', type: 'INCOME_UPDATE', target: { type: 'WITHDRAWAL', id: 'withdraw-hoa-pending' }, isRead: false, createdAt: '2026-10-08T14:20:00+07:00' },
+  { id: 'notif-hoa-withdraw-failed', userId: 'user-s01', targetRole: 'STAFF', title: 'Yêu cầu rút chưa thành công', content: 'Thông tin tài khoản nhận cần được kiểm tra lại. Xem nội dung cập nhật của yêu cầu rút.', type: 'INCOME_UPDATE', target: { type: 'WITHDRAWAL', id: 'withdraw-hoa-failed' }, isRead: false, createdAt: '2026-10-08T14:10:00+07:00' },
+  { id: 'notif-hoa-deleted', userId: 'user-s01', targetRole: 'STAFF', title: 'Cập nhật ca làm việc trước đây', content: 'Thông tin ca đã thay đổi. Nội dung ca liên kết có thể không còn khả dụng.', type: 'SCHEDULE_UPDATE', target: { type: 'BOOKING', id: 'bk-deleted-hoa' }, isRead: false, createdAt: '2026-10-08T12:10:00+07:00' },
+  { id: 'notif-tuan-restriction', userId: 'user-s05', targetRole: 'STAFF', title: 'Hạn chế nhận việc đã hết hạn', content: 'Hạn chế nhận việc áp dụng trước đây đã hết hạn ngày 22/03/2024. Xem nội dung thông báo để biết lý do.', type: 'SYSTEM', target: { type: 'RESTRICTION', id: 'res-003' }, isRead: false, createdAt: '2024-03-23T08:00:00+07:00' },
+
   // --- Customer Notifications (user-c01 - Hoa) ---
   {
     id: 'notif-001',
@@ -182,62 +187,12 @@ export const mockNotifications: AppNotification[] = [
 
   // ================= STAFF NOTIFICATIONS =================
 
-  // --- Staff An (user-s01) ---
-  {
-    id: 'notif-016',
-    userId: 'user-s01',
-    targetRole: 'STAFF',
-    title: 'Bạn có yêu cầu việc làm mới (Mode A)',
-    content: 'Khách hàng Nguyễn Thị Hoa chỉ định bạn cho ca làm 08:30 ngày 14/06 tại Bình Thạnh.',
-    type: 'NEW_JOB_AVAILABLE',
-    referenceId: 'bk-027',
-    isRead: false,
-    createdAt: '2024-06-12T14:05:00Z',
-  },
-  {
-    id: 'notif-017',
-    userId: 'user-s01',
-    targetRole: 'STAFF',
-    title: 'Thu nhập đã được cộng +467.500đ',
-    content: 'Khoản thù lao cho đơn hàng BK-2021 đã được ghi nhận vào ví thu nhập chờ duyệt.',
-    type: 'INCOME_UPDATE',
-    referenceId: 'inc-020',
-    isRead: true,
-    createdAt: '2024-06-12T11:55:00Z',
-  },
-  {
-    id: 'notif-018',
-    userId: 'user-s01',
-    targetRole: 'STAFF',
-    title: 'Nhắc nhở ca làm chiều nay lúc 15:00',
-    content: 'Bạn có ca làm việc Giúp việc theo giờ tại 123 Mai Chí Thọ. Hãy chuẩn bị đến đúng giờ!',
-    type: 'SCHEDULE_UPDATE',
-    referenceId: 'bk-023',
-    isRead: true,
-    createdAt: '2024-06-12T13:30:00Z',
-  },
-  {
-    id: 'notif-019',
-    userId: 'user-s01',
-    targetRole: 'STAFF',
-    title: 'Đánh giá 5 sao từ khách hàng',
-    content: 'Khách hàng Nguyễn Thị Hoa vừa để lại lời khen và đánh giá 5 sao cho bạn.',
-    type: 'SYSTEM',
-    referenceId: 'rev-001',
-    isRead: true,
-    createdAt: '2024-06-11T19:30:00Z',
-  },
-  {
-    id: 'notif-020',
-    userId: 'user-s01',
-    targetRole: 'STAFF',
-    title: 'Quyết toán tuần thành công +4.320.000đ',
-    content: 'Hệ thống đã kết chuyển thu nhập tuần vào số dư khả dụng của bạn.',
-    type: 'INCOME_UPDATE',
-    referenceId: 'inc-001',
-    isRead: true,
-    createdAt: '2024-06-10T00:00:00Z',
-  },
+  // --- Staff Hoa (user-s01) ---
+  { id: 'notif-016', userId: 'user-s01', targetRole: 'STAFF', title: 'Bạn có lời mời làm việc mới', content: 'Khách Hoàng Bích Thủy chọn bạn cho ca giúp việc 09:00–12:00 ngày 09/10 tại Bình Thạnh. Vui lòng xem lời mời.', type: 'NEW_JOB_AVAILABLE', target: { type: 'INVITATION', id: 'invite-hoa-01' }, isRead: false, createdAt: '2026-10-08T13:30:00+07:00' },
+  { id: 'notif-017', userId: 'user-s01', targetRole: 'STAFF', title: 'Khách đã nghiệm thu BK-2024-001', content: 'Ca giúp việc đã hoàn thành. Thu nhập 272.000đ được ghi nhận trong lịch sử thu nhập của bạn.', type: 'INCOME_UPDATE', target: { type: 'TRANSACTION', id: 'tx-003' }, isRead: false, createdAt: '2024-06-11T18:15:00+07:00' },
+  { id: 'notif-018', userId: 'user-s01', targetRole: 'STAFF', title: 'Nhắc lịch ca ngày mai lúc 08:30', content: 'Ca BK-2024-031: Tổng vệ sinh căn hộ cho Lê Minh Anh, 08:30–12:30 tại Quận 2. Kiểm tra lại lịch trước khi đi.', type: 'SCHEDULE_UPDATE', target: { type: 'BOOKING', id: 'bk-031' }, isRead: false, createdAt: '2026-10-08T14:00:00+07:00' },
+  { id: 'notif-019', userId: 'user-s01', targetRole: 'STAFF', title: 'Kiểm tra lịch trước khi bắt đầu ca', content: 'Nếu thông tin ca thay đổi, hãy kiểm tra lại trong mục Ca làm việc và liên hệ người phụ trách để được hỗ trợ.', type: 'SYSTEM', isRead: true, createdAt: '2026-10-08T08:00:00+07:00' },
+  { id: 'notif-020', userId: 'user-s01', targetRole: 'STAFF', title: 'Thu nhập ca BK-2024-015', content: 'Thu nhập 297.500đ từ ca vệ sinh máy lạnh đã có trong lịch sử thu nhập của bạn.', type: 'INCOME_UPDATE', target: { type: 'TRANSACTION', id: 'tx-001' }, isRead: true, createdAt: '2026-10-07T11:30:00+07:00' },
 
   // --- Staff Mai (user-s02) ---
   {
@@ -362,17 +317,7 @@ export const mockNotifications: AppNotification[] = [
   },
 
   // --- Staff Tuấn (user-s05) ---
-  {
-    id: 'notif-031',
-    userId: 'user-s05',
-    targetRole: 'STAFF',
-    title: 'Đánh giá 5 sao từ anh Huy',
-    content: 'Khách hàng khen ngợi: "Bộ sofa nỉ sạch bóng như mới ở showroom về!"',
-    type: 'SYSTEM',
-    referenceId: 'rev-014',
-    isRead: true,
-    createdAt: '2024-06-09T16:30:00Z',
-  },
+  { id: 'notif-031', userId: 'user-s05', targetRole: 'STAFF', title: 'Ca BK-2024-042 chờ nghiệm thu', content: 'Bạn đã hoàn thành các hạng mục bảo dưỡng máy lạnh cho Hoàng Minh Tuấn. Vui lòng chờ khách kiểm tra.', type: 'SCHEDULE_UPDATE', target: { type: 'BOOKING', id: 'bk-042' }, isRead: false, createdAt: '2026-10-08T16:45:00+07:00' },
 
   // --- Staff Ánh (user-s08) ---
   {

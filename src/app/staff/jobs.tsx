@@ -1,3 +1,4 @@
+import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState, useEffect } from 'react';
 import {
   Alert,
@@ -14,14 +15,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
-import { StaffService, StaffJobItem } from '@/data/staffService';
+import { StaffService, StaffJobItem, OpenOpportunity } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { useAuth } from '@/context/AuthContext';
+import { useStaffServiceEligibility } from '@/hooks/use-staff-service-eligibility';
 
 type TabKey = 'upcoming' | 'open' | 'completed';
 
 export default function StaffJobsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
+  const { currentStaff } = useAuth();
+  const staffId = currentStaff?.id || 'staff-001';
+  const evaluateService = useStaffServiceEligibility();
 
   const [activeTab, setActiveTab] = useState<TabKey>(
     params.tab === 'open' ? 'open' : params.tab === 'completed' ? 'completed' : 'upcoming'
@@ -30,24 +36,24 @@ export default function StaffJobsScreen() {
   const [selectedDistrict, setSelectedDistrict] = useState('Tất cả');
 
   const [jobs, setJobs] = useState<StaffJobItem[]>([]);
-  const [openShifts, setOpenShifts] = useState<StaffJobItem[]>([]);
+  const [openShifts, setOpenShifts] = useState<OpenOpportunity[]>([]);
 
   useEffect(() => {
     const refreshData = () => {
-      setJobs(StaffService.getJobs());
+      setJobs(StaffService.getJobs(staffId));
       setOpenShifts(StaffService.getOpenShifts());
     };
     refreshData();
     const unsubscribe = StaffService.subscribe(refreshData);
     return unsubscribe;
-  }, []);
+  }, [staffId]);
 
   const upcomingList = jobs.filter(
     (j) => j.status === 'ACCEPTED' || j.status === 'EN_ROUTE' || j.status === 'IN_PROGRESS'
   );
   const completedList = jobs.filter((j) => j.status === 'COMPLETED');
 
-  const currentList =
+  const currentList: (StaffJobItem | OpenOpportunity)[] =
     activeTab === 'upcoming'
       ? upcomingList
       : activeTab === 'open'
@@ -67,7 +73,7 @@ export default function StaffJobsScreen() {
     return matchSearch && matchDistrict;
   });
 
-  const handleClaim = (shift: StaffJobItem) => {
+  const handleClaim = (shift: OpenOpportunity) => {
     Alert.alert(
       'Xác nhận nhận ca',
       `Bạn có chắc muốn nhận ca ${shift.serviceName} tại ${shift.district} (${shift.timeSlot})?`,
@@ -76,17 +82,23 @@ export default function StaffJobsScreen() {
         {
           text: 'Nhận ca ngay',
           onPress: () => {
-            StaffService.claimOpenShift(shift.id);
-            setActiveTab('upcoming');
-            Alert.alert('Thành công', 'Đã thêm ca làm việc vào lịch của bạn!');
+            const result = StaffService.claimOpenShift(shift.id, staffId);
+            if (result.success) {
+              setActiveTab('upcoming');
+              Alert.alert('Thành công', 'Đã thêm ca làm việc vào lịch của bạn!');
+            } else {
+              Alert.alert('Không thể nhận ca', result.reason);
+            }
           },
         },
       ]
     );
   };
 
-  const getStatusBadge = (status: StaffJobItem['status']) => {
+  const getStatusBadge = (status: StaffJobItem['status'] | 'OPEN') => {
     switch (status) {
+      case 'OPEN':
+        return { label: 'Ca việc mới', bg: '#ECFDF5', text: '#047857' };
       case 'IN_PROGRESS':
         return { label: 'Đang làm việc', bg: '#DCFCE7', text: '#15803D' };
       case 'EN_ROUTE':
@@ -209,6 +221,7 @@ export default function StaffJobsScreen() {
           ) : (
             filteredList.map((job) => {
               const badge = getStatusBadge(job.status);
+              const eligibility = evaluateService(job.serviceId);
               return (
                 <View key={job.id} style={styles.jobCard}>
                   {/* Top row */}
@@ -301,28 +314,19 @@ export default function StaffJobsScreen() {
                           <Text style={styles.secondaryBtnText}>Xem chi tiết</Text>
                         </Pressable>
                         <Pressable
-                          style={styles.primaryClaimBtn}
-                          onPress={() => handleClaim(job)}
+                          style={[styles.primaryClaimBtn, !eligibility.allowed && { backgroundColor: BrandColors.gray400 }]}
+                          disabled={!eligibility.allowed}
+                          accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed }}
+                          accessibilityLabel={eligibility.reason ?? 'Nhận ca này'}
+                          onPress={() => handleClaim(job as OpenOpportunity)}
                         >
-                          <Text style={styles.primaryClaimBtnText}>Nhận ca này</Text>
+                          <Text style={styles.primaryClaimBtnText}>{eligibility.allowed ? 'Nhận ca này' : 'Chưa đủ điều kiện'}</Text>
                         </Pressable>
                       </>
                     ) : (
                       <>
-                        {job.conversationId ? (
-                          <Pressable
-                            style={styles.chatBtn}
-                            onPress={() =>
-                              router.push({
-                                pathname: '/chat/[id]',
-                                params: { id: job.conversationId || '' },
-                              })
-                            }
-                          >
-                            <IconSymbol name="chat" size={16} color="#047857" />
-                            <Text style={styles.chatBtnText}>Chat</Text>
-                          </Pressable>
-                        ) : null}
+                        <BookingChatLink bookingId={job.id} staffId={staffId}
+                          style={styles.chatBtn} textStyle={styles.chatBtnText} />
 
                         <Pressable
                           style={styles.primaryActionBtn}
@@ -346,6 +350,7 @@ export default function StaffJobsScreen() {
                       </>
                     )}
                   </View>
+                  {activeTab === 'open' && !eligibility.allowed && <Text style={{ color: BrandColors.gray600, fontSize: 13, lineHeight: 20 }}>{eligibility.reason}</Text>}
                 </View>
               );
             })

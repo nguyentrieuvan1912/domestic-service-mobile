@@ -56,8 +56,8 @@ export default function LoginScreen() {
     }, 450);
   };
 
-  const handleDemo = () => {
-    if (role === 'STAFF') quickLoginAsStaff('staff-001');
+  const handleDemo = (targetStaffId?: string) => {
+    if (role === 'STAFF') quickLoginAsStaff(targetStaffId || 'staff-001');
     else quickLoginAsCustomer('cust-001');
     setShowWelcome(true);
   };
@@ -123,9 +123,26 @@ export default function LoginScreen() {
                 {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.submitButtonText}>Đăng nhập {content.title}</Text><Text style={styles.submitArrow}>›</Text></>}
               </Pressable>
 
-              <Pressable style={styles.demoButton} onPress={handleDemo}>
-                <IconSymbol name="✦" style={styles.demoSparkle} /><Text style={styles.demoButtonText}>{content.demo}</Text>
-              </Pressable>
+              {role === 'STAFF' ? (
+                <View style={{ gap: 8, marginTop: 11 }}>
+                  <Pressable style={styles.demoButton} onPress={() => handleDemo('staff-001')}>
+                    <IconSymbol name="✦" style={styles.demoSparkle} />
+                    <Text style={styles.demoButtonText}>NV 1: Nguyễn Thị Hoa (Bình Thạnh)</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.demoButton, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', marginTop: 0 }]}
+                    onPress={() => handleDemo('staff-005')}
+                  >
+                    <IconSymbol name="✦" style={styles.demoSparkleBlue} />
+                    <Text style={[styles.demoButtonText, { color: '#0369A1' }]}>NV 2: Đỗ Văn Tuấn (Quận 1)</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable style={styles.demoButton} onPress={() => handleDemo()}>
+                  <IconSymbol name="✦" style={styles.demoSparkle} />
+                  <Text style={styles.demoButtonText}>{content.demo}</Text>
+                </Pressable>
+              )}
 
               {role === 'CUSTOMER' ? <View style={styles.registerRow}>
                 <Text style={styles.registerText}>Chưa có tài khoản? </Text>
@@ -152,6 +169,6 @@ const styles = StyleSheet.create({
   formCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 18, elevation: 4 }, formHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }, formIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' }, formHeadingCopy: { flex: 1 }, formTitle: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900' }, formSubtitle: { color: BrandColors.gray600, fontSize: 12, lineHeight: 17, marginTop: 2 },
   errorBox: { backgroundColor: '#FEF2F2', borderRadius: 10, padding: 10, marginBottom: 14 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 }, inputLabel: { color: BrandColors.gray700, fontSize: 12, fontWeight: '800', marginBottom: 7 }, passwordLabel: { marginTop: 14 }, inputWrapper: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderColor: '#D7E0E8', backgroundColor: '#F8FAFC', borderRadius: 13, paddingHorizontal: 12 }, input: { flex: 1, color: BrandColors.gray900, fontSize: 14 }, showPassword: { color: BrandColors.primary, fontSize: 12, fontWeight: '800' },
   optionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 18 }, rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 7 }, checkbox: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: '#94A3B8', alignItems: 'center', justifyContent: 'center' }, checkboxActive: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary }, checkboxText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' }, rememberText: { color: BrandColors.gray600, fontSize: 11 }, forgotText: { color: BrandColors.primary, fontSize: 11, fontWeight: '800' },
-  submitButton: { minHeight: 52, borderRadius: 14, backgroundColor: BrandColors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3 }, buttonLoading: { opacity: 0.75 }, submitButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' }, submitArrow: { color: '#FFFFFF', fontSize: 27, lineHeight: 28 }, demoButton: { minHeight: 44, marginTop: 11, borderRadius: 13, borderWidth: 1, borderColor: '#99F6E4', backgroundColor: '#F0FDFA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }, demoSparkle: { color: '#0F766E', fontSize: 15 }, demoButtonText: { color: '#0F766E', fontSize: 12, fontWeight: '800' },
+  submitButton: { minHeight: 52, borderRadius: 14, backgroundColor: BrandColors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3 }, buttonLoading: { opacity: 0.75 }, submitButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' }, submitArrow: { color: '#FFFFFF', fontSize: 27, lineHeight: 28 }, demoButton: { minHeight: 44, marginTop: 11, borderRadius: 13, borderWidth: 1, borderColor: '#99F6E4', backgroundColor: '#F0FDFA', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }, demoSparkle: { color: '#0F766E', fontSize: 15 }, demoSparkleBlue: { color: '#0369A1', fontSize: 15 }, demoButtonText: { color: '#0F766E', fontSize: 12, fontWeight: '800' },
   registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 17 }, registerText: { color: BrandColors.gray600, fontSize: 12 }, registerLink: { color: BrandColors.primary, fontSize: 12, fontWeight: '900' }, staffNotice: { flexDirection: 'row', gap: 7, alignItems: 'flex-start', marginTop: 15, padding: 10, borderRadius: 10, backgroundColor: '#F0F9FF' }, staffNoticeText: { flex: 1, color: '#075985', fontSize: 11, lineHeight: 16 },
 });

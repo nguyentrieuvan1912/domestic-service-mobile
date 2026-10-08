@@ -15,35 +15,45 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-import { StaffService, StaffJobItem } from '@/data/staffService';
+import { StaffService, StaffJobItem, OpenOpportunity, StaffOperationalProfile } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { NotificationBadge } from '@/components/common/NotificationBadge';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useStaffServiceEligibility } from '@/hooks/use-staff-service-eligibility';
 
 export default function StaffDashboard() {
   const router = useRouter();
   const { currentStaff } = useAuth();
-  const [isOnline, setIsOnline] = useState(true);
-  const [openShifts, setOpenShifts] = useState<StaffJobItem[]>([]);
-  const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
-  const [wallet, setWallet] = useState(StaffService.getWallet());
+  const { unreadCount } = useNotifications();
+  const evaluateService = useStaffServiceEligibility();
+  const staffId = currentStaff?.id || 'staff-001';
 
-  const staffName = currentStaff?.fullName || 'Nguyễn Thị Hoa';
+  const [profile, setProfile] = useState<StaffOperationalProfile>(() => StaffService.getOperationalProfile(staffId));
+  const [openShifts, setOpenShifts] = useState<OpenOpportunity[]>([]);
+  const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
+  const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
+
+  const isOnline = profile.isOnline;
+  const staffName = currentStaff?.fullName || profile.fullName;
   const staffAvatar =
     currentStaff?.avatar ||
+    profile.avatar ||
     'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80';
 
   useEffect(() => {
     const updateData = () => {
+      setProfile(StaffService.getOperationalProfile(staffId));
       setOpenShifts(StaffService.getOpenShifts());
-      setActiveJob(StaffService.getActiveJob() || StaffService.getUpcomingJobs()[0]);
-      setWallet(StaffService.getWallet());
+      setActiveJob(StaffService.getActiveJob(staffId) || StaffService.getUpcomingJobs(staffId)[0]);
+      setWallet(StaffService.getWallet(staffId));
     };
     updateData();
     const unsubscribe = StaffService.subscribe(updateData);
     return unsubscribe;
-  }, []);
+  }, [staffId]);
 
   const handleToggleOnline = (val: boolean) => {
-    setIsOnline(val);
+    StaffService.setOnline(val, staffId);
     Alert.alert(
       val ? 'Đã bật Trực tuyến' : 'Đã tạm nghỉ',
       val
@@ -52,7 +62,7 @@ export default function StaffDashboard() {
     );
   };
 
-  const handleClaimShift = (shift: StaffJobItem) => {
+  const handleClaimShift = (shift: OpenOpportunity) => {
     Alert.alert(
       'Xác nhận nhận ca',
       `Bạn có chắc muốn nhận ca "${shift.serviceName}" tại ${shift.district} (${shift.timeSlot})?\nThu nhập dự kiến: ${shift.netIncome.toLocaleString('vi-VN')}đ`,
@@ -61,8 +71,8 @@ export default function StaffDashboard() {
         {
           text: 'Nhận ca ngay',
           onPress: () => {
-            const success = StaffService.claimOpenShift(shift.id);
-            if (success) {
+            const result = StaffService.claimOpenShift(shift.id, staffId);
+            if (result.success) {
               Alert.alert(
                 'Nhận ca thành công! 🎉',
                 'Ca làm việc đã được chuyển vào mục "Ca làm việc của tôi". Bạn có thể mở xem chi tiết ngay bây giờ.',
@@ -74,6 +84,8 @@ export default function StaffDashboard() {
                   },
                 ]
               );
+            } else {
+              Alert.alert('Không thể nhận ca', result.reason);
             }
           },
         },
@@ -97,7 +109,7 @@ export default function StaffDashboard() {
                   <View style={styles.nameBadgeRow}>
                     <Text style={styles.greeting}>{staffName}</Text>
                     <View style={styles.verifiedBadge}>
-                      <Text style={styles.verifiedText}>✓ Đã xác thực</Text>
+                      <Text style={styles.verifiedText}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
                     </View>
                   </View>
                   <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình 5★</Text>
@@ -106,10 +118,12 @@ export default function StaffDashboard() {
 
               <Pressable
                 style={styles.notificationBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`Thông báo, ${unreadCount} chưa đọc`}
                 onPress={() => router.push('/notifications')}
               >
                 <IconSymbol name="bell" size={20} color={BrandColors.gray700} />
-                <View style={styles.notificationDot} />
+                <NotificationBadge count={unreadCount} />
               </Pressable>
             </View>
 
@@ -143,13 +157,13 @@ export default function StaffDashboard() {
 
               <Text style={styles.statusTitle}>
                 {isOnline
-                  ? 'Bán kính quét việc: 10 km quanh Bình Thạnh'
+                  ? `Bán kính quét việc: ${profile.maxDistanceKm} km quanh ${profile.primaryDistrict}`
                   : 'Bật trực tuyến để tiếp tục nhận ca làm việc mới'}
               </Text>
 
               <View style={styles.statusFooter}>
                 <Text style={styles.statusMeta}>
-                  {isOnline ? 'Khu vực: Bình Thạnh · Q.1 · Q.2 · Q.3' : 'Chế độ nghỉ ngơi'}
+                  {isOnline ? `Khu vực: ${profile.operatingDistricts.join(' · ')}` : 'Chế độ nghỉ ngơi'}
                 </Text>
                 <Pressable
                   onPress={() => router.push('/staff/availability')}
@@ -228,16 +242,16 @@ export default function StaffDashboard() {
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>Đánh giá đối tác</Text>
                 <View style={styles.ratingRow}>
-                  <Text style={styles.metricValue}>4.92</Text>
+                  <Text style={styles.metricValue}>{profile.rating.toFixed(2)}</Text>
                   <Text style={styles.metricStar}>★</Text>
                 </View>
-                <Text style={styles.metricSub}>248 lượt khen ngợi</Text>
+                <Text style={styles.metricSub}>{profile.reviewCount} lượt khen ngợi</Text>
               </View>
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>Tỷ lệ hoàn thành</Text>
-                <Text style={styles.metricValue}>99%</Text>
-                <Text style={styles.metricSub}>312 ca thành công</Text>
+                <Text style={styles.metricValue}>{profile.completionRate}%</Text>
+                <Text style={styles.metricSub}>Đạt chuẩn dịch vụ</Text>
               </View>
             </View>
 
@@ -246,7 +260,7 @@ export default function StaffDashboard() {
               <View>
                 <Text style={styles.sectionTitle}>Việc mới quanh bạn</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Dựa trên kỹ năng và khu vực bạn đã đăng ký
+                  Kiểm tra năng lực được xác nhận trước khi nhận ca
                 </Text>
               </View>
               <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open' } })}>
@@ -262,7 +276,9 @@ export default function StaffDashboard() {
                 </Text>
               </View>
             ) : (
-              openShifts.slice(0, 3).map((shift) => (
+              openShifts.slice(0, 3).map((shift) => {
+                const eligibility = evaluateService(shift.serviceId);
+                return (
                 <View key={shift.id} style={styles.shiftCard}>
                   <View style={styles.shiftHeader}>
                     <View style={styles.shiftBadge}>
@@ -312,14 +328,19 @@ export default function StaffDashboard() {
                     </Pressable>
 
                     <Pressable
-                      style={styles.claimBtn}
+                      style={[styles.claimBtn, !eligibility.allowed && { backgroundColor: BrandColors.gray400 }]}
+                      disabled={!eligibility.allowed}
+                      accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed }}
+                      accessibilityLabel={eligibility.reason ?? 'Nhận ca ngay'}
                       onPress={() => handleClaimShift(shift)}
                     >
-                      <Text style={styles.claimBtnText}>Nhận ca ngay</Text>
+                      <Text style={styles.claimBtnText}>{eligibility.allowed ? 'Nhận ca ngay' : 'Chưa đủ điều kiện'}</Text>
                     </Pressable>
                   </View>
+                  {!eligibility.allowed && <Text style={styles.shiftNoteText}>{eligibility.reason}</Text>}
                 </View>
-              ))
+                );
+              })
             )}
 
             {/* Safety & Support Banner */}
@@ -376,15 +397,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  notificationDot: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
-  },
 
   statusBanner: {
     borderRadius: 20,
@@ -413,7 +425,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.2)',
   },
-  statusMeta: { color: '#D1FAE5', fontSize: 12 },
+  statusMeta: { color: '#D1FAE5', fontSize: 12, flex: 1, paddingRight: 8 },
   editAreaBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   editAreaText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   editAreaArrow: { color: '#FFFFFF', fontSize: 18, lineHeight: 18 },

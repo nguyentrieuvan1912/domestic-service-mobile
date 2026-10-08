@@ -49,7 +49,7 @@ export default function PersonalInfoScreen() {
           <View style={styles.avatarSection}>
             <Image
               source={{
-                uri: currentCustomer?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+                uri: currentCustomer?.avatar || 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80',
               }}
               style={styles.avatar}
             />

@@ -14,11 +14,14 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffAvailabilitySlot } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { useAuth } from '@/context/AuthContext';
 
 export default function StaffAvailabilityScreen() {
   const router = useRouter();
+  const { currentStaff } = useAuth();
+  const staffId = currentStaff?.id || 'staff-001';
 
-  const [availability, setAvailability] = useState(StaffService.getAvailability());
+  const [availability, setAvailability] = useState(() => StaffService.getAvailability(staffId));
   const [autoAccept, setAutoAccept] = useState(availability.areas.autoAccept);
   const [maxDistance, setMaxDistance] = useState(availability.areas.maxDistanceKm);
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>(
@@ -27,11 +30,16 @@ export default function StaffAvailabilityScreen() {
 
   useEffect(() => {
     const update = () => {
-      setAvailability(StaffService.getAvailability());
+      const fresh = StaffService.getAvailability(staffId);
+      setAvailability(fresh);
+      setAutoAccept(fresh.areas.autoAccept);
+      setMaxDistance(fresh.areas.maxDistanceKm);
+      setSelectedDistricts(fresh.areas.selectedDistricts);
     };
+    update();
     const unsubscribe = StaffService.subscribe(update);
     return unsubscribe;
-  }, []);
+  }, [staffId]);
 
   const allDistricts = [
     'Bình Thạnh',
@@ -60,17 +68,19 @@ export default function StaffAvailabilityScreen() {
   };
 
   const toggleScheduleSlot = (slotId: string) => {
-    StaffService.toggleShiftSlot(slotId);
-    // Update immediately as well, so the selected state is visible on the same tap.
-    setAvailability(StaffService.getAvailability());
+    StaffService.toggleShiftSlot(slotId, staffId);
+    setAvailability(StaffService.getAvailability(staffId));
   };
 
   const handleSave = () => {
-    StaffService.updateOperatingAreas({
-      autoAccept,
-      maxDistanceKm: maxDistance,
-      selectedDistricts,
-    });
+    StaffService.updateOperatingAreas(
+      {
+        autoAccept,
+        maxDistanceKm: maxDistance,
+        selectedDistricts,
+      },
+      staffId
+    );
     Alert.alert(
       'Đã lưu cài đặt! ✓',
       'Hệ thống sẽ cập nhật thuật toán gửi thông báo ca làm việc mới theo lịch rảnh và khu vực bạn vừa chọn.'

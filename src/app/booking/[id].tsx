@@ -1,3 +1,4 @@
+import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState } from 'react';
 import {
   View,
@@ -44,14 +45,6 @@ export default function BookingDetailScreen() {
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
-
-  const handleCallStaff = () => {
-    Alert.alert(
-      'Cuộc gọi thoại bảo mật',
-      'Đang kết nối qua tổng đài mã hóa của CleanMaster. Số điện thoại cá nhân của bạn được bảo mật tuyệt đối.',
-      [{ text: 'Đồng ý gọi' }, { text: 'Hủy', style: 'cancel' }]
-    );
-  };
 
   const handleCancelBooking = () => {
     Alert.alert(
@@ -167,14 +160,12 @@ export default function BookingDetailScreen() {
             </View>
 
             <View style={styles.staffContactRow}>
-              <Pressable style={styles.contactBtn} onPress={handleCallStaff}>
-                <Text style={styles.contactBtnText}>📞 Gọi bảo mật</Text>
+              <Pressable style={[styles.contactBtn, { opacity: 0.55 }]} disabled
+                accessibilityLabel="Gọi thoại qua nền tảng chưa được hỗ trợ" accessibilityState={{ disabled: true }}>
+                <Text style={styles.contactBtnText}>Gọi chưa hỗ trợ</Text>
               </Pressable>
-              <Pressable
-                style={[styles.contactBtn, styles.contactBtnPrimary]}
-                onPress={() => router.push('/chat/conv-001')}>
-                <Text style={styles.contactBtnTextPrimary}>💬 Nhắn tin</Text>
-              </Pressable>
+              <BookingChatLink bookingId={booking.id} staffId={staff?.id}
+                style={[styles.contactBtn, styles.contactBtnPrimary]} textStyle={styles.contactBtnTextPrimary} label="💬 Nhắn tin" />
             </View>
           </View>
         )}

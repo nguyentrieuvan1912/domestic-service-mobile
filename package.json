@@ -36,12 +36,13 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --port 8090",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
+    "android": "expo start --android --port 8090",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs"
   },
   "private": true
 }
