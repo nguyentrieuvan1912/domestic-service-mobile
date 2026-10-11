@@ -37,6 +37,8 @@ Profile → `/staff/account-details?section=skills`. Chạm card → cùng route
 
 ### Hai việc mới để demo
 
+Cập nhật trong Prompt 05: hai ca này được dời sang ngày +3 (11/10/2026 tại lần kiểm tra), giữ giờ và thu nhập, để tránh ca đã nhận ngày +1 theo rule lịch mới. Mốc “ngày tiếp theo” trong bảng dưới là dữ liệu tại lần kiểm tra Prompt 04 trước thay đổi này. Xem `staff-availability-handoff.md` cho fixture và policy hiện tại.
+
 Hai vị trí ở đầu pool, hiện trên Trang chủ → “Việc mới quanh bạn” và Ca làm việc → “Việc mới”. Đăng nhập Hoa để nhận được; Tuấn bị chặn vì thiếu năng lực dọn nhà.
 
 | ID / mã | Địa điểm demo | Giờ ngày tiếp theo | Khoảng cách fixture | Thu nhập dự kiến |

@@ -45,3 +45,17 @@ export const mockStaffAreas: StaffArea[] = [
   { id: 'sa-025', staffId: 'staff-012', district: 'TP. Thủ Đức', city: 'TP. Hồ Chí Minh', isPrimary: true },
   { id: 'sa-026', staffId: 'staff-012', district: 'Bình Thạnh', city: 'TP. Hồ Chí Minh', isPrimary: false },
 ];
+
+// Shared local area catalog until Booking publishes an area DTO. IDs are UI fixture IDs.
+const operationalAreaNames = [
+  'Bình Thạnh', 'Quận 1', 'Quận 2', 'Quận 3', 'Quận 7', 'Phú Nhuận', 'Gò Vấp',
+  'Tân Bình', 'TP. Thủ Đức', 'Tân Phú', 'Quận 10', 'Nhà Bè',
+];
+export const STAFF_AREA_OPTIONS = [...new Set([...operationalAreaNames, ...mockStaffAreas.map(area => area.district)])]
+  .map((name, index) => ({ id: `area-${index + 1}`, name }));
+export function areaIdsForNames(names: readonly string[]): string[] {
+  return STAFF_AREA_OPTIONS.filter(item => names.includes(item.name) || names.includes('Toàn bộ các quận TP.HCM')).map(item => item.id);
+}
+export function areaNamesForIds(ids: readonly string[]): string[] {
+  return STAFF_AREA_OPTIONS.filter(item => ids.includes(item.id)).map(item => item.name);
+}

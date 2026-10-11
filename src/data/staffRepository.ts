@@ -2,6 +2,10 @@ import { mockStaffs } from './staffs';
 import { mockStaffBalances } from './staffBalances';
 import { mockReviews } from './reviews';
 import { StaffCapabilityRepository } from './staffCapabilityRepository';
+import { mockUsers } from './users';
+import { evaluateOpportunity } from './staffMatchingRules';
+import type { MatchContext, MatchEligibility, MatchReason, MatchingOpportunity, MatchingSnapshot } from '../types/staff-matching';
+import type { StaffCapabilityActor } from '../types/staff-capability';
 import {
   JobStepStatus,
   validateJobTransition,
@@ -9,6 +13,9 @@ import {
   isTerminalStatus,
 } from './staffStateTransitions';
 import { StaffId, UserId, getUserIdByStaffId, getStaffIdByUserId } from './staffMapping';
+import type { AvailabilityDraft, AvailabilitySnapshot, SavedAvailability, ScheduleBooking, ScheduleResult } from '../types/staff-availability';
+import { areaIdsForNames, areaNamesForIds } from './staffAreas';
+import { addCalendarDays, localDate, scheduleDates, intervalFor, normalizeDraft, canScheduleBooking } from './staffAvailabilityRules';
 
 export type { JobStepStatus, StaffId, UserId };
 
@@ -23,7 +30,7 @@ export interface OpenOpportunity {
   customerAvatar: string;
   address: string;
   district: string;
-  distanceKm: number;
+  distanceKm?: number;
   date: string;
   timeSlot: string;
   startsAt?: string;
@@ -35,6 +42,11 @@ export interface OpenOpportunity {
   platformFee: number;
   netIncome: number;
   requiredCapabilities?: string[];
+  // UI fixture proposal; one assignment per Staff, remaining positions rechecked at claim.
+  mode?: 'A' | 'B';
+  invitedStaffId?: string;
+  positionsRequired?: number;
+  claimedStaffIds?: string[];
   status: 'OPEN';
 }
 
@@ -50,7 +62,7 @@ export interface AcceptedAssignment {
   customerAvatar: string;
   address: string;
   district: string;
-  distanceKm: number;
+  distanceKm?: number;
   date: string;
   timeSlot: string;
   startsAt?: string;
@@ -128,6 +140,7 @@ export type ClaimOpportunityResult =
       success: false;
       reason: string;
       errorCode: 'NOT_FOUND' | 'ALREADY_CLAIMED' | 'LOCKED' | 'NOT_ELIGIBLE';
+      reasons?: MatchReason[];
     };
 
 export type JobDetailResult =
@@ -138,6 +151,30 @@ export type JobDetailResult =
 
 function clone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
+}
+function positionsRemaining(job: OpenOpportunity): number {
+  return (job.positionsRequired ?? 1) - (job.claimedStaffIds?.length ?? 0);
+}
+function publicOpportunity(job: OpenOpportunity): OpenOpportunity {
+  // Even the legacy facade/detail cannot disclose contacts, addresses or arbitrary notes.
+  return clone({ ...job, customerName: '', customerPhone: '', customerAvatar: '', address: '',
+    notes: undefined, distanceKm: undefined, claimedStaffIds: undefined });
+}
+function matchingOpportunity(job: OpenOpportunity): MatchingOpportunity {
+  return { id: job.id, bookingCode: job.bookingCode, serviceId: job.serviceId, serviceName: job.serviceName,
+    serviceIcon: job.serviceIcon, district: job.district, startsAt: job.startsAt ?? '', endsAt: job.endsAt ?? '',
+    packageTitle: job.packageTitle, addOnsText: job.addOnsText, netIncome: job.netIncome,
+    mode: job.mode ?? 'B', positionsRequired: job.positionsRequired ?? 1, positionsRemaining: positionsRemaining(job),
+    requiredCapabilities: [...(job.requiredCapabilities ?? [])], invitedStaffId: job.invitedStaffId };
+}
+function matchingContext(actor: StaffCapabilityActor, now: number): MatchContext {
+  const user = mockUsers.find(item => item.id === actor.userId && item.role === 'STAFF');
+  const staff = mockStaffs.find(item => item.id === actor.staffId && item.userId === actor.userId);
+  if (!user || !staff || getStaffIdByUserId(actor.userId) !== actor.staffId) throw new Error('Vui lòng đăng nhập nhân viên có hồ sơ hợp lệ.');
+  return { actor: { ...actor }, userActive: user.status === 'ACTIVE', staffStatus: staff.status,
+    isOnline: getOrCreateStaffStore(actor.staffId).profile.isOnline,
+    capabilities: StaffCapabilityRepository.getSnapshot(actor, now),
+    schedule: StaffRepository.getScheduleSnapshot(actor.staffId, now) };
 }
 
 // Internal Per-Staff Store
@@ -186,13 +223,27 @@ function createDefaultAvailabilitySlots(prefix: string): StaffAvailabilitySlot[]
 const claimLockSet = new Set<string>();
 
 // Global open pool (unassigned shifts)
-// Two local demo opportunities for tomorrow in the same timezone as capability validity.
-const demoTomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
-const demoDateParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(demoTomorrow);
+// Two local demo opportunities for day +3 in the same timezone as capability validity.
+const fixtureToday = localDate();
+const fixtureTomorrow = addCalendarDays(fixtureToday, 1);
+const fixtureBufferDay = addCalendarDays(fixtureToday, 2);
+// The earlier two demo jobs move to day +3 to avoid the already accepted next-day booking.
+const demoAvailableDay = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+const demoDateParts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(demoAvailableDay);
 const demoDatePart = (type: Intl.DateTimeFormatPartTypes) => demoDateParts.find((part) => part.type === type)!.value;
 const demoDateIso = `${demoDatePart('year')}-${demoDatePart('month')}-${demoDatePart('day')}`;
-const demoDateLabel = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(demoTomorrow);
+const demoDateLabel = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(demoAvailableDay);
 let openOpportunitiesStore: OpenOpportunity[] = [
+  ...['10:30', '11:00'].map((time, index): OpenOpportunity => ({
+    id: `open-buffer-${index + 1}`, bookingCode: `BK-DEMO-BUFFER-${index + 1}`,
+    serviceId: 'srv-001', serviceName: 'Vệ sinh nhà theo giờ', serviceIcon: 'clean',
+    customerName: index === 0 ? 'Trần Minh Phương' : 'Võ Thu Hà', customerPhone: '', customerAvatar: '',
+    address: 'Căn hộ demo, đường Nguyễn Xí', district: 'Bình Thạnh', distanceKm: 1.3,
+    date: fixtureBufferDay.split('-').reverse().join('/'), timeSlot: `${time} - ${index === 0 ? '11:30' : '12:00'} (1 giờ)`,
+    ...intervalFor(fixtureBufferDay, time, index === 0 ? '11:30' : '12:00'),
+    packageTitle: 'Dọn phòng khách 1 giờ', notes: 'Gia chủ chuẩn bị dụng cụ vệ sinh cơ bản.',
+    totalCustomerPaid: 95000, platformFee: 14250, netIncome: 80750, status: 'OPEN',
+  })),
   {
     id: 'open-104',
     bookingCode: 'BK-DEMO-104',
@@ -251,11 +302,12 @@ let openOpportunitiesStore: OpenOpportunity[] = [
     address: 'Chung cư Richmond City, 207C Nguyễn Xí',
     district: 'Bình Thạnh',
     distanceKm: 0.9,
-    date: 'Hôm nay',
+    date: 'Ngày mai',
     timeSlot: '18:00 - 20:00 (2 giờ)',
+    ...intervalFor(fixtureTomorrow, '18:00', '20:00'),
     packageTitle: 'Gói 2 giờ dọn dẹp',
     addOnsText: 'Ủi 5 bộ quần áo',
-    notes: 'Cần dọn gấp trước 20h30 tối nay do có khách đến chơi.',
+    notes: 'Cần dọn trước 20h30 tối ngày mai do có khách đến chơi.',
     totalCustomerPaid: 210000,
     platformFee: 31500,
     netIncome: 178500,
@@ -275,6 +327,7 @@ let openOpportunitiesStore: OpenOpportunity[] = [
     distanceKm: 4.8,
     date: 'Ngày mai',
     timeSlot: '08:00 - 13:00 (5 giờ)',
+    ...intervalFor(fixtureTomorrow, '08:00', '13:00'),
     packageTitle: 'Tổng vệ sinh nhà 3 tầng',
     notes: 'Có thang leo và máy hút bụi sẵn tại nhà.',
     totalCustomerPaid: 650000,
@@ -296,6 +349,7 @@ let openOpportunitiesStore: OpenOpportunity[] = [
     distanceKm: 2.4,
     date: 'Ngày mai',
     timeSlot: '16:00 - 18:30',
+    ...intervalFor(fixtureTomorrow, '16:00', '18:30'),
     packageTitle: 'Nấu 1 bữa tối (4 món) cho 4 người',
     notes: 'Thực đơn: Canh chua cá, sườn xào chua ngọt, rau muống xào tỏi.',
     totalCustomerPaid: 280000,
@@ -303,6 +357,22 @@ let openOpportunitiesStore: OpenOpportunity[] = [
     netIncome: 238000,
     status: 'OPEN',
   },
+  // Demo exclusions and a multi-position Mode B booking; all use the same store as the UI.
+  ...[
+    { id: 'open-outside-area', district: 'Quận 7', serviceId: 'srv-001', serviceName: 'Vệ sinh nhà theo giờ', start: '08:00', end: '10:00', positions: 1 },
+    { id: 'open-outside-time', district: 'Bình Thạnh', serviceId: 'srv-001', serviceName: 'Vệ sinh nhà theo giờ', start: '12:00', end: '13:00', positions: 1 },
+    { id: 'open-laundry-restricted', district: 'Bình Thạnh', serviceId: 'srv-012', serviceName: 'Giặt ủi', start: '08:00', end: '10:00', positions: 1 },
+    { id: 'open-team', district: 'Bình Thạnh', serviceId: 'srv-001', serviceName: 'Vệ sinh nhà theo giờ', start: '08:00', end: '11:00', positions: 2 },
+    { id: 'open-tuan-ac', district: 'Quận 1', serviceId: 'srv-004', serviceName: 'Vệ sinh máy lạnh', start: '13:00', end: '15:00', positions: 1 },
+  ].map((item): OpenOpportunity => ({
+    id: item.id, bookingCode: `BK-DEMO-${item.id.slice(5).toUpperCase()}`, serviceId: item.serviceId, serviceName: item.serviceName,
+    district: item.district, customerName: 'Khách demo', customerPhone: '', customerAvatar: '', address: 'Địa chỉ riêng của ca demo',
+    date: addCalendarDays(fixtureToday, 4), timeSlot: `${item.start} - ${item.end}`,
+    ...intervalFor(addCalendarDays(fixtureToday, 4), item.start, item.end), packageTitle: item.id === 'open-team' ? 'Vệ sinh căn hộ • cần 2 nhân viên' : item.serviceName,
+    mode: 'B', positionsRequired: item.positions, claimedStaffIds: [],
+    totalCustomerPaid: item.id === 'open-team' ? 285000 : 190000, platformFee: item.id === 'open-team' ? 42750 : 28500,
+    netIncome: item.id === 'open-team' ? 242250 : 161500, status: 'OPEN',
+  })),
 ];
 
 // Per-staff in-memory state dictionary
@@ -397,6 +467,7 @@ staffDataMap.set('staff-001', {
       distanceKm: 1.2,
       date: 'Hôm nay',
       timeSlot: '14:00 - 17:00 (3 giờ)',
+      ...intervalFor(fixtureToday, '14:00', '17:00'),
       packageTitle: 'Gói 3 giờ tiêu chuẩn',
       addOnsText: 'Vệ sinh tủ lạnh, Lau ban công',
       notes: 'Nhà có nuôi cún Poodle nhỏ rất ngoan. Nhờ chị lau kỹ mặt kính ban công và gầm sofa giúp em.',
@@ -428,6 +499,7 @@ staffDataMap.set('staff-001', {
       distanceKm: 3.5,
       date: 'Ngày mai',
       timeSlot: '08:30 - 12:30 (4 giờ)',
+      ...intervalFor(fixtureTomorrow, '08:30', '12:30'),
       packageTitle: 'Tổng vệ sinh căn 2PN',
       notes: 'Mang theo cây lau kính dài. Chủ nhà có mặt để mở cửa.',
       totalCustomerPaid: 580000,
@@ -441,6 +513,14 @@ staffDataMap.set('staff-001', {
         { id: 'chk-3', title: 'Tẩy ố nhà tắm và bồn rửa', done: false },
         { id: 'chk-4', title: 'Lau sàn gỗ bóng chuyên dụng', done: false },
       ],
+    },
+    {
+      id: 'bk-demo-buffer', bookingCode: 'BK-DEMO-0800', staffId: 'staff-001', serviceId: 'srv-001',
+      serviceName: 'Vệ sinh nhà theo giờ', serviceIcon: 'clean', customerName: 'Nguyễn Ngọc Lan',
+      customerPhone: '', customerAvatar: '', address: 'Căn hộ demo, đường Nguyễn Xí', district: 'Bình Thạnh', distanceKm: 1.3,
+      date: fixtureBufferDay.split('-').reverse().join('/'), timeSlot: '08:00 - 10:00 (2 giờ)',
+      ...intervalFor(fixtureBufferDay, '08:00', '10:00'), packageTitle: 'Dọn nhà 2 giờ',
+      totalCustomerPaid: 190000, platformFee: 28500, netIncome: 161500, status: 'ACCEPTED',
     },
     {
       id: 'bk-015',
@@ -561,6 +641,7 @@ staffDataMap.set('staff-005', {
       distanceKm: 0.8,
       date: 'Hôm nay',
       timeSlot: '15:00 - 17:00',
+      ...intervalFor(fixtureToday, '15:00', '17:00'),
       packageTitle: 'Vệ sinh 3 dàn lạnh treo tường',
       notes: 'Căn hộ tầng 8, thang máy tải sẵn sàng.',
       totalCustomerPaid: 520000,
@@ -642,7 +723,42 @@ function getOrCreateStaffStore(staffId: StaffId): StaffDataStore {
 // Reactive listeners
 type Listener = () => void;
 const listeners = new Set<Listener>();
+let storeRevision = 0;
+const savedSchedules = new Map<StaffId, SavedAvailability>();
+function readSchedule(staffId: StaffId, now = Date.now()): SavedAvailability {
+  let saved = savedSchedules.get(staffId);
+  const dates = scheduleDates(now);
+  if (!saved) {
+    const profile = getOrCreateStaffStore(staffId).profile;
+    saved = {
+      revision: 1, updatedAt: new Date(now).toISOString(), areaIds: areaIdsForNames(profile.operatingDistricts),
+      // Legacy autoAccept was only a preference. It migrates to notification preference, never acceptance.
+      matchNotifications: profile.autoAccept,
+      days: dates.map((date, index) => ({ date, intervals: staffId === 'staff-010' ? [] :
+        index < 2 ? [intervalFor(date, '08:00', '20:00')] :
+        index === 2 && staffId === 'staff-001' ? [intervalFor(date, '08:00', '12:00')] :
+        [intervalFor(date, '08:00', '12:00'), intervalFor(date, '13:00', '18:00')] })),
+    };
+    savedSchedules.set(staffId, saved);
+    getOrCreateStaffStore(staffId).profile.autoAccept = false;
+  }
+  // Rolling horizon: preserve saved dates; newly entering dates are empty until explicitly saved.
+  return clone({ ...saved, days: dates.map(date => saved!.days.find(day => day.date === date) ?? { date, intervals: [] }) });
+}
+function scheduleBookings(staffId: StaffId): { bookings: ScheduleBooking[]; unknownBookingCodes: string[] } {
+  const bookings: ScheduleBooking[] = [], unknownBookingCodes: string[] = [];
+  for (const assignment of getOrCreateStaffStore(staffId).assignments) {
+    if (assignment.status === 'CANCELLED') continue;
+    if (!assignment.startsAt || !assignment.endsAt || !Number.isFinite(Date.parse(assignment.startsAt)) || !Number.isFinite(Date.parse(assignment.endsAt)) || Date.parse(assignment.startsAt) >= Date.parse(assignment.endsAt)) {
+      if (assignment.status !== 'COMPLETED') unknownBookingCodes.push(assignment.bookingCode);
+      continue;
+    }
+    bookings.push({ id: assignment.id, bookingCode: assignment.bookingCode, district: assignment.district, status: assignment.status, startsAt: assignment.startsAt, endsAt: assignment.endsAt });
+  }
+  return { bookings, unknownBookingCodes };
+}
 function notifyListeners() {
+  storeRevision += 1;
   listeners.forEach((fn) => {
     try {
       fn();
@@ -656,6 +772,56 @@ function notifyListeners() {
  * Type-safe StaffRepository providing scoped immutable snapshots and reactive subscriptions.
  */
 export const StaffRepository = {
+  getMatchingSnapshot(actor: StaffCapabilityActor, now = Date.now()): MatchingSnapshot {
+    const context = matchingContext(actor, now);
+    return { context, checkedAt: new Date(now).toISOString(), revision: storeRevision,
+      items: openOpportunitiesStore.filter(job => positionsRemaining(job) > 0).map(job => {
+        const opportunity = matchingOpportunity(job);
+        return { opportunity, eligibility: evaluateOpportunity(context, opportunity, now) };
+      }) };
+  },
+  getMatchingOpportunity(actor: StaffCapabilityActor, id: string, now = Date.now()) {
+    const context = matchingContext(actor, now);
+    const raw = openOpportunitiesStore.find(job => job.id === id);
+    if (!raw) return undefined;
+    const opportunity = matchingOpportunity(raw);
+    return { opportunity, eligibility: evaluateOpportunity(context, opportunity, now) };
+  },
+  getOpportunityEligibility(staffId: StaffId, id: string, now = Date.now()): MatchEligibility {
+    const opportunity = openOpportunitiesStore.find(job => job.id === id);
+    const fail = (code: 'INVALID_ACTOR' | 'POSITION_FULL', message: string): MatchEligibility => ({ allowed: false, reasons: [{ code, message }], checks: [] });
+    if (!opportunity) return fail('POSITION_FULL', 'Ca không còn khả dụng để nhận.');
+    const userId = getUserIdByStaffId(staffId);
+    if (!userId) return fail('INVALID_ACTOR', 'Hồ sơ nhân viên chưa hợp lệ.');
+    try { return evaluateOpportunity(matchingContext({ userId, staffId }, now), matchingOpportunity(opportunity), now); }
+    catch { return fail('INVALID_ACTOR', 'Chưa kiểm tra được hồ sơ nhân viên.'); }
+  },
+  getStoreRevision(): number { return storeRevision; },
+  getScheduleSnapshot(staffId: StaffId, now = Date.now()): AvailabilitySnapshot {
+    return { saved: readSchedule(staffId, now), ...scheduleBookings(staffId) };
+  },
+  saveSchedule(staffId: StaffId, draft: AvailabilityDraft, revision: number, now = Date.now()): SavedAvailability {
+    const snapshot = this.getScheduleSnapshot(staffId, now);
+    if (snapshot.saved.revision !== revision) throw new Error('Lịch đã được cập nhật ở nơi khác. Hãy tải lại trước khi lưu.');
+    if (snapshot.unknownBookingCodes.length) throw new Error(`Chưa có giờ hợp lệ của ca ${snapshot.unknownBookingCodes.join(', ')}. Cần xác minh trước khi thay đổi lịch.`);
+    const result = normalizeDraft(draft, snapshot.bookings, now);
+    if (!result.draft) throw new Error(result.error);
+    const saved = { ...result.draft, revision: revision + 1, updatedAt: new Date(now).toISOString() };
+    savedSchedules.set(staffId, clone(saved));
+    const store = getOrCreateStaffStore(staffId);
+    const districts = areaNamesForIds(saved.areaIds);
+    store.profile = { ...store.profile, autoAccept: false, operatingDistricts: districts,
+      primaryDistrict: districts.includes(store.profile.primaryDistrict) ? store.profile.primaryDistrict : districts[0] };
+    notifyListeners();
+    return clone(saved);
+  },
+  canReceiveOpportunity(staffId: StaffId, id: string, now = Date.now()): ScheduleResult {
+    const opportunity = openOpportunitiesStore.find(item => item.id === id);
+    if (!opportunity) return { allowed: false, reason: 'Vị trí không còn mở để nhận.' };
+    const snapshot = this.getScheduleSnapshot(staffId, now);
+    if (snapshot.unknownBookingCodes.length) return { allowed: false, reason: 'Cần xác minh giờ các ca đã nhận trước khi nhận thêm việc.' };
+    return canScheduleBooking(snapshot.saved, { ...opportunity, startsAt: opportunity.startsAt ?? '', endsAt: opportunity.endsAt ?? '' }, snapshot.bookings, now);
+  },
   subscribe(fn: Listener): () => void {
     listeners.add(fn);
     return () => {
@@ -688,7 +854,7 @@ export const StaffRepository = {
     const operatingDistricts = settings.operatingDistricts || settings.selectedDistricts || store.profile.operatingDistricts;
     store.profile = {
       ...store.profile,
-      ...(settings.autoAccept !== undefined ? { autoAccept: settings.autoAccept } : {}),
+      autoAccept: false, // Deprecated compatibility field; no automatic booking acceptance engine.
       ...(settings.maxDistanceKm !== undefined ? { maxDistanceKm: settings.maxDistanceKm } : {}),
       ...(settings.primaryDistrict !== undefined ? { primaryDistrict: settings.primaryDistrict } : {}),
       operatingDistricts,
@@ -702,14 +868,19 @@ export const StaffRepository = {
   },
 
   getOpenOpportunities(): OpenOpportunity[] {
-    return clone(openOpportunitiesStore);
+    return openOpportunitiesStore.filter(job => positionsRemaining(job) > 0).map(publicOpportunity);
   },
 
   getJobDetail(staffId: StaffId, jobId: string): JobDetailResult {
-    // 1. Check open opportunities pool
+    if (!mockStaffs.some(staff => staff.id === staffId)) return { kind: 'FORBIDDEN', reason: 'Vui lòng đăng nhập nhân viên có hồ sơ hợp lệ.' };
+    // Owned assignment takes priority while other positions of a Mode B booking remain open.
+    const owned = getOrCreateStaffStore(staffId).assignments.find(job => job.id === jobId);
+    if (owned) return { kind: 'ASSIGNMENT', assignment: clone(owned) };
+    // 1. Check public open opportunities pool
     const openOpp = openOpportunitiesStore.find((o) => o.id === jobId);
-    if (openOpp) {
-      return { kind: 'OPEN_OPPORTUNITY', opportunity: clone(openOpp) };
+    if (openOpp && positionsRemaining(openOpp) > 0) {
+      if (openOpp.mode === 'A' && openOpp.invitedStaffId !== staffId) return { kind: 'FORBIDDEN', reason: 'Lời mời này không dành cho bạn.' };
+      return { kind: 'OPEN_OPPORTUNITY', opportunity: publicOpportunity(openOpp) };
     }
 
     // 2. Check current staff's assignments
@@ -762,11 +933,10 @@ export const StaffRepository = {
       }
 
       const opportunity = openOpportunitiesStore[idx];
-      // Check the Admin-confirmed capability again before consuming the slot.
-      const eligibility = StaffCapabilityRepository.canReceiveService(staffId, opportunity.serviceId);
-      if (!eligibility.allowed) return { success: false, reason: eligibility.reason ?? 'Chưa đủ điều kiện năng lực.', errorCode: 'NOT_ELIGIBLE' };
-      // Remove from open pool
-      openOpportunitiesStore = openOpportunitiesStore.filter((o) => o.id !== opportunityId);
+      // Capture fresh account/capability/restriction/saved schedule and remaining slots inside the lock.
+      const eligibility = this.getOpportunityEligibility(staffId, opportunityId);
+      if (!eligibility.allowed) return { success: false, reason: eligibility.reasons.map(item => item.message).join('\n'), reasons: eligibility.reasons, errorCode: 'NOT_ELIGIBLE' };
+      opportunity.claimedStaffIds = [...(opportunity.claimedStaffIds ?? []), staffId];
 
       // Create new accepted assignment for this staff
       const store = getOrCreateStaffStore(staffId);

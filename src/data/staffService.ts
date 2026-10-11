@@ -25,6 +25,8 @@ import {
   isStaffUser,
   STAFF_USER_MAPPINGS,
 } from './staffMapping';
+import { selectMatchingItems, STAFF_MATCHING_POLICY } from './staffMatchingRules';
+import type { MatchingOpportunity } from '../types/staff-matching';
 
 export type {
   JobStepStatus,
@@ -68,8 +70,11 @@ export const StaffService = {
     return StaffRepository.getAssignments(staffId);
   },
 
-  getOpenShifts(): OpenOpportunity[] {
-    return StaffRepository.getOpenOpportunities();
+  getOpenShifts(staffId: string): MatchingOpportunity[] {
+    const userId = getUserIdByStaffId(staffId);
+    if (!userId) return [];
+    return selectMatchingItems(StaffRepository.getMatchingSnapshot({ userId, staffId }),
+      { query: '', district: 'Tất cả', sort: STAFF_MATCHING_POLICY.defaultSort }).map(item => item.opportunity);
   },
 
   getJobById(id: string, staffId: string = DEFAULT_STAFF_ID): StaffJobItem | OpenOpportunity | undefined {
@@ -129,6 +134,9 @@ export const StaffService = {
 
   getAvailability(staffId: string = DEFAULT_STAFF_ID) {
     return StaffRepository.getAvailability(staffId);
+  },
+  getScheduleSnapshot(staffId: string = DEFAULT_STAFF_ID) {
+    return StaffRepository.getScheduleSnapshot(staffId);
   },
 
   toggleShiftSlot(slotId: string, staffId: string = DEFAULT_STAFF_ID) {

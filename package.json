@@ -42,7 +42,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs"
+    "test": "node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs && node scripts/test-staff-availability.mjs && node scripts/test-staff-matching.mjs"
   },
   "private": true
 }

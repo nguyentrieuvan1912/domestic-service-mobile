@@ -16,14 +16,25 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, JobStepStatus, JobDetailResult, AcceptedAssignment, OpenOpportunity } from '@/data/staffService';
 import { BookingChatLink } from '@/components/common/BookingChatLink';
 import { useAuth } from '@/context/AuthContext';
-import { useStaffServiceEligibility } from '@/hooks/use-staff-service-eligibility';
+import { useStaffMatching } from '@/hooks/use-staff-matching';
+import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
+import { StaffMatchExplanation, opportunityTime } from '@/components/staff/StaffMatchingList';
+import { EmptyState } from '@/components/common/EmptyState';
 
 export default function StaffJobDetailScreen() {
+  const { currentUser, currentStaff } = useAuth();
+  const router = useRouter();
+  if (!getCapabilityActor(currentUser, currentStaff)) return <SafeAreaView style={styles.centerContainer}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /><Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/auth/login')}><Text>Quay lại</Text></Pressable></SafeAreaView>;
+  return <StaffJobDetailContent key={currentUser!.id} />;
+}
+function StaffJobDetailContent() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentStaff } = useAuth();
   const staffId = currentStaff?.id || 'staff-001';
-  const evaluateService = useStaffServiceEligibility();
+  const matching = useStaffMatching();
+  const [showMatch, setShowMatch] = useState(false);
 
   const [detailResult, setDetailResult] = useState<JobDetailResult>(() =>
     id ? StaffService.getJobDetail(staffId, id) : { kind: 'NOT_FOUND', reason: 'Không tìm thấy ca làm việc.' }
@@ -92,7 +103,8 @@ export default function StaffJobDetailScreen() {
   const assignment = isAssignment ? detailResult.assignment : undefined;
   const opportunity = !isAssignment ? detailResult.opportunity : undefined;
   const commonItem = (assignment || opportunity)!;
-  const eligibility = evaluateService(commonItem.serviceId);
+  const matchItem = opportunity && matching.actor && matching.data ? StaffMatchingRepository.detail(matching.actor, opportunity.id) : undefined;
+  const eligibility = { allowed: matching.status === 'READY' && !!matchItem?.eligibility.allowed, reason: matching.status === 'LOADING' ? 'Đang kiểm tra điều kiện…' : matching.status === 'ERROR' ? matching.error : matchItem?.eligibility.reasons.map(item => item.message).join('\n') };
 
   // Workflow steps for Accepted Assignments only
   const steps: { key: JobStepStatus; title: string; desc: string }[] = [
@@ -181,29 +193,6 @@ export default function StaffJobDetailScreen() {
     }
   };
 
-  const handleClaimOpenShift = () => {
-    if (!opportunity) return;
-    Alert.alert(
-      'Xác nhận nhận ca',
-      `Bạn có chắc muốn nhận ca "${opportunity.serviceName}" tại ${opportunity.district} (${opportunity.timeSlot})?\nThu nhập dự kiến: ${opportunity.netIncome.toLocaleString('vi-VN')}đ`,
-      [
-        { text: 'Suy nghĩ lại', style: 'cancel' },
-        {
-          text: 'Nhận ca ngay',
-          onPress: () => {
-            const res = StaffService.claimOpenShift(opportunity.id, staffId);
-            if (res.success) {
-              setDetailResult({ kind: 'ASSIGNMENT', assignment: res.assignment });
-              Alert.alert('Nhận ca thành công! 🎉', 'Ca làm việc đã được chuyển vào lịch của bạn.');
-            } else {
-              Alert.alert('Không thể nhận ca', res.reason);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleToggleChecklist = (checkId: string) => {
     if (!assignment) return;
     const res = StaffService.toggleChecklistItem(assignment.id, checkId, staffId);
@@ -213,6 +202,7 @@ export default function StaffJobDetailScreen() {
   };
 
   const handlePhoneCall = () => {
+    if (!assignment || !assignment.customerPhone) return;
     Alert.alert(
       'Liên hệ khách hàng',
       `Gọi cho khách hàng ${commonItem.customerName} qua số điện thoại: ${commonItem.customerPhone}?`,
@@ -231,6 +221,7 @@ export default function StaffJobDetailScreen() {
   };
 
   const handleOpenMap = () => {
+    if (!assignment) return;
     Alert.alert(
       'Chỉ đường',
       `Mở ứng dụng bản đồ để chỉ đường đến:\n${commonItem.address}`,
@@ -241,7 +232,7 @@ export default function StaffJobDetailScreen() {
           onPress: () => {
             const query = encodeURIComponent(commonItem.address);
             Linking.openURL(`https://maps.google.com/?q=${query}`).catch(() => {
-              Alert.alert('Thông báo', 'Đã lưu tọa độ điểm hẹn.');
+              Alert.alert('Chưa mở được bản đồ', 'Thiết bị chưa mở được ứng dụng bản đồ.');
             });
           },
         },
@@ -288,19 +279,20 @@ export default function StaffJobDetailScreen() {
           <View style={styles.openNoticeBanner}>
             <View style={styles.openNoticeHeader}>
               <IconSymbol name="sparkles" size={20} color="#047857" />
-              <Text style={styles.openNoticeTitle}>Ca làm việc mở quanh bạn</Text>
+              <Text style={styles.openNoticeTitle}>Điều kiện nhận ca</Text>
             </View>
             <Text style={styles.openNoticeDesc}>
-              Ca này đang chờ đối tác tiếp nhận. Bạn có thể xem kỹ thông tin địa điểm và thu nhập trước khi quyết định nhận ca.
+              Xem dịch vụ, khu vực và thu nhập ước tính trước khi quyết định nhận một vị trí. Thông tin khách được mở sau khi nhận ca.
             </Text>
             {!eligibility.allowed && <Text style={styles.openNoticeDesc}>{eligibility.reason}</Text>}
             <Pressable style={[styles.primaryActionButton, !eligibility.allowed && { backgroundColor: BrandColors.gray400 }]}
               disabled={!eligibility.allowed} accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed }}
-              accessibilityLabel={eligibility.reason ?? 'Nhận ca làm việc này'} onPress={handleClaimOpenShift}>
+              accessibilityLabel={eligibility.reason ?? 'Nhận ca làm việc này'} onPress={() => setShowMatch(true)}>
               <Text style={styles.primaryActionText}>
-                {eligibility.allowed ? `Nhận ca làm việc này ngay (+${commonItem.netIncome.toLocaleString('vi-VN')}đ)` : 'Chưa đủ điều kiện nhận dịch vụ'}
+                {eligibility.allowed ? `Nhận ca làm việc này ngay (+${commonItem.netIncome.toLocaleString('vi-VN')}đ)` : 'Chưa đủ điều kiện nhận ca'}
               </Text>
             </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => matching.status === 'ERROR' ? matching.retry() : setShowMatch(true)}><Text style={{ color: BrandColors.primaryDark, fontWeight: '600' }}>{matching.status === 'ERROR' ? 'Thử lại kiểm tra điều kiện' : 'Vì sao phù hợp / Điều kiện chưa đạt'}</Text></Pressable>
             <Pressable onPress={() => router.push({ pathname: '/staff/account-details', params: { section: 'skills' } })} accessibilityRole="button">
               <Text style={{ color: BrandColors.primaryDark, fontWeight: '600' }}>Xem năng lực được xác nhận</Text>
             </Pressable>
@@ -406,20 +398,20 @@ export default function StaffJobDetailScreen() {
           </>
         )}
 
-        {/* Customer Information Card */}
-        <View style={styles.card}>
+        {/* Contact is available only after ownership of an assignment. */}
+        {isAssignment && <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Khách hàng liên hệ</Text>
           <View style={styles.customerRow}>
-            <Image source={{ uri: commonItem.customerAvatar }} style={styles.customerAvatar} />
+            {commonItem.customerAvatar ? <Image source={{ uri: commonItem.customerAvatar }} style={styles.customerAvatar} /> : <View style={[styles.customerAvatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 }]}><IconSymbol name="user" size={24} color={BrandColors.gray500} /></View>}
             <View style={styles.customerInfo}>
               <Text style={styles.customerName}>{commonItem.customerName}</Text>
-              <Text style={styles.customerPhone}>📞 {commonItem.customerPhone}</Text>
-              <Text style={styles.customerDist}>Cách bạn ~{commonItem.distanceKm} km</Text>
+              <Text style={styles.customerPhone}>{commonItem.customerPhone ? `📞 ${commonItem.customerPhone}` : 'Chưa có số điện thoại liên hệ'}</Text>
+
             </View>
             <View style={styles.contactButtons}>
-              <Pressable style={styles.contactBtnCall} onPress={handlePhoneCall}>
+              <Pressable accessibilityRole="button" accessibilityState={{ disabled: !commonItem.customerPhone }} disabled={!commonItem.customerPhone} style={[styles.contactBtnCall, !commonItem.customerPhone && { opacity: 0.45 }]} onPress={handlePhoneCall}>
                 <IconSymbol name="phone" size={16} color="#FFFFFF" />
-                <Text style={styles.contactBtnCallText}>Gọi điện</Text>
+                <Text style={styles.contactBtnCallText}>{commonItem.customerPhone ? 'Gọi điện' : 'Chưa có số'}</Text>
               </Pressable>
 
               {isAssignment && assignment ? (
@@ -428,7 +420,7 @@ export default function StaffJobDetailScreen() {
               ) : null}
             </View>
           </View>
-        </View>
+        </View>}
 
         {/* Location & Time */}
         <View style={styles.card}>
@@ -438,7 +430,7 @@ export default function StaffJobDetailScreen() {
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Khung giờ làm việc</Text>
               <Text style={styles.infoValue}>
-                {commonItem.date} • {commonItem.timeSlot}
+                {matchItem ? opportunityTime(matchItem.opportunity) : `${commonItem.date} • ${commonItem.timeSlot}`}
               </Text>
             </View>
           </View>
@@ -446,16 +438,17 @@ export default function StaffJobDetailScreen() {
           <View style={styles.infoRow}>
             <IconSymbol name="📍" style={styles.infoIcon} />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Địa chỉ cụ thể</Text>
-              <Text style={styles.infoValue}>{commonItem.address}</Text>
+              <Text style={styles.infoLabel}>{isAssignment ? 'Địa chỉ cụ thể' : 'Khu vực làm việc'}</Text>
+              <Text style={styles.infoValue}>{isAssignment ? commonItem.address : `${commonItem.district}, TP. Hồ Chí Minh`}</Text>
               <Text style={styles.infoSubValue}>Khu vực: {commonItem.district}, TP. Hồ Chí Minh</Text>
             </View>
           </View>
 
-          <Pressable style={styles.mapButton} onPress={handleOpenMap}>
+          {isAssignment && <Pressable style={styles.mapButton} onPress={handleOpenMap}>
             <IconSymbol name="location" size={16} color="#2563EB" />
             <Text style={styles.mapButtonText}>Mở ứng dụng Bản đồ chỉ đường</Text>
-          </Pressable>
+          </Pressable>}
+          {!isAssignment && <Text style={styles.infoSubValue}>Địa chỉ cụ thể và liên hệ khách được mở sau khi nhận ca.</Text>}
         </View>
 
         {/* Service Details & Notes */}
@@ -478,7 +471,7 @@ export default function StaffJobDetailScreen() {
             </View>
           ) : null}
 
-          {commonItem.notes ? (
+          {isAssignment && commonItem.notes ? (
             <View style={styles.notesHighlight}>
               <Text style={styles.notesHighlightTitle}>💬 Ghi chú đặc biệt từ gia chủ:</Text>
               <Text style={styles.notesHighlightContent}>{commonItem.notes}</Text>
@@ -524,25 +517,25 @@ export default function StaffJobDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Minh bạch thu nhập ca này</Text>
           <View style={styles.financeRow}>
-            <Text style={styles.financeLabel}>Giá gói khách đặt:</Text>
+            <Text style={styles.financeLabel}>{isAssignment ? 'Giá tham chiếu ca:' : 'Giá tham chiếu / vị trí:'}</Text>
             <Text style={styles.financeValue}>
               {commonItem.totalCustomerPaid.toLocaleString('vi-VN')}đ
             </Text>
           </View>
           <View style={styles.financeRow}>
-            <Text style={styles.financeLabel}>Phí vận hành & bảo hiểm sàn (15%):</Text>
+            <Text style={styles.financeLabel}>Phí vận hành ước tính:</Text>
             <Text style={styles.financeFee}>
               -{commonItem.platformFee.toLocaleString('vi-VN')}đ
             </Text>
           </View>
           <View style={[styles.financeRow, styles.financeTotalRow]}>
-            <Text style={styles.financeTotalLabel}>Thu nhập thực nhận của bạn:</Text>
+            <Text style={styles.financeTotalLabel}>{isAssignment ? 'Thu nhập ca của bạn:' : 'Thu nhập ước tính / nhân viên:'}</Text>
             <Text style={styles.financeTotalAmount}>
               +{commonItem.netIncome.toLocaleString('vi-VN')}đ
             </Text>
           </View>
           <Text style={styles.financeNote}>
-            * Tiền công sẽ tự động cộng vào Ví nhân viên ngay khi khách hàng xác nhận nghiệm thu.
+            Thu nhập chưa được ghi có khi nhận ca; xem giao dịch trong mục Thu nhập sau khi hoàn tất theo quy trình.
           </Text>
         </View>
 
@@ -552,6 +545,7 @@ export default function StaffJobDetailScreen() {
           <Text style={styles.helpText}>Cần hỗ trợ sự cố khẩn cấp? Liên hệ Admin ngay</Text>
         </Pressable>
       </ScrollView>
+      {showMatch && opportunity && <StaffMatchExplanation matching={matching} opportunityId={opportunity.id} onClose={() => setShowMatch(false)} onClaimed={job => setDetailResult({ kind: 'ASSIGNMENT', assignment: job })} />}
     </SafeAreaView>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,21 +14,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-import { StaffService, StaffJobItem, OpenOpportunity, StaffOperationalProfile } from '@/data/staffService';
+import { StaffService, StaffJobItem, StaffOperationalProfile } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
-import { useStaffServiceEligibility } from '@/hooks/use-staff-service-eligibility';
+import { useStaffMatching } from '@/hooks/use-staff-matching';
+import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
+import { selectMatchingItems } from '@/data/staffMatchingRules';
+import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
+import { EmptyState } from '@/components/common/EmptyState';
 
 export default function StaffDashboard() {
+  const { currentUser, currentStaff } = useAuth();
+  const router = useRouter();
+  if (!getCapabilityActor(currentUser, currentStaff)) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
+  return <StaffDashboardContent key={currentUser!.id} />;
+}
+function StaffDashboardContent() {
   const router = useRouter();
   const { currentStaff } = useAuth();
   const { unreadCount } = useNotifications();
-  const evaluateService = useStaffServiceEligibility();
+  const matching = useStaffMatching();
+  const [matchFilter, setMatchFilter] = useState(DEFAULT_MATCH_FILTER);
+  const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
   const staffId = currentStaff?.id || 'staff-001';
 
   const [profile, setProfile] = useState<StaffOperationalProfile>(() => StaffService.getOperationalProfile(staffId));
-  const [openShifts, setOpenShifts] = useState<OpenOpportunity[]>([]);
   const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
   const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
 
@@ -43,7 +54,6 @@ export default function StaffDashboard() {
   useEffect(() => {
     const updateData = () => {
       setProfile(StaffService.getOperationalProfile(staffId));
-      setOpenShifts(StaffService.getOpenShifts());
       setActiveJob(StaffService.getActiveJob(staffId) || StaffService.getUpcomingJobs(staffId)[0]);
       setWallet(StaffService.getWallet(staffId));
     };
@@ -52,45 +62,8 @@ export default function StaffDashboard() {
     return unsubscribe;
   }, [staffId]);
 
-  const handleToggleOnline = (val: boolean) => {
-    StaffService.setOnline(val, staffId);
-    Alert.alert(
-      val ? 'Đã bật Trực tuyến' : 'Đã tạm nghỉ',
-      val
-        ? 'Hồ sơ của bạn đã sẵn sàng nhận các ca làm việc mới phù hợp.'
-        : 'Hệ thống sẽ không gửi ca mới cho bạn trong thời gian tạm nghỉ.'
-    );
-  };
-
-  const handleClaimShift = (shift: OpenOpportunity) => {
-    Alert.alert(
-      'Xác nhận nhận ca',
-      `Bạn có chắc muốn nhận ca "${shift.serviceName}" tại ${shift.district} (${shift.timeSlot})?\nThu nhập dự kiến: ${shift.netIncome.toLocaleString('vi-VN')}đ`,
-      [
-        { text: 'Suy nghĩ lại', style: 'cancel' },
-        {
-          text: 'Nhận ca ngay',
-          onPress: () => {
-            const result = StaffService.claimOpenShift(shift.id, staffId);
-            if (result.success) {
-              Alert.alert(
-                'Nhận ca thành công! 🎉',
-                'Ca làm việc đã được chuyển vào mục "Ca làm việc của tôi". Bạn có thể mở xem chi tiết ngay bây giờ.',
-                [
-                  { text: 'Để sau' },
-                  {
-                    text: 'Xem chi tiết',
-                    onPress: () => router.push({ pathname: '/staff/job-detail', params: { id: shift.id } }),
-                  },
-                ]
-              );
-            } else {
-              Alert.alert('Không thể nhận ca', result.reason);
-            }
-          },
-        },
-      ]
-    );
+  const handleToggleOnline = (value: boolean) => {
+    if (matching.actor) StaffMatchingRepository.setOnline(matching.actor, value);
   };
 
   return (
@@ -112,7 +85,7 @@ export default function StaffDashboard() {
                       <Text style={styles.verifiedText}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
                     </View>
                   </View>
-                  <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình 5★</Text>
+                  <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình</Text>
                 </View>
               </Pressable>
 
@@ -157,7 +130,7 @@ export default function StaffDashboard() {
 
               <Text style={styles.statusTitle}>
                 {isOnline
-                  ? `Bán kính quét việc: ${profile.maxDistanceKm} km quanh ${profile.primaryDistrict}`
+                  ? `${profile.operatingDistricts.length} khu vực • ${StaffService.getScheduleSnapshot(staffId).saved.days.reduce((sum, day) => sum + day.intervals.length, 0)} khoảng rảnh đã lưu`
                   : 'Bật trực tuyến để tiếp tục nhận ca làm việc mới'}
               </Text>
 
@@ -200,8 +173,7 @@ export default function StaffDashboard() {
                       📍 {activeJob.address}
                     </Text>
                     <Text style={styles.activeJobCustomer}>
-                      👤 Khách: <Text style={styles.boldText}>{activeJob.customerName}</Text> •{' '}
-                      {activeJob.distanceKm} km
+                      👤 Khách: <Text style={styles.boldText}>{activeJob.customerName}</Text>
                     </Text>
                   </View>
 
@@ -258,90 +230,18 @@ export default function StaffDashboard() {
             {/* Available Shifts Section */}
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Việc mới quanh bạn</Text>
+                <Text style={styles.sectionTitle}>Việc phù hợp</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Kiểm tra năng lực được xác nhận trước khi nhận ca
+                  Theo năng lực, khu vực và lịch đã lưu
                 </Text>
               </View>
               <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open' } })}>
-                <Text style={styles.seeAllText}>Xem tất cả ({openShifts.length}) ›</Text>
+                <Text style={styles.seeAllText}>Xem tất cả ({matchCount}) ›</Text>
               </Pressable>
             </View>
 
-            {openShifts.length === 0 ? (
-              <View style={styles.emptyOpenShifts}>
-                <Text style={styles.emptyOpenShiftsTitle}>Hiện không có ca trống quanh khu vực</Text>
-                <Text style={styles.emptyOpenShiftsSub}>
-                  Bạn có thể mở rộng bán kính hoạt động trong cài đặt để nhận thêm nhiều việc.
-                </Text>
-              </View>
-            ) : (
-              openShifts.slice(0, 3).map((shift) => {
-                const eligibility = evaluateService(shift.serviceId);
-                return (
-                <View key={shift.id} style={styles.shiftCard}>
-                  <View style={styles.shiftHeader}>
-                    <View style={styles.shiftBadge}>
-                      <IconSymbol name={shift.serviceIcon || 'clean'} size={16} color="#047857" />
-                      <Text style={styles.shiftServiceTitle}>{shift.serviceName}</Text>
-                    </View>
-                    <Text style={styles.shiftIncome}>
-                      +{shift.netIncome.toLocaleString('vi-VN')}đ
-                    </Text>
-                  </View>
-
-                  <Text style={styles.shiftPackage}>{shift.packageTitle}</Text>
-
-                  <View style={styles.shiftMetaList}>
-                    <View style={styles.shiftMetaItem}>
-                      <Text style={styles.shiftMetaText}>⏱️ {shift.date} • {shift.timeSlot}</Text>
-                    </View>
-                    <View style={styles.shiftMetaItem}>
-                      <Text style={styles.shiftMetaText} numberOfLines={1}>
-                        📍 {shift.address} ({shift.district})
-                      </Text>
-                    </View>
-                    <View style={styles.shiftMetaItem}>
-                      <Text style={styles.shiftDistanceText}>🚶 Cách bạn {shift.distanceKm} km</Text>
-                    </View>
-                  </View>
-
-                  {shift.notes ? (
-                    <View style={styles.shiftNoteBox}>
-                      <Text style={styles.shiftNoteText} numberOfLines={2}>
-                        💬 Ghi chú: {shift.notes}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.shiftActionRow}>
-                    <Pressable
-                      style={styles.detailBtn}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/staff/job-detail',
-                          params: { id: shift.id },
-                        })
-                      }
-                    >
-                      <Text style={styles.detailBtnText}>Chi tiết</Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[styles.claimBtn, !eligibility.allowed && { backgroundColor: BrandColors.gray400 }]}
-                      disabled={!eligibility.allowed}
-                      accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed }}
-                      accessibilityLabel={eligibility.reason ?? 'Nhận ca ngay'}
-                      onPress={() => handleClaimShift(shift)}
-                    >
-                      <Text style={styles.claimBtnText}>{eligibility.allowed ? 'Nhận ca ngay' : 'Chưa đủ điều kiện'}</Text>
-                    </Pressable>
-                  </View>
-                  {!eligibility.allowed && <Text style={styles.shiftNoteText}>{eligibility.reason}</Text>}
-                </View>
-                );
-              })
-            )}
+            <MatchingSortPicker value={matchFilter.sort} onChange={sort => setMatchFilter(value => ({ ...value, sort }))} />
+            <StaffMatchingList matching={matching} filter={matchFilter} limit={3} />
 
             {/* Safety & Support Banner */}
             <View style={styles.supportCard}>
