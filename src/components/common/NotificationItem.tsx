@@ -3,42 +3,33 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { Notification } from '@/types/notification';
 import { IconSymbol } from './IconSymbol';
+import { formatNotificationTime, getNotificationPresentation } from '@/data/notificationAdapter';
 
 interface NotificationItemProps {
   notification: Notification;
   onPress: () => void;
+  disabled?: boolean;
 }
 
 export const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onPress,
+  disabled = false,
 }) => {
-  const getIconAndBg = (type: string) => {
-    switch (type) {
-      case 'BOOKING':
-        return { icon: '📅', bg: '#E0F2FE' };
-      case 'STAFF':
-        return { icon: '🧑‍🔧', bg: '#DCFCE7' };
-      case 'PAYMENT':
-        return { icon: '💳', bg: '#FEF3C7' };
-      case 'PROMOTION':
-        return { icon: '🎁', bg: '#FCE7F3' };
-      default:
-        return { icon: '🔔', bg: '#F1F5F9' };
-    }
-  };
-
-  const { icon, bg } = getIconAndBg(notification.type);
+  const { icon, background, label } = getNotificationPresentation(notification);
 
   return (
     <Pressable
       style={[styles.container, !notification.isRead && styles.unreadContainer]}
+      disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled }}
+      accessibilityLabel={`${label}. ${notification.title}. ${notification.isRead ? 'Đã đọc' : 'Chưa đọc'}${disabled ? '. Đang cập nhật trạng thái đã đọc' : ''}`}
       onPress={onPress}>
-      <View style={[styles.iconBox, { backgroundColor: bg }]}>
+      <View style={[styles.iconBox, { backgroundColor: background }]}>
         <IconSymbol name={icon} size={20} />
       </View>
 
       <View style={styles.body}>
+        <Text style={styles.typeLabel}>{label} • {notification.isRead ? 'Đã đọc' : 'Chưa đọc'}</Text>
         <View style={styles.topRow}>
           <Text
             numberOfLines={1}
@@ -53,12 +44,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         </Text>
 
         <Text style={styles.timeText}>
-          {new Date(notification.createdAt).toLocaleString('vi-VN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            day: '2-digit',
-            month: '2-digit',
-          })}
+          {formatNotificationTime(notification.createdAt)}
         </Text>
       </View>
     </Pressable>
@@ -66,6 +52,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
 };
 
 const styles = StyleSheet.create({
+  typeLabel: { fontSize: 11, fontWeight: '600', color: BrandColors.gray500, marginBottom: 5 },
   container: {
     flexDirection: 'row',
     padding: Spacing.three,

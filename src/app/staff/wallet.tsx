@@ -16,27 +16,30 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffWalletTransaction } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { useAuth } from '@/context/AuthContext';
 
 export default function StaffWalletScreen() {
   const router = useRouter();
+  const { currentStaff } = useAuth();
+  const staffId = currentStaff?.id || 'staff-001';
 
-  const [wallet, setWallet] = useState(StaffService.getWallet());
+  const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
   const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'WITHDRAW' | 'BONUS'>('ALL');
 
   // Withdraw Modal State
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('1000000');
   const [selectedBank, setSelectedBank] = useState('Vietcombank (****9821)');
-  const [accountName, setAccountName] = useState('NGUYEN THI HOA');
+  const accountName = currentStaff?.fullName?.toUpperCase() || 'NGUYỄN THỊ HOA';
 
   useEffect(() => {
     const update = () => {
-      setWallet(StaffService.getWallet());
+      setWallet(StaffService.getWallet(staffId));
     };
     update();
     const unsubscribe = StaffService.subscribe(update);
     return unsubscribe;
-  }, []);
+  }, [staffId]);
 
   const { balance, transactions } = wallet;
 
@@ -60,7 +63,7 @@ export default function StaffWalletScreen() {
       return;
     }
 
-    const success = StaffService.withdrawMoney(amountNum, selectedBank, '9821');
+    const success = StaffService.withdrawMoney(amountNum, selectedBank, '9821', staffId);
     if (success) {
       setIsWithdrawVisible(false);
       Alert.alert(
@@ -146,7 +149,7 @@ export default function StaffWalletScreen() {
 
             <View style={styles.linkedBankRow}>
               <Text style={styles.linkedBankText}>
-                🏦 Thụ hưởng: Vietcombank (****9821) - NGUYEN THI HOA
+                🏦 Thụ hưởng: Vietcombank (****9821) - {accountName}
               </Text>
             </View>
           </LinearGradient>

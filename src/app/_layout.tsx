@@ -34,6 +34,7 @@ export default function RootLayout() {
           <Stack.Screen name="staff/account-details" options={{ headerShown: false }} />
           <Stack.Screen name="staff/personal-info" options={{ headerShown: false }} />
           <Stack.Screen name="service/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="catalog/index" options={{ headerShown: false }} />
           <Stack.Screen name="booking/new" options={{ headerShown: false }} />
           <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="booking/matching" options={{ presentation: 'card', headerShown: false }} />
@@ -41,6 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="ai/index" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="account/addresses" options={{ headerShown: false }} />
           <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
         </Stack>

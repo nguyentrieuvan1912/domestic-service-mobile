@@ -22,10 +22,16 @@ export interface AppNotification {
   content: string;
   type: NotificationType;
   referenceId?: string; // bookingId, promotionId, etc.
-  data?: { bookingId?: string; [key: string]: any };
+  target?: NotificationTarget;
+  data?: { bookingId?: string; [key: string]: unknown };
   isRead: boolean;
   createdAt: string;
 }
 
 export type Notification = AppNotification;
 
+// Local navigation metadata; does not redefine backend notification DTOs.
+export type NotificationTargetType =
+  | 'BOOKING' | 'INVITATION' | 'OPPORTUNITY' | 'TRANSACTION' | 'WITHDRAWAL'
+  | 'RESTRICTION' | 'PROMOTION' | 'REVIEW' | 'SYSTEM';
+export interface NotificationTarget { type: NotificationTargetType; id: string }

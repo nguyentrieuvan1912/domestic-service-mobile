@@ -1,27 +1,43 @@
+import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState, useEffect } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffJobItem } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { useAuth } from '@/context/AuthContext';
+import { useStaffMatching } from '@/hooks/use-staff-matching';
+import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { selectMatchingItems } from '@/data/staffMatchingRules';
+import { STAFF_AREA_OPTIONS } from '@/data/staffAreas';
+import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
+import { EmptyState } from '@/components/common/EmptyState';
 
 type TabKey = 'upcoming' | 'open' | 'completed';
 
 export default function StaffJobsScreen() {
+  const { currentUser, currentStaff } = useAuth();
+  const router = useRouter();
+  if (!getCapabilityActor(currentUser, currentStaff)) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
+  return <StaffJobsContent key={currentUser!.id} />;
+}
+function StaffJobsContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
+  const { currentStaff } = useAuth();
+  const staffId = currentStaff?.id || 'staff-001';
+  const matching = useStaffMatching();
+  const [sort, setSort] = useState(DEFAULT_MATCH_FILTER.sort);
+  const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
 
   const [activeTab, setActiveTab] = useState<TabKey>(
     params.tab === 'open' ? 'open' : params.tab === 'completed' ? 'completed' : 'upcoming'
@@ -30,31 +46,24 @@ export default function StaffJobsScreen() {
   const [selectedDistrict, setSelectedDistrict] = useState('Tất cả');
 
   const [jobs, setJobs] = useState<StaffJobItem[]>([]);
-  const [openShifts, setOpenShifts] = useState<StaffJobItem[]>([]);
 
   useEffect(() => {
     const refreshData = () => {
-      setJobs(StaffService.getJobs());
-      setOpenShifts(StaffService.getOpenShifts());
+      setJobs(StaffService.getJobs(staffId));
     };
     refreshData();
     const unsubscribe = StaffService.subscribe(refreshData);
     return unsubscribe;
-  }, []);
+  }, [staffId]);
 
   const upcomingList = jobs.filter(
     (j) => j.status === 'ACCEPTED' || j.status === 'EN_ROUTE' || j.status === 'IN_PROGRESS'
   );
   const completedList = jobs.filter((j) => j.status === 'COMPLETED');
 
-  const currentList =
-    activeTab === 'upcoming'
-      ? upcomingList
-      : activeTab === 'open'
-      ? openShifts
-      : completedList;
+  const currentList = activeTab === 'upcoming' ? upcomingList : completedList;
 
-  const districts = ['Tất cả', 'Bình Thạnh', 'Quận 1', 'Quận 2', 'Quận 7'];
+  const districts = ['Tất cả', ...STAFF_AREA_OPTIONS.map(area => area.name)];
 
   const filteredList = currentList.filter((item) => {
     const matchSearch =
@@ -67,26 +76,10 @@ export default function StaffJobsScreen() {
     return matchSearch && matchDistrict;
   });
 
-  const handleClaim = (shift: StaffJobItem) => {
-    Alert.alert(
-      'Xác nhận nhận ca',
-      `Bạn có chắc muốn nhận ca ${shift.serviceName} tại ${shift.district} (${shift.timeSlot})?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Nhận ca ngay',
-          onPress: () => {
-            StaffService.claimOpenShift(shift.id);
-            setActiveTab('upcoming');
-            Alert.alert('Thành công', 'Đã thêm ca làm việc vào lịch của bạn!');
-          },
-        },
-      ]
-    );
-  };
-
-  const getStatusBadge = (status: StaffJobItem['status']) => {
+  const getStatusBadge = (status: StaffJobItem['status'] | 'OPEN') => {
     switch (status) {
+      case 'OPEN':
+        return { label: 'Ca việc mới', bg: '#ECFDF5', text: '#047857' };
       case 'IN_PROGRESS':
         return { label: 'Đang làm việc', bg: '#DCFCE7', text: '#15803D' };
       case 'EN_ROUTE':
@@ -131,7 +124,7 @@ export default function StaffJobsScreen() {
             <Text
               style={[styles.tabButtonText, activeTab === 'open' && styles.tabButtonTextActive]}
             >
-              Việc mới ({openShifts.length})
+              Việc mới ({matchCount})
             </Text>
           </Pressable>
 
@@ -156,7 +149,7 @@ export default function StaffJobsScreen() {
             <IconSymbol name="search" size={16} color={BrandColors.gray400} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Tìm theo khách hàng, mã đơn, địa chỉ..."
+              placeholder={activeTab === 'open' ? 'Tìm dịch vụ, mã ca, khu vực...' : 'Tìm khách hàng, mã ca, địa chỉ...'}
               placeholderTextColor={BrandColors.gray400}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -189,20 +182,20 @@ export default function StaffJobsScreen() {
           </ScrollView>
         </View>
 
+        {activeTab === 'open' && <View style={{ padding: Spacing.two }}><MatchingSortPicker value={sort} onChange={setSort} /></View>}
         {/* List of Shifts */}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         >
-          {filteredList.length === 0 ? (
+          {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol name="calendar" size={44} color={BrandColors.gray300} />
               <Text style={styles.emptyTitle}>Không có ca làm việc nào</Text>
               <Text style={styles.emptySub}>
                 {activeTab === 'upcoming'
                   ? 'Bạn chưa có ca làm việc nào sắp tới. Hãy chuyển sang tab "Việc mới" để nhận thêm ca.'
-                  : activeTab === 'open'
-                  ? 'Hiện không có ca việc mới phù hợp với bộ lọc.'
                   : 'Chưa có lịch sử ca hoàn thành.'}
               </Text>
             </View>
@@ -227,19 +220,11 @@ export default function StaffJobsScreen() {
                       </View>
                     </View>
 
-                    {activeTab !== 'open' && (
                       <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
                         <Text style={[styles.statusBadgeText, { color: badge.text }]}>
                           {badge.label}
                         </Text>
                       </View>
-                    )}
-
-                    {activeTab === 'open' && (
-                      <Text style={styles.openNetIncome}>
-                        +{job.netIncome.toLocaleString('vi-VN')}đ
-                      </Text>
-                    )}
                   </View>
 
                   <Text style={styles.packageTitle}>{job.packageTitle}</Text>
@@ -263,8 +248,7 @@ export default function StaffJobsScreen() {
                     <View style={styles.jobMetaRow}>
                       <IconSymbol name="👤" style={styles.metaIcon} />
                       <Text style={styles.metaText}>
-                        Khách: {job.customerName} • Cách bạn{' '}
-                        <Text style={styles.distanceText}>{job.distanceKm} km</Text>
+                        Khách: {job.customerName}
                       </Text>
                     </View>
                   </View>
@@ -287,42 +271,8 @@ export default function StaffJobsScreen() {
 
                   {/* Action Buttons */}
                   <View style={styles.actionRow}>
-                    {activeTab === 'open' ? (
-                      <>
-                        <Pressable
-                          style={styles.secondaryBtn}
-                          onPress={() =>
-                            router.push({
-                              pathname: '/staff/job-detail',
-                              params: { id: job.id },
-                            })
-                          }
-                        >
-                          <Text style={styles.secondaryBtnText}>Xem chi tiết</Text>
-                        </Pressable>
-                        <Pressable
-                          style={styles.primaryClaimBtn}
-                          onPress={() => handleClaim(job)}
-                        >
-                          <Text style={styles.primaryClaimBtnText}>Nhận ca này</Text>
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        {job.conversationId ? (
-                          <Pressable
-                            style={styles.chatBtn}
-                            onPress={() =>
-                              router.push({
-                                pathname: '/chat/[id]',
-                                params: { id: job.conversationId || '' },
-                              })
-                            }
-                          >
-                            <IconSymbol name="chat" size={16} color="#047857" />
-                            <Text style={styles.chatBtnText}>Chat</Text>
-                          </Pressable>
-                        ) : null}
+                        <BookingChatLink bookingId={job.id} staffId={staffId}
+                          style={styles.chatBtn} textStyle={styles.chatBtnText} />
 
                         <Pressable
                           style={styles.primaryActionBtn}
@@ -343,8 +293,6 @@ export default function StaffJobsScreen() {
                               : 'Bắt đầu di chuyển →'}
                           </Text>
                         </Pressable>
-                      </>
-                    )}
                   </View>
                 </View>
               );

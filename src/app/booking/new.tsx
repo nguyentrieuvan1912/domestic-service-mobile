@@ -19,15 +19,17 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
 import { useAuth } from '@/context/AuthContext';
+import { SmartExtras } from '@/components/booking/SmartExtras';
+import { buildBookingExtras, getExtraTotals, toggleBookingExtra } from '@/utils/booking-extras';
 import {
   mockServices,
+  mockServicePackages,
   getServiceById,
   getPackagesByServiceId,
   getAddOnsByServiceId,
   getAddressesByCustomerId,
   getAvailableStaffs,
   getStaffById,
-  getRelatedServices,
 } from '@/data';
 import { mockPromotions } from '@/data/promotions';
 import { BookingMode } from '@/types/booking';
@@ -119,43 +121,17 @@ export default function NewBookingScreen() {
       ? 'MODE_B'
       : params.staffId
       ? 'MODE_A'
+      : params.serviceId
+      ? 'MODE_B'
       : null
   );
 
   // Step index
   const [currentStep, setCurrentStep] = useState<number>(0);
 
-  // Smooth step transition animation
-  const stepFadeAnim = useRef(new Animated.Value(1)).current;
-  const stepTranslateY = useRef(new Animated.Value(0)).current;
-
+  // Instant & buttery-smooth step transition (eliminates all blinking and delay)
   const triggerStepTransition = (nextStep: number) => {
-    Animated.parallel([
-      Animated.timing(stepFadeAnim, {
-        toValue: 0,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-      Animated.timing(stepTranslateY, {
-        toValue: 8,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setCurrentStep(nextStep);
-      Animated.parallel([
-        Animated.timing(stepFadeAnim, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.timing(stepTranslateY, {
-          toValue: 0,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
+    setCurrentStep(nextStep);
   };
 
   // ================= Form States =================
@@ -165,7 +141,7 @@ export default function NewBookingScreen() {
   const service = getServiceById(selectedServiceId) || mockServices[0];
   const packages = getPackagesByServiceId(service.id);
   const serviceAddOns = getAddOnsByServiceId(service.id);
-  const addOns = serviceAddOns.length > 0 ? serviceAddOns : getAddOnsByServiceId('srv-001');
+  const extraOptions = buildBookingExtras(service, serviceAddOns, mockServices, mockServicePackages);
   const addresses = getAddressesByCustomerId(currentCustomer?.id || 'cust-001');
   const availableStaffs = getAvailableStaffs();
 
@@ -202,19 +178,20 @@ export default function NewBookingScreen() {
     packages.find((p) => p.id === selectedPackageId) || packages[0];
   const [requiredStaffCount, setRequiredStaffCount] = useState<number>(1);
 
-  // Add-ons (default empty so customer can pick or not pick)
-  const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
-
-  // AI Related Services (Cross-sell)
-  const relatedServices = getRelatedServices(service.id);
-  const [selectedRelatedServiceIds, setSelectedRelatedServiceIds] = useState<string[]>([]);
-
-  const toggleRelatedService = (relServiceId: string) => {
-    if (selectedRelatedServiceIds.includes(relServiceId)) {
-      setSelectedRelatedServiceIds(selectedRelatedServiceIds.filter((id) => id !== relServiceId));
-    } else {
-      setSelectedRelatedServiceIds([...selectedRelatedServiceIds, relServiceId]);
-    }
+  // Shared local selection for both booking modes. Nothing is preselected or sent to an API.
+  const [selectedExtraKeys, setSelectedExtraKeys] = useState<string[]>([]);
+  const extraTotals = getExtraTotals(extraOptions, selectedExtraKeys);
+  const selectedAddOnIds = extraTotals.selected.filter(e => e.kind === 'ADD_ON').map(e => e.id);
+  const selectedRelatedServiceIds = extraTotals.selected.filter(e => e.kind === 'SERVICE').map(e => e.id);
+  const toggleExtra = (key: string) => {
+    setSelectedExtraKeys(previous => toggleBookingExtra(extraOptions, previous, key));
+  };
+  const chooseService = (id: string) => {
+    if (id === service.id) return;
+    setSelectedServiceId(id);
+    setSelectedPackageId(getPackagesByServiceId(id)[0]?.id || '');
+    // A different primary service must not silently retain/charge unrelated extras.
+    setSelectedExtraKeys([]);
   };
 
   // Promotion / Voucher (integrated directly in Order Summary)
@@ -264,8 +241,8 @@ export default function NewBookingScreen() {
       return () => clearTimeout(timer);
     }
 
-    // Mode B Step 7: Searching radar
-    if (selectedMode === 'MODE_B' && currentStep === 7 && !isModeBStaffAccepted) {
+    // Mode B Step 6: Searching radar
+    if (selectedMode === 'MODE_B' && currentStep === 6 && !isModeBStaffAccepted) {
       const loop1 = Animated.loop(
         Animated.parallel([
           Animated.timing(radarWave1, {
@@ -344,7 +321,7 @@ export default function NewBookingScreen() {
     // Success Screen Bounce (Step 8 in both modes)
     if (
       (selectedMode === 'MODE_A' && currentStep === 8) ||
-      (selectedMode === 'MODE_B' && currentStep === 8)
+      (selectedMode === 'MODE_B' && currentStep === 7)
     ) {
       Animated.spring(successScaleAnim, {
         toValue: 1,
@@ -361,13 +338,8 @@ export default function NewBookingScreen() {
       ? 120000 * selectedDurationHours
       : (selectedPackage?.price || 200000) + (requiredStaffCount - 1) * 150000;
 
-  const addOnsTotal = addOns
-    .filter((a) => selectedAddOnIds.includes(a.id))
-    .reduce((sum, a) => sum + a.price, 0);
-
-  const relatedServicesTotal = relatedServices
-    .filter((r) => selectedRelatedServiceIds.includes(r.service.id))
-    .reduce((sum, r) => sum + r.discountedPrice, 0);
+  const addOnsTotal = extraTotals.addOnsTotal;
+  const relatedServicesTotal = extraTotals.servicesTotal;
 
   const subtotal = basePrice + addOnsTotal + relatedServicesTotal;
 
@@ -387,15 +359,6 @@ export default function NewBookingScreen() {
   }
   const totalAmount = Math.max(0, subtotal - discountAmount);
 
-  // Toggle add-on selection
-  const toggleAddOn = (addonId: string) => {
-    if (selectedAddOnIds.includes(addonId)) {
-      setSelectedAddOnIds(selectedAddOnIds.filter((id) => id !== addonId));
-    } else {
-      setSelectedAddOnIds([...selectedAddOnIds, addonId]);
-    }
-  };
-
   // Back navigation
   const handleBack = () => {
     if (selectedMode === null) {
@@ -405,7 +368,7 @@ export default function NewBookingScreen() {
     if (currentStep > 0) {
       triggerStepTransition(currentStep - 1);
     } else {
-      if (!params.mode) {
+      if (!params.mode && !params.serviceId && !params.staffId) {
         setSelectedMode(null);
       } else {
         router.back();
@@ -442,7 +405,7 @@ export default function NewBookingScreen() {
     return (
       <View style={styles.headerWrapper}>
         <View style={styles.headerRow}>
-          <Pressable style={styles.backButton} onPress={handleBack} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Quay lại bước trước" style={styles.backButton} onPress={handleBack} hitSlop={8}>
             <IconSymbol name="arrowBack" size={20} color={BrandColors.gray900} />
           </Pressable>
           <View style={styles.headerTitleContainer}>
@@ -470,16 +433,9 @@ export default function NewBookingScreen() {
     );
   };
 
-  // Wrapper for animated step transitions
+  // Wrapper for step transitions (instant & buttery-smooth)
   const renderAnimatedStep = (content: React.ReactNode) => (
-    <Animated.View
-      style={{
-        flex: 1,
-        opacity: stepFadeAnim,
-        transform: [{ translateY: stepTranslateY }],
-      }}>
-      {content}
-    </Animated.View>
+    <View style={{ flex: 1 }}>{content}</View>
   );
 
   // Common Voucher Selector inside Order Summary
@@ -624,7 +580,7 @@ export default function NewBookingScreen() {
                 <View style={styles.modeTitleRow}>
                   <Text style={styles.modeCardTitle}>Chọn nhân viên</Text>
                   <View style={styles.modeBadgeModeA}>
-                    <Text style={styles.modeBadgeTextA}>Mode A</Text>
+                    <Text style={styles.modeBadgeTextA}>Tự chọn</Text>
                   </View>
                 </View>
                 <Text style={styles.modeCardSubtitle}>
@@ -650,7 +606,7 @@ export default function NewBookingScreen() {
                 <View style={styles.modeTitleRow}>
                   <Text style={styles.modeCardTitle}>Chọn dịch vụ</Text>
                   <View style={styles.modeBadgeModeB}>
-                    <Text style={styles.modeBadgeTextB}>Mode B</Text>
+                    <Text style={styles.modeBadgeTextB}>Tự động</Text>
                   </View>
                 </View>
                 <Text style={styles.modeCardSubtitle}>
@@ -697,7 +653,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Chọn địa chỉ làm việc', 0, 9)}
+            {renderHeader('Chọn địa chỉ làm việc', 0, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -776,7 +732,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Chọn ngày & giờ', 1, 9)}
+            {renderHeader('Chọn ngày & giờ', 1, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -894,7 +850,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Nhân viên khả dụng', 2, 9)}
+            {renderHeader('Nhân viên khả dụng', 2, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 {/* Auto Filter Banner */}
@@ -1028,57 +984,89 @@ export default function NewBookingScreen() {
                       </Pressable>
                     </View>
                   ) : (
-                    filteredStaffs.map((staff) => {
-                      const age = getStaffAge(staff.dateOfBirth);
-                      const isSelected = selectedStaffId === staff.id;
-                      return (
-                        <Pressable
-                          key={staff.id}
-                          style={[styles.cleanStaffCard, isSelected && styles.cleanStaffCardSelected]}
-                          onPress={() => {
-                            setSelectedStaffId(staff.id);
-                            triggerStepTransition(3);
-                          }}>
-                          {/* 1. Avatar */}
-                          <View style={styles.cleanAvatarBox}>
-                            <Image source={{ uri: staff.avatar }} style={styles.cleanAvatarImg} />
-                            <View style={styles.cleanOnlineDot} />
-                          </View>
+                    <>
+                      <View style={styles.topStaffNoticeRow}>
+                        <IconSymbol name="sparkles" size={14} color={BrandColors.primary} />
+                        <Text style={styles.topStaffNoticeText}>
+                          Top {Math.min(filteredStaffs.length, 3)} nhân viên xuất sắc phù hợp nhất gần bạn
+                        </Text>
+                      </View>
+                      {filteredStaffs.slice(0, 3).map((staff) => {
+                        const age = getStaffAge(staff.dateOfBirth);
+                        const isSelected = selectedStaffId === staff.id;
+                        return (
+                          <Pressable
+                            key={staff.id}
+                            style={[styles.bigStaffCard, isSelected && styles.bigStaffCardSelected]}
+                            onPress={() => {
+                              setSelectedStaffId(staff.id);
+                              triggerStepTransition(3);
+                            }}>
+                            {/* Top: Avatar lớn + Thông tin chính */}
+                            <View style={styles.bigStaffTopRow}>
+                              <View style={styles.bigAvatarBox}>
+                                <Image source={{ uri: staff.avatar }} style={styles.bigAvatarImg} />
+                                <View style={styles.bigOnlineDot} />
+                              </View>
 
-                          {/* 2. Tên & 3. Tuổi */}
-                          <View style={styles.cleanStaffInfo}>
-                            <View style={styles.cleanNameRow}>
-                              <Text style={styles.cleanFullName}>{staff.fullName}</Text>
-                              <Text style={styles.cleanAgeText}>• {age} tuổi</Text>
+                              <View style={styles.bigStaffInfoCol}>
+                                <View style={styles.bigStaffNameRow}>
+                                  <Text style={styles.bigStaffFullName}>{staff.fullName}</Text>
+                                  <View style={styles.bigVerifiedPill}>
+                                    <Text style={styles.bigVerifiedPillText}>✓ Đã duyệt CCCD</Text>
+                                  </View>
+                                </View>
+
+                                <Text style={styles.bigStaffMetaText}>
+                                  {age} tuổi • {staff.experienceYears} năm kinh nghiệm
+                                </Text>
+
+                                <View style={styles.bigRatingRow}>
+                                  <Text style={styles.bigRatingBadge}>⭐ {staff.rating}★</Text>
+                                  <Text style={styles.bigReviewCount}>({staff.reviewCount} đánh giá tích cực)</Text>
+                                </View>
+                              </View>
                             </View>
 
-                            {/* 4. Giờ làm */}
-                            <View style={styles.cleanWorkHoursRow}>
-                              <IconSymbol name="clock" size={13} color={BrandColors.primary} />
-                              <Text style={styles.cleanWorkHoursText}>
-                                Giờ làm: 08:00 – 17:00 (Nhận ca {selectedTimeSlot})
+                            {/* Tags / Kỹ năng tiêu biểu */}
+                            {staff.specialties && staff.specialties.length > 0 && (
+                              <View style={styles.bigSpecialtiesRow}>
+                                {staff.specialties.slice(0, 3).map((sp: string, idx: number) => (
+                                  <View key={idx} style={styles.bigSpecialtyPill}>
+                                    <Text style={styles.bigSpecialtyPillText}>✓ {sp}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+
+                            {/* Lời giới thiệu ngắn (Bio) */}
+                            {staff.bio ? (
+                              <Text numberOfLines={2} style={styles.bigStaffBio}>
+                                "{staff.bio}"
                               </Text>
-                            </View>
+                            ) : null}
 
-                            {/* Rating snippet */}
-                            <View style={styles.cleanRatingSnippet}>
-                              <IconSymbol name="star" size={12} color={BrandColors.accent} />
-                              <Text style={styles.cleanRatingText}>{staff.rating}★</Text>
-                              <Text style={styles.cleanReviewCount}>({staff.reviewCount} đánh giá)</Text>
-                            </View>
-                          </View>
+                            {/* Divider */}
+                            <View style={styles.bigStaffDivider} />
 
-                          {/* 5. Giá tiền & Action to view profile */}
-                          <View style={styles.cleanPriceColumn}>
-                            <Text style={styles.cleanPriceNumber}>120.000đ</Text>
-                            <Text style={styles.cleanPriceUnit}>/ giờ</Text>
-                            <View style={styles.viewProfilePill}>
-                              <Text style={styles.viewProfilePillText}>Xem kĩ hồ sơ ›</Text>
+                            {/* Footer: Giá & Nút chọn */}
+                            <View style={styles.bigStaffFooter}>
+                              <View>
+                                <Text style={styles.bigPriceLabel}>Giá dịch vụ theo giờ</Text>
+                                <View style={styles.bigPriceRow}>
+                                  <Text style={styles.bigPriceValue}>120.000đ</Text>
+                                  <Text style={styles.bigPriceUnit}>/ giờ</Text>
+                                </View>
+                              </View>
+
+                              <View style={styles.bigSelectBtn}>
+                                <Text style={styles.bigSelectBtnText}>Chọn & Xem hồ sơ ›</Text>
+                              </View>
                             </View>
-                          </View>
-                        </Pressable>
-                      );
-                    })
+                          </Pressable>
+                        );
+                      })}
+                    </>
                   )}
                 </ScrollView>
               </View>
@@ -1097,7 +1085,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Hồ sơ nhân viên', 3, 9)}
+            {renderHeader('Hồ sơ nhân viên', 3, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -1233,7 +1221,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Thời lượng & Dịch vụ bổ trợ', 4, 9)}
+            {renderHeader('Thời lượng & Dịch vụ bổ trợ', 4, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -1297,114 +1285,13 @@ export default function NewBookingScreen() {
                     })}
                   </View>
 
-                  {/* USER REQUIREMENT 2: DỊCH VỤ BỔ TRỢ (ADD-ON) */}
-                  <Text style={[styles.sectionHeaderTitle, { marginTop: Spacing.four }]}>
-                    Dịch vụ bổ sung (Add-on)
-                  </Text>
-                  <Text style={styles.stepSubtitleNote}>
-                    Chọn thêm dịch vụ vệ sinh chuyên sâu đi kèm (Tùy chọn)
-                  </Text>
-
-                  {addOns.map((addon) => {
-                    const isSelected = selectedAddOnIds.includes(addon.id);
-                    return (
-                      <Pressable
-                        key={addon.id}
-                        style={[styles.addonCard, isSelected && styles.addonCardSelected]}
-                        onPress={() => toggleAddOn(addon.id)}>
-                        <Image source={{ uri: addon.image }} style={styles.addonImage} />
-                        <View style={styles.addonInfo}>
-                          <Text style={styles.addonName}>{addon.name}</Text>
-                          <Text style={styles.addonDuration}>+ {addon.durationMinutes} phút làm việc</Text>
-                          <Text style={styles.addonPriceBadge}>+{formatVND(addon.price)}</Text>
-                        </View>
-                        <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
-                          {isSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-
-                  {/* USER REQUIREMENT 3: Ô "KHÔNG CHỌN" ĐỂ KHÁCH CÓ THỂ KHÔNG CHỌN ADD-ON */}
-                  <Pressable
-                    style={[
-                      styles.noAddonCard,
-                      selectedAddOnIds.length === 0 && styles.noAddonCardSelected,
-                    ]}
-                    onPress={() => setSelectedAddOnIds([])}>
-                    <View
-                      style={[
-                        styles.noAddonIconCircle,
-                        selectedAddOnIds.length === 0 && styles.noAddonIconCircleSelected,
-                      ]}>
-                      <IconSymbol
-                        name={selectedAddOnIds.length === 0 ? 'check' : 'clean'}
-                        size={18}
-                        color={selectedAddOnIds.length === 0 ? BrandColors.primary : BrandColors.gray500}
-                      />
-                    </View>
-                    <View style={styles.noAddonInfo}>
-                      <Text style={styles.noAddonTitle}>Không chọn dịch vụ bổ sung</Text>
-                      <Text style={styles.noAddonSubtitle}>
-                        Chỉ dọn dẹp nhà tiêu chuẩn trong {selectedDurationHours} giờ đã chọn
-                      </Text>
-                    </View>
-                    <View style={[styles.radioCircle, selectedAddOnIds.length === 0 && styles.radioCircleSelected]}>
-                      {selectedAddOnIds.length === 0 && <View style={styles.radioInnerDot} />}
-                    </View>
-                  </Pressable>
-
-                  {/* AI GỢI Ý KẾT HỢP DỊCH VỤ LIÊN QUAN */}
-                  {relatedServices.length > 0 && (
-                    <View style={{ marginTop: Spacing.four, marginBottom: Spacing.two }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <IconSymbol name="💡" style={{ fontSize: 16 }} />
-                        <Text style={styles.sectionHeaderTitle}>Gợi ý kết hợp thông minh (AI Combo)</Text>
-                      </View>
-                      <Text style={styles.stepSubtitleNote}>
-                        Khách đặt {service.name} thường chọn thêm các dịch vụ bổ trợ để tiết kiệm chi phí
-                      </Text>
-
-                      {relatedServices.map((rel) => {
-                        const isRelSelected = selectedRelatedServiceIds.includes(rel.service.id);
-                        return (
-                          <Pressable
-                            key={rel.service.id}
-                            style={[
-                              styles.addonCard,
-                              { borderColor: isRelSelected ? BrandColors.primary : '#E2E8F0' },
-                              isRelSelected && { backgroundColor: '#F0FDF4' },
-                            ]}
-                            onPress={() => toggleRelatedService(rel.service.id)}>
-                            <Image source={{ uri: rel.service.image }} style={styles.addonImage} />
-                            <View style={styles.addonInfo}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.addonName}>{rel.service.name}</Text>
-                                <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>AI Gợi ý</Text>
-                                </View>
-                              </View>
-                              <Text numberOfLines={2} style={{ fontSize: 11, color: BrandColors.gray600, marginVertical: 2 }}>
-                                {rel.reason}
-                              </Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={styles.addonPriceBadge}>+{formatVND(rel.discountedPrice)}</Text>
-                                <Text style={{ fontSize: 10, color: BrandColors.gray400, textDecorationLine: 'line-through' }}>
-                                  {formatVND(rel.service.basePrice)}
-                                </Text>
-                                <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>
-                                  {rel.discountOffer}
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={[styles.checkboxCircle, isRelSelected && styles.checkboxCircleSelected]}>
-                              {isRelSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
+                  <SmartExtras
+                    key={service.id}
+                    options={extraOptions}
+                    selectedKeys={selectedExtraKeys}
+                    onToggle={toggleExtra}
+                    onClear={() => setSelectedExtraKeys([])}
+                  />
                 </ScrollView>
 
                 {/* USER REQUIREMENT 4: DƯỚI NÚT TIẾP THEO CÓ HIỂN THỊ SỐ TIỀN ƯỚC TÍNH LUÔN CẬP NHẬT KHI THÊM BỚT ADDON */}
@@ -1414,7 +1301,7 @@ export default function NewBookingScreen() {
                     <Text style={styles.estimateAmountVal}>{formatVND(subtotal)}</Text>
                     <Text style={styles.estimateNoteText}>
                       {selectedDurationHours}h dọn ({formatVND(basePrice)})
-                      {addOnsTotal > 0 ? ` + ${selectedAddOnIds.length} Add-on` : ' • Không Add-on'}
+                      {extraTotals.selected.length > 0 ? ` + ${extraTotals.selected.length} mục chọn thêm` : ' • Không chọn thêm'}
                     </Text>
                   </View>
                   <Pressable
@@ -1440,7 +1327,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Tóm tắt đơn hàng', 5, 9)}
+            {renderHeader('Tóm tắt đơn hàng', 5, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -1450,7 +1337,7 @@ export default function NewBookingScreen() {
                     <View style={styles.summaryStaffMeta}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.summaryStaffName}>{selectedStaff.fullName}</Text>
-                        <Badge label="Mode A" variant="primary" size="sm" />
+                        <Badge label="Tự chọn nhân viên" variant="primary" size="sm" />
                       </View>
                       <Text style={styles.summaryStaffSub}>
                         {getStaffAge(selectedStaff.dateOfBirth)} tuổi • 4.9★ • 120.000đ/giờ
@@ -1491,7 +1378,7 @@ export default function NewBookingScreen() {
                     )}
                     {relatedServicesTotal > 0 && (
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceKey}>Dịch vụ kết hợp thông minh ({selectedRelatedServiceIds.length})</Text>
+                        <Text style={styles.priceKey}>Dịch vụ liên quan ({selectedRelatedServiceIds.length})</Text>
                         <Text style={styles.priceVal}>+{formatVND(relatedServicesTotal)}</Text>
                       </View>
                     )}
@@ -1579,7 +1466,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Phương thức thanh toán', 6, 9)}
+            {renderHeader('Phương thức thanh toán', 6, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -1768,7 +1655,7 @@ export default function NewBookingScreen() {
   // ===================== LUỒNG MODE B: CHỌN DỊCH VỤ =========================
   // =========================================================================
   if (selectedMode === 'MODE_B') {
-    // ---------------- STEP 0: CHỌN DỊCH VỤ (Mode B) ----------------
+    // ---------------- STEP 0: GÓI DIỆN TÍCH & SỐ LƯỢNG NHÂN VIÊN (Mode B) ----------------
     if (currentStep === 0) {
       return (
         <LinearGradient
@@ -1776,69 +1663,23 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Chọn dịch vụ', 0, 9)}
+            {renderHeader('Gói diện tích & Số lượng', 0, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.stepSubtitleNote}>Chọn loại hình dịch vụ phù hợp với nhu cầu của bạn</Text>
-
-                  {mockServices.map((srv) => {
-                    const isSelected = srv.id === selectedServiceId;
-                    return (
-                      <Pressable
-                        key={srv.id}
-                        style={[styles.serviceCardWithImg, isSelected && styles.serviceCardSelected]}
-                        onPress={() => setSelectedServiceId(srv.id)}>
-                        <Image source={{ uri: srv.image }} style={styles.serviceImgThumb} />
-                        <View style={styles.serviceBody}>
-                          <View style={styles.serviceTitleRow}>
-                            <Text style={styles.serviceTitleText}>{srv.name}</Text>
-                            <Badge label={srv.highlightBadges[0] || 'Phổ biến'} variant="primary" size="sm" />
-                          </View>
-                          <Text style={styles.serviceDescText} numberOfLines={2}>
-                            {srv.description}
-                          </Text>
-                          <View style={styles.serviceFooterRow}>
-                            <Text style={styles.servicePriceVal}>{formatVND(srv.basePrice)}</Text>
-                            <Text style={styles.serviceUnitText}>/ {srv.unit}</Text>
-                          </View>
-                        </View>
-                        <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                          {isSelected && <View style={styles.radioInnerDot} />}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                <View style={styles.bottomBar}>
-                  <Pressable
-                    style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(1)}>
-                    <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
-                      <Text style={styles.ctaPrimaryText}>Tiếp tục</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-          </SafeAreaView>
-        </LinearGradient>
-      );
-    }
-
-    // ---------------- STEP 1: GÓI DIỆN TÍCH & SỐ LƯỢNG NHÂN VIÊN (Mode B) ----------------
-    if (currentStep === 1) {
-      return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
-          <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Gói diện tích & Số lượng', 1, 9)}
-            {renderAnimatedStep(
-              <View style={styles.stepContainer}>
-                <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+                  {/* Selected service banner */}
+                  <View style={styles.selectedServiceHeaderCard}>
+                    <Image source={{ uri: service.image }} style={styles.selectedServiceHeaderImg} />
+                    <View style={styles.selectedServiceHeaderMeta}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.selectedServiceHeaderName}>{service.name}</Text>
+                        <Badge label="Dịch vụ đã chọn" variant="success" size="sm" />
+                      </View>
+                      <Text style={styles.selectedServiceHeaderPrice}>
+                        Giá từ {formatVND(service.basePrice)} / {service.unit}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={styles.sectionHeaderTitle}>Chọn gói diện tích</Text>
                   {packages.map((pkg) => {
                     const isSelected = pkg.id === selectedPackageId;
@@ -1898,7 +1739,7 @@ export default function NewBookingScreen() {
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(2)}>
+                    onPress={() => triggerStepTransition(1)}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Chọn Add-on)</Text>
                     </LinearGradient>
@@ -1911,124 +1752,27 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 2: DỊCH VỤ BỔ SUNG (ADD-ON) (Mode B) ----------------
+    // ---------------- STEP 1: DỊCH VỤ BỔ SUNG (ADD-ON) (Mode B) ----------------
     // Đã đẩy lên ngay sau diện tích theo yêu cầu user
     // Thêm ô "Không chọn" và thanh bottom bar ước tính giá cập nhật real-time
-    if (currentStep === 2) {
+    if (currentStep === 1) {
       return (
         <LinearGradient
           colors={BrandColors.softBgGradient}
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Dịch vụ bổ sung (Add-on)', 2, 9)}
+            {renderHeader('Dịch vụ bổ sung (Add-on)', 1, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.stepSubtitleNote}>
-                    Thêm các dịch vụ vệ sinh chuyên sâu đi kèm gói chính
-                  </Text>
-
-                  {addOns.map((addon) => {
-                    const isSelected = selectedAddOnIds.includes(addon.id);
-                    return (
-                      <Pressable
-                        key={addon.id}
-                        style={[styles.addonCard, isSelected && styles.addonCardSelected]}
-                        onPress={() => toggleAddOn(addon.id)}>
-                        <Image source={{ uri: addon.image }} style={styles.addonImage} />
-                        <View style={styles.addonInfo}>
-                          <Text style={styles.addonName}>{addon.name}</Text>
-                          <Text style={styles.addonDuration}>+ {addon.durationMinutes} phút làm việc</Text>
-                          <Text style={styles.addonPriceBadge}>+{formatVND(addon.price)}</Text>
-                        </View>
-                        <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
-                          {isSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-
-                  {/* USER REQUIREMENT: Ô "Không chọn" để khách có thể không chọn add-on */}
-                  <Pressable
-                    style={[
-                      styles.noAddonCard,
-                      selectedAddOnIds.length === 0 && styles.noAddonCardSelected,
-                    ]}
-                    onPress={() => setSelectedAddOnIds([])}>
-                    <View
-                      style={[
-                        styles.noAddonIconCircle,
-                        selectedAddOnIds.length === 0 && styles.noAddonIconCircleSelected,
-                      ]}>
-                      <IconSymbol
-                        name={selectedAddOnIds.length === 0 ? 'check' : 'clean'}
-                        size={18}
-                        color={selectedAddOnIds.length === 0 ? BrandColors.primary : BrandColors.gray500}
-                      />
-                    </View>
-                    <View style={styles.noAddonInfo}>
-                      <Text style={styles.noAddonTitle}>Không chọn dịch vụ bổ sung</Text>
-                      <Text style={styles.noAddonSubtitle}>
-                        Chỉ sử dụng gói {selectedPackage.name}, không thêm dịch vụ phát sinh
-                      </Text>
-                    </View>
-                    <View style={[styles.radioCircle, selectedAddOnIds.length === 0 && styles.radioCircleSelected]}>
-                      {selectedAddOnIds.length === 0 && <View style={styles.radioInnerDot} />}
-                    </View>
-                  </Pressable>
-
-                  {/* AI GỢI Ý KẾT HỢP DỊCH VỤ LIÊN QUAN */}
-                  {relatedServices.length > 0 && (
-                    <View style={{ marginTop: Spacing.four, marginBottom: Spacing.two }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <IconSymbol name="💡" style={{ fontSize: 16 }} />
-                        <Text style={styles.sectionHeaderTitle}>Gợi ý kết hợp thông minh (AI Combo)</Text>
-                      </View>
-                      <Text style={styles.stepSubtitleNote}>
-                        Gợi ý dịch vụ cùng chuyên môn kỹ thuật giúp tiết kiệm đến 20% chi phí
-                      </Text>
-
-                      {relatedServices.map((rel) => {
-                        const isRelSelected = selectedRelatedServiceIds.includes(rel.service.id);
-                        return (
-                          <Pressable
-                            key={rel.service.id}
-                            style={[
-                              styles.addonCard,
-                              { borderColor: isRelSelected ? BrandColors.primary : '#E2E8F0' },
-                              isRelSelected && { backgroundColor: '#F0FDF4' },
-                            ]}
-                            onPress={() => toggleRelatedService(rel.service.id)}>
-                            <Image source={{ uri: rel.service.image }} style={styles.addonImage} />
-                            <View style={styles.addonInfo}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.addonName}>{rel.service.name}</Text>
-                                <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>AI Gợi ý</Text>
-                                </View>
-                              </View>
-                              <Text numberOfLines={2} style={{ fontSize: 11, color: BrandColors.gray600, marginVertical: 2 }}>
-                                {rel.reason}
-                              </Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={styles.addonPriceBadge}>+{formatVND(rel.discountedPrice)}</Text>
-                                <Text style={{ fontSize: 10, color: BrandColors.gray400, textDecorationLine: 'line-through' }}>
-                                  {formatVND(rel.service.basePrice)}
-                                </Text>
-                                <Text style={{ fontSize: 10, color: '#059669', fontWeight: '700' }}>
-                                  {rel.discountOffer}
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={[styles.checkboxCircle, isRelSelected && styles.checkboxCircleSelected]}>
-                              {isRelSelected && <Text style={styles.checkmarkIcon}>✓</Text>}
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  )}
+                  <SmartExtras
+                    key={service.id}
+                    options={extraOptions}
+                    selectedKeys={selectedExtraKeys}
+                    onToggle={toggleExtra}
+                    onClear={() => setSelectedExtraKeys([])}
+                  />
                 </ScrollView>
 
                 {/* USER REQUIREMENT: Hiển thị số tiền ước tính cập nhật real-time */}
@@ -2038,12 +1782,12 @@ export default function NewBookingScreen() {
                     <Text style={styles.estimateAmountVal}>{formatVND(subtotal)}</Text>
                     <Text style={styles.estimateNoteText}>
                       Gói {selectedPackage.name}
-                      {addOnsTotal > 0 ? ` + ${selectedAddOnIds.length} Add-on` : ' • Không Add-on'}
+                      {extraTotals.selected.length > 0 ? ` + ${extraTotals.selected.length} mục chọn thêm` : ' • Không chọn thêm'}
                     </Text>
                   </View>
                   <Pressable
                     style={styles.ctaEstimateBtn}
-                    onPress={() => triggerStepTransition(3)}>
+                    onPress={() => triggerStepTransition(2)}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Địa chỉ) ›</Text>
                     </LinearGradient>
@@ -2056,15 +1800,15 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 3: CHỌN ĐỊA CHỈ (Mode B) ----------------
-    if (currentStep === 3) {
+    // ---------------- STEP 2: CHỌN ĐỊA CHỈ (Mode B) ----------------
+    if (currentStep === 2) {
       return (
         <LinearGradient
           colors={BrandColors.softBgGradient}
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Địa chỉ làm việc', 3, 9)}
+            {renderHeader('Địa chỉ làm việc', 2, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -2117,7 +1861,7 @@ export default function NewBookingScreen() {
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(4)}>
+                    onPress={() => triggerStepTransition(3)}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Chọn ngày & giờ)</Text>
                     </LinearGradient>
@@ -2130,15 +1874,15 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 4: CHỌN NGÀY & GIỜ (Mode B) ----------------
-    if (currentStep === 4) {
+    // ---------------- STEP 3: CHỌN NGÀY & GIỜ (Mode B) ----------------
+    if (currentStep === 3) {
       return (
         <LinearGradient
           colors={BrandColors.softBgGradient}
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Chọn ngày & giờ', 4, 9)}
+            {renderHeader('Chọn ngày & giờ', 3, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -2225,7 +1969,7 @@ export default function NewBookingScreen() {
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(5)}>
+                    onPress={() => triggerStepTransition(4)}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Xem tóm tắt)</Text>
                     </LinearGradient>
@@ -2238,15 +1982,15 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 5: TÓM TẮT ĐƠN HÀNG & MÃ GIẢM GIÁ (Mode B) ----------------
-    if (currentStep === 5) {
+    // ---------------- STEP 4: TÓM TẮT ĐƠN HÀNG & MÃ GIẢM GIÁ (Mode B) ----------------
+    if (currentStep === 4) {
       return (
         <LinearGradient
           colors={BrandColors.softBgGradient}
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Tóm tắt đơn hàng', 5, 9)}
+            {renderHeader('Tóm tắt đơn hàng', 4, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -2256,7 +2000,7 @@ export default function NewBookingScreen() {
                     <View style={styles.summaryStaffMeta}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.summaryStaffName}>{service.name}</Text>
-                        <Badge label="Mode B: Nhận nhanh" variant="primary" size="sm" />
+                        <Badge label="Hệ thống điều phối" variant="primary" size="sm" />
                       </View>
                       <Text style={styles.summaryStaffSub}>
                         {selectedPackage.name} • {requiredStaffCount} nhân viên
@@ -2303,7 +2047,7 @@ export default function NewBookingScreen() {
                     )}
                     {relatedServicesTotal > 0 && (
                       <View style={styles.priceRow}>
-                        <Text style={styles.priceKey}>Dịch vụ kết hợp thông minh ({selectedRelatedServiceIds.length})</Text>
+                        <Text style={styles.priceKey}>Dịch vụ liên quan ({selectedRelatedServiceIds.length})</Text>
                         <Text style={styles.priceVal}>+{formatVND(relatedServicesTotal)}</Text>
                       </View>
                     )}
@@ -2343,7 +2087,7 @@ export default function NewBookingScreen() {
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(6)}>
+                    onPress={() => triggerStepTransition(5)}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Tiến hành thanh toán</Text>
                     </LinearGradient>
@@ -2356,8 +2100,8 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 6: PHƯƠNG THỨC THANH TOÁN (Mode B) ----------------
-    if (currentStep === 6) {
+    // ---------------- STEP 5: PHƯƠNG THỨC THANH TOÁN (Mode B) ----------------
+    if (currentStep === 5) {
       const paymentMethods: { id: PaymentMethod; name: string; desc: string; icon: string }[] = [
         {
           id: 'VNPAY',
@@ -2391,7 +2135,7 @@ export default function NewBookingScreen() {
           locations={BrandColors.softBgGradientLocations}
           style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Phương thức thanh toán', 6, 9)}
+            {renderHeader('Phương thức thanh toán', 5, 8)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
@@ -2443,7 +2187,7 @@ export default function NewBookingScreen() {
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(7)}>
+                    onPress={() => triggerStepTransition(6)}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>
                         Xác nhận & Tìm nhân viên ({formatVND(totalAmount)})
@@ -2458,8 +2202,8 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 7: RADAR TÌM KIẾM NHÂN VIÊN (Mode B) ----------------
-    if (currentStep === 7) {
+    // ---------------- STEP 6: RADAR TÌM KIẾM NHÂN VIÊN (Mode B) ----------------
+    if (currentStep === 6) {
       if (isModeBStaffAccepted && modeBMatchedStaff) {
         return (
           <LinearGradient
@@ -2602,8 +2346,8 @@ export default function NewBookingScreen() {
       );
     }
 
-    // ---------------- STEP 8: ĐẶT LỊCH THÀNH CÔNG (Mode B) ----------------
-    if (currentStep === 8) {
+    // ---------------- STEP 7: ĐẶT LỊCH THÀNH CÔNG (Mode B) ----------------
+    if (currentStep === 7) {
       return (
         <LinearGradient
           colors={BrandColors.softBgGradient}
@@ -3168,114 +2912,174 @@ const styles = StyleSheet.create({
     color: BrandColors.white,
   },
 
-  // Staff card
-  cleanStaffCard: {
+    // Top Staff Notice
+  topStaffNoticeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: Spacing.three,
-    borderRadius: BorderRadius.lg,
+    gap: 6,
     marginBottom: Spacing.two,
+    backgroundColor: BrandColors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: BorderRadius.md,
+  },
+  topStaffNoticeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: BrandColors.primaryDark,
+  },
+
+  // Big Staff Card - Spacious, Clean & Premium
+  bigStaffCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.three,
+    marginBottom: Spacing.three,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
     elevation: 2,
   },
-  cleanStaffCardSelected: {
+  bigStaffCardSelected: {
     borderColor: BrandColors.primary,
-    backgroundColor: BrandColors.primaryLight,
+    backgroundColor: '#F0FDFA',
   },
-  cleanAvatarBox: {
+  bigStaffTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bigAvatarBox: {
     position: 'relative',
-    marginRight: Spacing.two,
   },
-  cleanAvatarImg: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#E5E7EB',
+  bigAvatarImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#E2E8F0',
   },
-  cleanOnlineDot: {
+  bigOnlineDot: {
     position: 'absolute',
     bottom: 2,
     right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: BrandColors.success,
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  cleanStaffInfo: {
+  bigStaffInfoCol: {
     flex: 1,
   },
-  cleanNameRow: {
+  bigStaffNameRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 5,
-    marginBottom: 2,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
   },
-  cleanFullName: {
-    fontSize: 15,
-    fontWeight: '700',
+  bigStaffFullName: {
+    fontSize: 16,
+    fontWeight: '800',
     color: BrandColors.gray900,
   },
-  cleanAgeText: {
-    fontSize: 12,
-    color: BrandColors.gray500,
+  bigVerifiedPill: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  cleanWorkHoursRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  cleanWorkHoursText: {
-    fontSize: 11,
-    color: BrandColors.gray600,
-  },
-  cleanRatingSnippet: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 3,
-  },
-  cleanRatingText: {
-    fontSize: 11,
+  bigVerifiedPillText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: BrandColors.gray800,
+    color: '#065F46',
   },
-  cleanReviewCount: {
-    fontSize: 10,
-    color: BrandColors.gray500,
+  bigStaffMetaText: {
+    fontSize: 12,
+    color: BrandColors.gray600,
+    marginBottom: 3,
   },
-  cleanPriceColumn: {
-    alignItems: 'flex-end',
-    marginLeft: Spacing.two,
+  bigRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  cleanPriceNumber: {
-    fontSize: 14,
+  bigRatingBadge: {
+    fontSize: 12,
     fontWeight: '800',
-    color: BrandColors.primary,
+    color: '#D97706',
   },
-  cleanPriceUnit: {
-    fontSize: 10,
+  bigReviewCount: {
+    fontSize: 11,
     color: BrandColors.gray500,
   },
-  viewProfilePill: {
-    marginTop: 6,
-    backgroundColor: BrandColors.primaryLight,
+  bigSpecialtiesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  bigSpecialtyPill: {
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: BorderRadius.xs,
+    borderRadius: 6,
   },
-  viewProfilePillText: {
+  bigSpecialtyPillText: {
+    fontSize: 11,
+    color: BrandColors.gray700,
+    fontWeight: '600',
+  },
+  bigStaffBio: {
+    fontSize: 12,
+    color: BrandColors.gray600,
+    fontStyle: 'italic',
+    lineHeight: 17,
+    marginTop: 8,
+  },
+  bigStaffDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 10,
+  },
+  bigStaffFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bigPriceLabel: {
     fontSize: 10,
+    color: BrandColors.gray500,
+    fontWeight: '500',
+  },
+  bigPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+  },
+  bigPriceValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: BrandColors.primary,
+  },
+  bigPriceUnit: {
+    fontSize: 11,
+    color: BrandColors.gray500,
+    fontWeight: '600',
+  },
+  bigSelectBtn: {
+    backgroundColor: BrandColors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.md,
+  },
+  bigSelectBtnText: {
+    fontSize: 12,
     fontWeight: '700',
-    color: BrandColors.primaryDark,
+    color: '#FFFFFF',
   },
 
   emptyFilterBox: {
@@ -4290,6 +4094,42 @@ const styles = StyleSheet.create({
   serviceUnitText: {
     fontSize: 11,
     color: BrandColors.gray500,
+  },
+
+  selectedServiceHeaderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: BorderRadius.lg,
+    padding: 12,
+    marginBottom: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  selectedServiceHeaderImg: {
+    width: 52,
+    height: 52,
+    borderRadius: BorderRadius.md,
+  },
+  selectedServiceHeaderMeta: {
+    flex: 1,
+  },
+  selectedServiceHeaderName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: BrandColors.gray900,
+  },
+  selectedServiceHeaderPrice: {
+    fontSize: 13,
+    color: BrandColors.primaryDark,
+    fontWeight: '600',
+    marginTop: 2,
   },
 
   // Package Card (Mode B)

@@ -33,7 +33,7 @@ export default function StaffPersonalInfoScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarSection}>
-          <Image source={{ uri: staff?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80' }} style={styles.avatar} />
+          <Image source={{ uri: staff?.avatar || 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80' }} style={styles.avatar} />
           <Text style={styles.avatarName}>{staff?.fullName || 'Nguyễn Thị Hoa'}</Text>
           <Text style={styles.avatarHint}>Ảnh đại diện sẽ được cập nhật sau khi có kết nối máy chủ.</Text>
         </View>

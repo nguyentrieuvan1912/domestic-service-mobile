@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,70 +14,56 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-import { StaffService, StaffJobItem } from '@/data/staffService';
+import { StaffService, StaffJobItem, StaffOperationalProfile } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { NotificationBadge } from '@/components/common/NotificationBadge';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useStaffMatching } from '@/hooks/use-staff-matching';
+import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
+import { selectMatchingItems } from '@/data/staffMatchingRules';
+import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
+import { EmptyState } from '@/components/common/EmptyState';
 
 export default function StaffDashboard() {
+  const { currentUser, currentStaff } = useAuth();
+  const router = useRouter();
+  if (!getCapabilityActor(currentUser, currentStaff)) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
+  return <StaffDashboardContent key={currentUser!.id} />;
+}
+function StaffDashboardContent() {
   const router = useRouter();
   const { currentStaff } = useAuth();
-  const [isOnline, setIsOnline] = useState(true);
-  const [openShifts, setOpenShifts] = useState<StaffJobItem[]>([]);
-  const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
-  const [wallet, setWallet] = useState(StaffService.getWallet());
+  const { unreadCount } = useNotifications();
+  const matching = useStaffMatching();
+  const [matchFilter, setMatchFilter] = useState(DEFAULT_MATCH_FILTER);
+  const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
+  const staffId = currentStaff?.id || 'staff-001';
 
-  const staffName = currentStaff?.fullName || 'Nguyễn Thị Hoa';
+  const [profile, setProfile] = useState<StaffOperationalProfile>(() => StaffService.getOperationalProfile(staffId));
+  const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
+  const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
+
+  const isOnline = profile.isOnline;
+  const staffName = currentStaff?.fullName || profile.fullName;
   const staffAvatar =
     currentStaff?.avatar ||
+    profile.avatar ||
     'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80';
 
   useEffect(() => {
     const updateData = () => {
-      setOpenShifts(StaffService.getOpenShifts());
-      setActiveJob(StaffService.getActiveJob() || StaffService.getUpcomingJobs()[0]);
-      setWallet(StaffService.getWallet());
+      setProfile(StaffService.getOperationalProfile(staffId));
+      setActiveJob(StaffService.getActiveJob(staffId) || StaffService.getUpcomingJobs(staffId)[0]);
+      setWallet(StaffService.getWallet(staffId));
     };
     updateData();
     const unsubscribe = StaffService.subscribe(updateData);
     return unsubscribe;
-  }, []);
+  }, [staffId]);
 
-  const handleToggleOnline = (val: boolean) => {
-    setIsOnline(val);
-    Alert.alert(
-      val ? 'Đã bật Trực tuyến' : 'Đã tạm nghỉ',
-      val
-        ? 'Hồ sơ của bạn đã sẵn sàng nhận các ca làm việc mới phù hợp.'
-        : 'Hệ thống sẽ không gửi ca mới cho bạn trong thời gian tạm nghỉ.'
-    );
-  };
-
-  const handleClaimShift = (shift: StaffJobItem) => {
-    Alert.alert(
-      'Xác nhận nhận ca',
-      `Bạn có chắc muốn nhận ca "${shift.serviceName}" tại ${shift.district} (${shift.timeSlot})?\nThu nhập dự kiến: ${shift.netIncome.toLocaleString('vi-VN')}đ`,
-      [
-        { text: 'Suy nghĩ lại', style: 'cancel' },
-        {
-          text: 'Nhận ca ngay',
-          onPress: () => {
-            const success = StaffService.claimOpenShift(shift.id);
-            if (success) {
-              Alert.alert(
-                'Nhận ca thành công! 🎉',
-                'Ca làm việc đã được chuyển vào mục "Ca làm việc của tôi". Bạn có thể mở xem chi tiết ngay bây giờ.',
-                [
-                  { text: 'Để sau' },
-                  {
-                    text: 'Xem chi tiết',
-                    onPress: () => router.push({ pathname: '/staff/job-detail', params: { id: shift.id } }),
-                  },
-                ]
-              );
-            }
-          },
-        },
-      ]
-    );
+  const handleToggleOnline = (value: boolean) => {
+    if (matching.actor) StaffMatchingRepository.setOnline(matching.actor, value);
   };
 
   return (
@@ -97,19 +82,21 @@ export default function StaffDashboard() {
                   <View style={styles.nameBadgeRow}>
                     <Text style={styles.greeting}>{staffName}</Text>
                     <View style={styles.verifiedBadge}>
-                      <Text style={styles.verifiedText}>✓ Đã xác thực</Text>
+                      <Text style={styles.verifiedText}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
                     </View>
                   </View>
-                  <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình 5★</Text>
+                  <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình</Text>
                 </View>
               </Pressable>
 
               <Pressable
                 style={styles.notificationBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`Thông báo, ${unreadCount} chưa đọc`}
                 onPress={() => router.push('/notifications')}
               >
                 <IconSymbol name="bell" size={20} color={BrandColors.gray700} />
-                <View style={styles.notificationDot} />
+                <NotificationBadge count={unreadCount} />
               </Pressable>
             </View>
 
@@ -143,13 +130,13 @@ export default function StaffDashboard() {
 
               <Text style={styles.statusTitle}>
                 {isOnline
-                  ? 'Bán kính quét việc: 10 km quanh Bình Thạnh'
+                  ? `${profile.operatingDistricts.length} khu vực • ${StaffService.getScheduleSnapshot(staffId).saved.days.reduce((sum, day) => sum + day.intervals.length, 0)} khoảng rảnh đã lưu`
                   : 'Bật trực tuyến để tiếp tục nhận ca làm việc mới'}
               </Text>
 
               <View style={styles.statusFooter}>
                 <Text style={styles.statusMeta}>
-                  {isOnline ? 'Khu vực: Bình Thạnh · Q.1 · Q.2 · Q.3' : 'Chế độ nghỉ ngơi'}
+                  {isOnline ? `Khu vực: ${profile.operatingDistricts.join(' · ')}` : 'Chế độ nghỉ ngơi'}
                 </Text>
                 <Pressable
                   onPress={() => router.push('/staff/availability')}
@@ -186,8 +173,7 @@ export default function StaffDashboard() {
                       📍 {activeJob.address}
                     </Text>
                     <Text style={styles.activeJobCustomer}>
-                      👤 Khách: <Text style={styles.boldText}>{activeJob.customerName}</Text> •{' '}
-                      {activeJob.distanceKm} km
+                      👤 Khách: <Text style={styles.boldText}>{activeJob.customerName}</Text>
                     </Text>
                   </View>
 
@@ -228,99 +214,34 @@ export default function StaffDashboard() {
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>Đánh giá đối tác</Text>
                 <View style={styles.ratingRow}>
-                  <Text style={styles.metricValue}>4.92</Text>
+                  <Text style={styles.metricValue}>{profile.rating.toFixed(2)}</Text>
                   <Text style={styles.metricStar}>★</Text>
                 </View>
-                <Text style={styles.metricSub}>248 lượt khen ngợi</Text>
+                <Text style={styles.metricSub}>{profile.reviewCount} lượt khen ngợi</Text>
               </View>
 
               <View style={styles.metricCard}>
                 <Text style={styles.metricLabel}>Tỷ lệ hoàn thành</Text>
-                <Text style={styles.metricValue}>99%</Text>
-                <Text style={styles.metricSub}>312 ca thành công</Text>
+                <Text style={styles.metricValue}>{profile.completionRate}%</Text>
+                <Text style={styles.metricSub}>Đạt chuẩn dịch vụ</Text>
               </View>
             </View>
 
             {/* Available Shifts Section */}
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Việc mới quanh bạn</Text>
+                <Text style={styles.sectionTitle}>Việc phù hợp</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Dựa trên kỹ năng và khu vực bạn đã đăng ký
+                  Theo năng lực, khu vực và lịch đã lưu
                 </Text>
               </View>
               <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open' } })}>
-                <Text style={styles.seeAllText}>Xem tất cả ({openShifts.length}) ›</Text>
+                <Text style={styles.seeAllText}>Xem tất cả ({matchCount}) ›</Text>
               </Pressable>
             </View>
 
-            {openShifts.length === 0 ? (
-              <View style={styles.emptyOpenShifts}>
-                <Text style={styles.emptyOpenShiftsTitle}>Hiện không có ca trống quanh khu vực</Text>
-                <Text style={styles.emptyOpenShiftsSub}>
-                  Bạn có thể mở rộng bán kính hoạt động trong cài đặt để nhận thêm nhiều việc.
-                </Text>
-              </View>
-            ) : (
-              openShifts.slice(0, 3).map((shift) => (
-                <View key={shift.id} style={styles.shiftCard}>
-                  <View style={styles.shiftHeader}>
-                    <View style={styles.shiftBadge}>
-                      <IconSymbol name={shift.serviceIcon || 'clean'} size={16} color="#047857" />
-                      <Text style={styles.shiftServiceTitle}>{shift.serviceName}</Text>
-                    </View>
-                    <Text style={styles.shiftIncome}>
-                      +{shift.netIncome.toLocaleString('vi-VN')}đ
-                    </Text>
-                  </View>
-
-                  <Text style={styles.shiftPackage}>{shift.packageTitle}</Text>
-
-                  <View style={styles.shiftMetaList}>
-                    <View style={styles.shiftMetaItem}>
-                      <Text style={styles.shiftMetaText}>⏱️ {shift.date} • {shift.timeSlot}</Text>
-                    </View>
-                    <View style={styles.shiftMetaItem}>
-                      <Text style={styles.shiftMetaText} numberOfLines={1}>
-                        📍 {shift.address} ({shift.district})
-                      </Text>
-                    </View>
-                    <View style={styles.shiftMetaItem}>
-                      <Text style={styles.shiftDistanceText}>🚶 Cách bạn {shift.distanceKm} km</Text>
-                    </View>
-                  </View>
-
-                  {shift.notes ? (
-                    <View style={styles.shiftNoteBox}>
-                      <Text style={styles.shiftNoteText} numberOfLines={2}>
-                        💬 Ghi chú: {shift.notes}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.shiftActionRow}>
-                    <Pressable
-                      style={styles.detailBtn}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/staff/job-detail',
-                          params: { id: shift.id },
-                        })
-                      }
-                    >
-                      <Text style={styles.detailBtnText}>Chi tiết</Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={styles.claimBtn}
-                      onPress={() => handleClaimShift(shift)}
-                    >
-                      <Text style={styles.claimBtnText}>Nhận ca ngay</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))
-            )}
+            <MatchingSortPicker value={matchFilter.sort} onChange={sort => setMatchFilter(value => ({ ...value, sort }))} />
+            <StaffMatchingList matching={matching} filter={matchFilter} limit={3} />
 
             {/* Safety & Support Banner */}
             <View style={styles.supportCard}>
@@ -376,15 +297,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  notificationDot: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
-  },
 
   statusBanner: {
     borderRadius: 20,
@@ -413,7 +325,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.2)',
   },
-  statusMeta: { color: '#D1FAE5', fontSize: 12 },
+  statusMeta: { color: '#D1FAE5', fontSize: 12, flex: 1, paddingRight: 8 },
   editAreaBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   editAreaText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   editAreaArrow: { color: '#FFFFFF', fontSize: 18, lineHeight: 18 },

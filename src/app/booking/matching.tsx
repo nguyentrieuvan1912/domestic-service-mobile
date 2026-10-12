@@ -1,3 +1,4 @@
+import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -290,11 +291,8 @@ export default function MatchingStaffScreen() {
                     onPress={() => router.replace(`/booking/${bookingId || 'bk-036'}`)}>
                     <Text style={styles.primaryActionText}>Xem chi tiết đơn hàng</Text>
                   </Pressable>
-                  <Pressable
-                    style={styles.secondaryActionBtn}
-                    onPress={() => router.push('/chat/conv-001')}>
-                    <Text style={styles.secondaryActionText}>Nhắn tin cho nhân viên</Text>
-                  </Pressable>
+                  <BookingChatLink bookingId={bookingId} staffId={matchedStaff.id}
+                    style={styles.secondaryActionBtn} textStyle={styles.secondaryActionText} label="Nhắn tin cho nhân viên" />
                 </View>
               </View>
             </View>

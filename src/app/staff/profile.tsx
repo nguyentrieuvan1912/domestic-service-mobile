@@ -14,26 +14,25 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { StaffService } from '@/data/staffService';
+import { useStaffCapabilities } from '@/hooks/use-staff-capabilities';
+import { EmptyState } from '@/components/common/EmptyState';
 
 export default function StaffProfileScreen() {
   const router = useRouter();
   const { currentStaff, logout } = useAuth();
+  const capabilityResource = useStaffCapabilities();
+  if (!capabilityResource.actor || !currentStaff) return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <EmptyState icon="shield" title="Vui lòng đăng nhập tài khoản nhân viên" description="Đăng nhập để xem hồ sơ và năng lực của bạn." actionText="Đăng nhập" onAction={() => router.push('/auth/login')} />
+  </SafeAreaView>;
+  const staffId = currentStaff.id;
+  const profile = StaffService.getOperationalProfile(staffId);
 
-  const staff = currentStaff || {
-    fullName: 'Nguyễn Thị Hoa',
-    phone: '0912 001 001',
-    email: 'hoa.nguyen.staff@homecare.vn',
-    avatar:
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    experienceYears: 5,
-    rating: 4.92,
-    reviewCount: 248,
-    completionRate: 99,
-    satisfactionRate: 99,
-    completedBookingsCount: 312,
-    idCardNumber: '001089012345',
-    specialties: ['Vệ sinh nhà theo giờ', 'Dọn dẹp căn hộ', 'Vệ sinh sofa & rèm'],
-  };
+  const staff = currentStaff;
+
+  const staffCode = currentStaff?.id
+    ? `NV-${currentStaff.id.replace('staff-', '').padStart(3, '0')}`
+    : 'NV-001';
 
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất tài khoản đối tác?', [
@@ -68,11 +67,11 @@ export default function StaffProfileScreen() {
               <View style={styles.identityInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.staffName}>{staff.fullName}</Text>
-                  <View style={styles.badgeVerified}>
-                    <Text style={styles.badgeVerifiedText}>✓ CCCD Đã duyệt</Text>
+                  <View style={[styles.badgeVerified, !staff.isVerified && { backgroundColor: BrandColors.gray100 }]}>
+                    <Text style={[styles.badgeVerifiedText, !staff.isVerified && { color: BrandColors.gray600 }]}>{staff.isVerified ? 'Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
                   </View>
                 </View>
-                <Text style={styles.staffMeta}>Mã NV: NV-001 • {staff.experienceYears} năm kinh nghiệm</Text>
+                <Text style={styles.staffMeta}>Mã NV: {staffCode} • {staff.experienceYears} năm kinh nghiệm</Text>
                 <Text style={styles.staffContact}>📞 {staff.phone}</Text>
               </View>
             </View>
@@ -83,24 +82,24 @@ export default function StaffProfileScreen() {
             <View style={styles.kpiGrid}>
               <View style={styles.kpiItem}>
                 <View style={styles.kpiStarRow}>
-                  <Text style={styles.kpiValue}>4.92</Text>
+                  <Text style={styles.kpiValue}>{profile.rating.toFixed(2)}</Text>
                   <Text style={styles.kpiStar}>★</Text>
                 </View>
-                <Text style={styles.kpiLabel}>248 đánh giá</Text>
+                <Text style={styles.kpiLabel}>{profile.reviewCount} đánh giá</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>99%</Text>
+                <Text style={styles.kpiValue}>{profile.completionRate}%</Text>
                 <Text style={styles.kpiLabel}>Tỷ lệ hoàn thành</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>99%</Text>
+                <Text style={styles.kpiValue}>{staff.satisfactionRate}%</Text>
                 <Text style={styles.kpiLabel}>Hài lòng 5★</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>312</Text>
+                <Text style={styles.kpiValue}>{staff.completedBookingsCount ?? '—'}</Text>
                 <Text style={styles.kpiLabel}>Ca thành công</Text>
               </View>
             </View>
@@ -120,9 +119,11 @@ export default function StaffProfileScreen() {
               <Text style={styles.utilityArrow}>›</Text>
             </Pressable>
 
-            <Pressable style={styles.utilityRow} onPress={() => router.push('/staff/account-details?section=skills' as never)}>
+            <Pressable style={styles.utilityRow} onPress={() => router.push({ pathname: '/staff/account-details', params: { section: 'skills' } })}>
               <View style={styles.utilityIconWrap}><IconSymbol name="success" size={18} color="#047857" /></View>
-              <View style={styles.utilityCopy}><Text style={styles.utilityTitle}>Kỹ năng & chuyên môn</Text><Text style={styles.utilitySubtitle}>Dịch vụ bạn đã đăng ký</Text></View>
+              <View style={styles.utilityCopy}><Text style={styles.utilityTitle}>Năng lực được xác nhận</Text><Text style={styles.utilitySubtitle}>{capabilityResource.status === 'READY' && capabilityResource.data
+                ? `${capabilityResource.data.eligibleCount} / ${capabilityResource.data.capabilities.length} năng lực còn hiệu lực để nhận dịch vụ`
+                : capabilityResource.status === 'ERROR' ? 'Chưa tải được năng lực • Chạm để thử lại' : 'Đang tải năng lực…'}</Text></View>
               <Text style={styles.utilityArrow}>›</Text>
             </Pressable>
 
@@ -148,7 +149,7 @@ export default function StaffProfileScreen() {
               onPress={() =>
                 Alert.alert(
                   'Hồ sơ pháp lý & Chứng nhận',
-                  '• Căn cước công dân số: 001089012345 (Đã duyệt)\n• Giấy xác nhận hạnh kiểm: Đạt chuẩn\n• Khóa đào tạo nghiệp vụ 5 sao: Đã tốt nghiệp loại Giỏi.'
+                  'Chưa có thông tin chứng nhận pháp lý chi tiết được cấp quyền xem. Liên hệ người phụ trách hồ sơ qua kênh công ty đã cấp để được hỗ trợ.'
                 )
               }
             >

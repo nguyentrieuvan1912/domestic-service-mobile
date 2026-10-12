@@ -1,3 +1,8 @@
+import { CatalogDetail, CatalogPage } from '@/api/catalog-types';
+import { catalogDetailView, catalogTemplate } from '@/api/catalog-view';
+import { mockServicePackages } from '@/data/servicePackages';
+import { useCatalogResource } from '@/hooks/use-catalog-resource';
+import { CatalogState } from '@/components/common/CatalogState';
 import React, { useState } from 'react';
 import {
   View,
@@ -17,9 +22,6 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
 import {
-  getServiceById,
-  getPackagesByServiceId,
-  getAddOnsByServiceId,
   getReviewsByServiceId,
   getRelatedServices,
   getBundleForService,
@@ -31,14 +33,42 @@ type ActiveTab = 'CONFIG' | 'PACKAGES' | 'REVIEWS' | 'INFO';
 
 export default function ServiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  return /^\d+$/.test(id || '') ? <CatalogDetailLoader id={id!} /> : <LegacyCatalogLookup id={id || ''} />;
+}
 
-  const service = getServiceById(id || 'srv-001') || getServiceById('srv-001')!;
-  const packages = getPackagesByServiceId(service.id);
-  const addOns = getAddOnsByServiceId(service.id);
-  const reviews = getReviewsByServiceId(service.id);
-  const relatedServices = getRelatedServices(service.id);
-  const serviceBundle = getBundleForService(service.id);
+function ServiceLoadState(props: React.ComponentProps<typeof CatalogState>) {
+  const router = useRouter();
+  return <SafeAreaView style={{ flex: 1, backgroundColor: BrandColors.white }}>
+    <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} style={{ padding: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+      <IconSymbol name="chevron.left" size={22} color={BrandColors.primary} />
+      <Text style={{ color: BrandColors.primary, fontWeight: '700' }}>Quay lại</Text>
+    </Pressable>
+    <CatalogState {...props} />
+  </SafeAreaView>;
+}
+
+// Old banners/Booking/AI prototypes still use srv-* IDs. Resolve them before calling the numeric API.
+function LegacyCatalogLookup({ id }: { id: string }) {
+  const result = useCatalogResource<CatalogPage>('/services?size=100');
+  if (result.loading || result.error) return <ServiceLoadState loading={result.loading} error={result.error} onRetry={result.retry} />;
+  const service = result.data?.items.find(item => item.code === 'UI-' + id);
+  return service ? <CatalogDetailLoader id={String(service.id)} /> : <ServiceLoadState error="Không tìm thấy dịch vụ." />;
+}
+
+function CatalogDetailLoader({ id }: { id: string }) {
+  const result = useCatalogResource<CatalogDetail>('/services/' + encodeURIComponent(id));
+  if (result.loading || result.error || !result.data) return <ServiceLoadState loading={result.loading} error={result.error} onRetry={result.retry} />;
+  return <ServiceDetailContent key={result.data.service.id} detail={result.data} />;
+}
+
+function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
+  const router = useRouter();
+  const { service, packages, addOns } = catalogDetailView(detail);
+  const presentationId = catalogTemplate(detail.service)?.id || '';
+  // These existing Person 2 screens remain prototypes, not connected reviews/AI/Booking APIs.
+  const reviews = getReviewsByServiceId(presentationId);
+  const relatedServices = getRelatedServices(presentationId);
+  const serviceBundle = getBundleForService(presentationId);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('CONFIG');
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
@@ -85,7 +115,7 @@ export default function ServiceDetailScreen() {
   const calculateTotalPrice = () => {
     let total = selectedPackage ? selectedPackage.price : service.basePrice;
     if (service.dynamicFieldType === 'AC_CLEANING' && acQuantity > 1) {
-      total = selectedPackage.price * acQuantity;
+      total = (selectedPackage?.price ?? service.basePrice) * acQuantity;
     }
     if (acNeedGas) total += 80000;
 
@@ -119,8 +149,9 @@ export default function ServiceDetailScreen() {
     router.push({
       pathname: '/booking/new',
       params: {
-        serviceId: service.id,
-        packageId: selectedPackage?.id || '',
+        // Booking still uses the original prototype lookup IDs until Person 2 integrates its API.
+        serviceId: presentationId || service.id,
+        packageId: mockServicePackages.find(item => item.serviceId === presentationId && item.name === selectedPackage?.name)?.id || selectedPackage?.id || '',
         mode: 'MODE_B',
         customConfig: JSON.stringify(customConfig),
       },

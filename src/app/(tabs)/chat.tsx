@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useReducer } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '@/context/AuthContext';
+import { ChatRepository, getChatActor } from '@/data/chatRepository';
+import { CHAT_TIME_ZONE } from '@/data/chatPolicy';
 import { mockConversations } from '@/data/conversations';
 
 export default function ChatListScreen() {
   const router = useRouter();
+  const { currentUser } = useAuth();
+  const actor = getChatActor(currentUser);
+  const [, refresh] = useReducer((value: number) => value + 1, 0);
+  useEffect(() => ChatRepository.subscribe(refresh), []);
+  const conversations = mockConversations.filter((conversation) =>
+    ChatRepository.access(conversation.id, actor).kind === 'READY');
 
   return (
     <LinearGradient
@@ -59,8 +68,10 @@ export default function ChatListScreen() {
 
         {/* Conversations List */}
         <View style={styles.conversationList}>
-          {mockConversations.map((conv) => {
-            const hasUnread = conv.unreadCountCustomer > 0;
+          {conversations.length === 0 && <Text style={styles.lastMsg}>Chưa có cuộc trò chuyện cho tài khoản này.</Text>}
+          {conversations.map((conv) => {
+            const unreadCount = actor?.role === 'STAFF' ? conv.unreadCountStaff : conv.unreadCountCustomer;
+            const hasUnread = unreadCount > 0;
             return (
               <Pressable
                 key={conv.id}
@@ -70,19 +81,20 @@ export default function ChatListScreen() {
                 ]}
                 onPress={() => router.push(`/chat/${conv.id}`)}>
                 <View style={styles.avatarWrapper}>
-                  <Image source={{ uri: conv.staffAvatar }} style={styles.avatar} />
+                  <Image source={{ uri: actor?.role === 'STAFF' ? conv.customerAvatar : conv.staffAvatar }} style={styles.avatar} />
                   <View style={styles.onlineDot} />
                 </View>
 
                 <View style={styles.convBody}>
                   <View style={styles.convTopRow}>
                     <Text style={[styles.staffName, hasUnread && styles.staffNameBold]}>
-                      {conv.staffName}
+                      {actor?.role === 'STAFF' ? conv.customerName : conv.staffName}
                     </Text>
                     <Text style={styles.timeText}>
                       {new Date(conv.lastMessageTime).toLocaleTimeString('vi-VN', {
                         hour: '2-digit',
                         minute: '2-digit',
+                        timeZone: CHAT_TIME_ZONE,
                       })}
                     </Text>
                   </View>
@@ -93,12 +105,12 @@ export default function ChatListScreen() {
                     <Text
                       style={[styles.lastMsg, hasUnread && styles.lastMsgBold]}
                       numberOfLines={1}>
-                      {conv.lastMessage}
+                      {conv.lastMessage || 'Chưa có tin nhắn'}
                     </Text>
                     {hasUnread && (
                       <View style={styles.unreadBadge}>
                         <Text style={styles.unreadBadgeText}>
-                          {conv.unreadCountCustomer}
+                          {unreadCount}
                         </Text>
                       </View>
                     )}
