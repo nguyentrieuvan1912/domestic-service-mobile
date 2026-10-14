@@ -31,6 +31,8 @@ export interface CustomerAddress {
 }
 
 export interface Customer {
+  savedAddressCount?: number;
+  defaultAddressLabel?: string;
   id: string;
   userId: string;
   fullName: string;

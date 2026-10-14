@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState, useEffect } from 'react';
 import {
@@ -16,7 +17,9 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { RatingStars } from '@/components/common/RatingStars';
 import { StaffCard } from '@/components/common/StaffCard';
-import { getAvailableStaffs, getServiceById, mockStaffs } from '@/data';
+import { useBookingDetail } from '@/hooks/use-booking-detail';
+import { bookingServiceView, CustomerBookings, ConnectedBooking } from '@/data/connectedBookings';
+import type { Staff } from '@/types/user';
 
 type MatchingState =
   | 'SEARCHING' // 1. Đang tìm Staff
@@ -29,41 +32,23 @@ type MatchingState =
   | 'CANCELLED'; // 8. Booking đã bị hủy
 
 export default function MatchingStaffScreen() {
-  const router = useRouter();
-  const { bookingId, serviceId } = useLocalSearchParams<{
-    bookingId?: string;
-    serviceId?: string;
-  }>();
-
-  const service = getServiceById(serviceId || 'srv-004');
-  const availableStaffs = getAvailableStaffs(service?.category);
-  const matchedStaff = availableStaffs[0] || mockStaffs[1];
-
-  const [matchingState, setMatchingState] = useState<MatchingState>('SEARCHING');
-  const [searchTimer, setSearchTimer] = useState(15);
-
-  // Automated progression simulation from SEARCHING -> FOUND_SINGLE -> ACCEPTED
-  useEffect(() => {
-    let timer: any;
-    if (matchingState === 'SEARCHING') {
-      timer = setTimeout(() => {
-        setMatchingState('FOUND_SINGLE');
-      }, 3500);
-    } else if (matchingState === 'FINDING_REPLACEMENT') {
-      timer = setTimeout(() => {
-        setMatchingState('FOUND_SINGLE');
-      }, 3000);
-    }
-    return () => clearTimeout(timer);
-  }, [matchingState]);
-
+  const router=useRouter();const {bookingId}=useLocalSearchParams<{bookingId?:string}>();const data=useBookingDetail(bookingId);
+  if(!data.booking)return <SafeAreaView><Text>{data.loading?'Đang tải trạng thái đơn...':data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable><Pressable onPress={()=>router.back()}><Text>Quay lại</Text></Pressable></SafeAreaView>;
+  return <MatchingContent booking={data.booking} assignedStaff={data.staff} />;
+}
+function MatchingContent({booking,assignedStaff}: {booking:ConnectedBooking;assignedStaff?:Staff}) {
+  const router=useRouter();const bookingId=booking.id;const service=bookingServiceView(booking);
+  const matchedStaff=assignedStaff;const availableStaffs:Staff[]=assignedStaff?[assignedStaff]:[];
+  const matchingState=(booking.status==='CANCELLED'?'CANCELLED':booking.status==='NO_STAFF_FOUND'?'NO_STAFF':booking.status==='REJECTED'?'STAFF_REJECTED':['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(booking.status)&&matchedStaff?'ACCEPTED':'SEARCHING') as MatchingState;
+  const setMatchingState=(_state:MatchingState)=>{void CustomerBookings.detail(bookingId).catch(e=>Alert.alert('Chưa tải được trạng thái',e.message));};
+  const searchTimer=0;
   const handleCancelBooking = () => {
     Alert.alert('Hủy yêu cầu tìm thợ', 'Bạn có chắc chắn muốn hủy tìm nhân viên không?', [
       { text: 'Tiếp tục tìm', style: 'cancel' },
       {
         text: 'Hủy đơn',
         style: 'destructive',
-        onPress: () => setMatchingState('CANCELLED'),
+        onPress: async () => {try{await CustomerBookings.cancel(bookingId,'Khách hàng hủy tìm nhân viên');router.replace('/(tabs)/bookings');}catch(e){Alert.alert('Chưa hủy được đơn',e instanceof Error?e.message:'Vui lòng thử lại.');}},
       },
     ]);
   };
@@ -106,7 +91,7 @@ export default function MatchingStaffScreen() {
                   styles.simBtn,
                   matchingState === st.id && styles.simBtnActive,
                 ]}
-                onPress={() => setMatchingState(st.id as MatchingState)}>
+                disabled onPress={() => {}}>
                 <Text
                   style={[
                     styles.simBtnText,
@@ -167,7 +152,7 @@ export default function MatchingStaffScreen() {
                 Hệ thống đã gửi thông tin đơn cho nhân viên này. Đang chờ xác nhận nhận việc.
               </Text>
 
-              <StaffCard staff={matchedStaff} showSelectButton={false} />
+              <StaffCard staff={matchedStaff!} showSelectButton={false} />
 
               <View style={styles.actionBtnRow}>
                 <Pressable
@@ -275,10 +260,10 @@ export default function MatchingStaffScreen() {
                 </Text>
 
                 <View style={styles.assignedStaffCard}>
-                  <Image source={{ uri: matchedStaff.avatar }} style={styles.assignedAvatar} />
+                  <Image source={remoteImageSource(matchedStaff?.avatar)} style={styles.assignedAvatar} />
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.assignedName}>{matchedStaff.fullName}</Text>
-                    <RatingStars rating={matchedStaff.rating} size={12} reviewCount={matchedStaff.reviewCount} />
+                    <Text style={styles.assignedName}>{matchedStaff?.fullName}</Text>
+                    <RatingStars rating={matchedStaff?.rating || 0} size={12} reviewCount={matchedStaff?.reviewCount || 0} />
                     <Text style={styles.assignedEta}>
                       Dự kiến đến trước 10 phút • SĐT đã được kết nối
                     </Text>
@@ -288,10 +273,10 @@ export default function MatchingStaffScreen() {
                 <View style={styles.acceptedActions}>
                   <Pressable
                     style={styles.primaryActionBtn}
-                    onPress={() => router.replace(`/booking/${bookingId || 'bk-036'}`)}>
+                    onPress={() => router.replace(`/booking/${bookingId}`)}>
                     <Text style={styles.primaryActionText}>Xem chi tiết đơn hàng</Text>
                   </Pressable>
-                  <BookingChatLink bookingId={bookingId} staffId={matchedStaff.id}
+                  <BookingChatLink bookingId={bookingId} staffId={matchedStaff?.id}
                     style={styles.secondaryActionBtn} textStyle={styles.secondaryActionText} label="Nhắn tin cho nhân viên" />
                 </View>
               </View>

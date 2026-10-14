@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { AIChatBubble } from '@/components/common/AIChatBubble';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
-import { mockAIMessages } from '@/data/aiMessages';
+import { operationRequest } from '@/api/operations';
+import { useAuth } from '@/context/AuthContext';
 import { AIMessage, AISuggestion } from '@/types/ai';
 
 const QUICK_PROMPTS = [
@@ -31,176 +32,47 @@ const QUICK_PROMPTS = [
 export default function AIAssistantScreen() {
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
-  const [messages, setMessages] = useState<AIMessage[]>(mockAIMessages.slice(0, 4));
+  const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
 
-  const sendMessage = (textToSend: string) => {
-    if (!textToSend.trim()) return;
-
-    const userMsg: AIMessage = {
-      id: `ai-user-${Date.now()}`,
-      conversationId: 'ai-conv-001',
-      role: 'USER',
-      content: textToSend.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
-    setIsTyping(true);
-
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-
-    // Natural language context-aware AI response
-    setTimeout(() => {
-      const q = textToSend.toLowerCase();
-      let aiReply: AIMessage;
-
-      if (q.includes('máy lạnh') || q.includes('điều hòa')) {
-        aiReply = {
-          id: `ai-bot-${Date.now()}`,
-          conversationId: 'ai-conv-001',
-          role: 'ASSISTANT',
-          content:
-            'Dạ em đã ghi nhận nhu cầu của bạn:\n• Dịch vụ: **Vệ sinh máy lạnh**\n• Số lượng dự kiến: **3 bộ máy**\n• Thời gian đề xuất: **Chiều Thứ Bảy (14:00 - 16:00)**\n\nEm gợi ý bạn chọn **Combo 3 máy lạnh (380.000đ)** kèm Add-on **Khử khuẩn Nano Bạc** để tối ưu chi phí và bảo hành 30 ngày nhé!',
-          suggestions: [
-            {
-              type: 'PACKAGE',
-              referenceId: 'pkg-014',
-              title: 'Combo vệ sinh 3 máy lạnh',
-              subtitle: 'Tiết kiệm 100k • Tặng kiểm tra gas',
-              price: 380000,
-            },
-            {
-              type: 'SERVICE',
-              referenceId: 'srv-004',
-              title: 'Chi tiết dịch vụ Vệ sinh máy lạnh',
-              subtitle: 'Thợ điện lạnh chuyên nghiệp',
-              price: 150000,
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-      } else if (q.includes('trẻ em') || q.includes('bé') || q.includes('bảo mẫu')) {
-        aiReply = {
-          id: `ai-bot-${Date.now()}`,
-          conversationId: 'ai-conv-001',
-          role: 'ASSISTANT',
-          content:
-            'Với nhu cầu trông bé, CleanMaster có đội ngũ **Bảo mẫu mầm non** đã qua kiểm tra lý lịch tư pháp số 2 và có chứng chỉ sư phạm mầm non. Bạn có thể chọn ca 4 giờ hoặc ca nguyên ngày 8 giờ.',
-          suggestions: [
-            {
-              type: 'SERVICE',
-              referenceId: 'srv-009',
-              title: 'Bảo mẫu & Chăm sóc trẻ em',
-              subtitle: '100% nhân viên lý lịch sạch',
-              price: 120000,
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-      } else if (q.includes('người già') || q.includes('người cao tuổi') || q.includes('ông bà')) {
-        aiReply = {
-          id: `ai-bot-${Date.now()}`,
-          conversationId: 'ai-conv-001',
-          role: 'ASSISTANT',
-          content:
-            'Dịch vụ **Chăm sóc người cao tuổi** có nhân viên được đào tạo kỹ năng điều dưỡng gia đình, đo huyết áp, nhắc uống thuốc và hỗ trợ vận động an toàn.',
-          suggestions: [
-            {
-              type: 'SERVICE',
-              referenceId: 'srv-010',
-              title: 'Chăm sóc người cao tuổi',
-              subtitle: 'Điều dưỡng tận tâm, nhẹ nhàng',
-              price: 130000,
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-      } else if (q.includes('70m2') || q.includes('tổng vệ sinh') || q.includes('căn hộ')) {
-        aiReply = {
-          id: `ai-bot-${Date.now()}`,
-          conversationId: 'ai-conv-001',
-          role: 'ASSISTANT',
-          content:
-            'Với căn hộ 70m² (2 phòng ngủ), em khuyên bạn nên chọn **Gói Tổng vệ sinh căn hộ tiêu chuẩn (60 - 90m²)** 1.100.000đ để nhân viên tẩy cặn canxi kính, hút bụi trần sàn và chà sàn công nghiệp nhé!',
-          suggestions: [
-            {
-              type: 'PACKAGE',
-              referenceId: 'pkg-009',
-              title: 'Tổng vệ sinh căn hộ (60–90m²)',
-              subtitle: 'Làm sạch sâu toàn diện',
-              price: 1100000,
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-      } else if (q.includes('khuyến mãi') || q.includes('voucher') || q.includes('giảm giá')) {
-        aiReply = {
-          id: `ai-bot-${Date.now()}`,
-          conversationId: 'ai-conv-001',
-          role: 'ASSISTANT',
-          content:
-            'Hôm nay bạn có thể nhập mã **FLASH50K** để được giảm ngay 50.000đ cho mọi đơn dịch vụ gia đình, hoặc mã **SUMMER20** giảm 20% đơn từ 200.000đ!',
-          suggestions: [
-            {
-              type: 'PROMOTION',
-              referenceId: 'promo-002',
-              title: 'Mã FLASH50K - Giảm 50.000đ',
-              subtitle: 'Áp dụng cho mọi đơn',
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-      } else {
-        aiReply = {
-          id: `ai-bot-${Date.now()}`,
-          conversationId: 'ai-conv-001',
-          role: 'ASSISTANT',
-          content:
-            'Em là CleanMaster AI. Nền tảng hiện cung cấp đầy đủ 16 dịch vụ gia đình: vệ sinh nhà, điện lạnh, máy giặt, chăm sóc trẻ em, người già, thú cưng, nấu ăn, đi chợ hộ. Bạn cần em tư vấn dịch vụ nào ạ?',
-          suggestions: [
-            {
-              type: 'SERVICE',
-              referenceId: 'srv-001',
-              title: 'Vệ sinh nhà theo giờ',
-              subtitle: 'Linh hoạt 2 - 4h',
-              price: 80000,
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-      }
-
-      setMessages((prev) => [...prev, aiReply]);
-      setIsTyping(false);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }, 1200);
+  const { currentCustomer } = useAuth();
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [error,setError]=useState('');
+  const requestRef=useRef<{text:string;key:string}|null>(null);
+  const mapMessages = (rows: (AIMessage & {id:number;conversationId:number})[]): AIMessage[] => rows.map(m=>({...m,id:String(m.id),conversationId:String(m.conversationId)}));
+  useEffect(()=>{let active=true;setMessages([]);setConversationId(null);if(!currentCustomer)return;void operationRequest<{id:number}[]>('ai-assistant','/conversations').then(async list=>{if(!active||!list[0])return;const id=String(list[0].id);const rows=await operationRequest<(AIMessage & {id:number;conversationId:number})[]>('ai-assistant','/conversations/'+id+'/messages');if(active){setConversationId(id);setMessages(mapMessages(rows));}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false;};},[currentCustomer?.id]);
+  const sendMessage = async (textToSend: string) => {
+    const text=textToSend.trim();if(!text||isTyping)return;
+    setIsTyping(true);setError('');
+    try {
+      let id=conversationId;
+      if(!id){const created=await operationRequest<{id:number}>('ai-assistant','/conversations','POST');id=String(created.id);setConversationId(id);}
+      if(requestRef.current?.text!==text)requestRef.current={text,key:'ai-'+Date.now()+'-'+Math.random().toString(36).slice(2)};
+      await operationRequest('ai-assistant','/conversations/'+id+'/messages','POST',{content:text,clientKey:requestRef.current!.key});
+      const rows=await operationRequest<(AIMessage & {id:number;conversationId:number})[]>('ai-assistant','/conversations/'+id+'/messages');setMessages(mapMessages(rows));setInputText('');requestRef.current=null;
+      scrollViewRef.current?.scrollToEnd({animated:true});
+    } catch(e){setError(e instanceof Error?e.message:'Chưa nhận được phản hồi AI.');}finally{setIsTyping(false);}
   };
 
   const handleSuggestionPress = (sug: AISuggestion) => {
     if (sug.type === 'PACKAGE' || sug.type === 'SERVICE') {
-      const targetId = sug.referenceId.startsWith('srv') ? sug.referenceId : 'srv-004';
+      const targetId = sug.referenceId;
       router.push(`/service/${targetId}`);
     } else if (sug.type === 'PROMOTION') {
       router.push('/(tabs)/services');
     }
   };
 
-  const handleClearHistory = () => {
-    setMessages(mockAIMessages.slice(0, 1));
-    setShowClearModal(false);
-    Alert.alert('Đã xóa', 'Lịch sử hội thoại với Trợ lý AI đã được làm mới.');
+  const handleClearHistory = async () => {
+    try {if(conversationId)await operationRequest('ai-assistant','/conversations/'+conversationId,'DELETE');setMessages([]);setConversationId(null);requestRef.current=null;setShowClearModal(false);}
+    catch(e){setError(e instanceof Error?e.message:'Chưa kết thúc được hội thoại.');}
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {error && <Text accessibilityRole="alert" style={{color:'#B91C1C',padding:12}}>{error}</Text>}
       {/* HEADER */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>

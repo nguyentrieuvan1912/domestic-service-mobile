@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -24,7 +25,7 @@ export const StaffCard: React.FC<StaffCardProps> = ({
       onPress={onSelect}>
       <View style={styles.topRow}>
         <View style={styles.avatarWrapper}>
-          <Image source={{ uri: staff.avatar }} style={styles.avatar} />
+          <Image source={remoteImageSource(staff.avatar)} style={styles.avatar} />
           {staff.isOnline && <View style={styles.onlineDot} />}
         </View>
 

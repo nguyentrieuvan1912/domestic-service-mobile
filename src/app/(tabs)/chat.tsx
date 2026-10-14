@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useEffect, useReducer } from 'react';
 import {
   View,
@@ -13,9 +14,8 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
-import { ChatRepository, getChatActor } from '@/data/chatRepository';
+import { ChatRepository, getChatActor } from '@/data/connectedChatRepository';
 import { CHAT_TIME_ZONE } from '@/data/chatPolicy';
-import { mockConversations } from '@/data/conversations';
 
 export default function ChatListScreen() {
   const router = useRouter();
@@ -23,7 +23,8 @@ export default function ChatListScreen() {
   const actor = getChatActor(currentUser);
   const [, refresh] = useReducer((value: number) => value + 1, 0);
   useEffect(() => ChatRepository.subscribe(refresh), []);
-  const conversations = mockConversations.filter((conversation) =>
+  useEffect(() => { if (!currentUser) return; const load = () => { void ChatRepository.loadList(getChatActor(currentUser)).catch(() => {}); }; load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [currentUser?.id]);
+  const conversations = ChatRepository.list().filter((conversation) =>
     ChatRepository.access(conversation.id, actor).kind === 'READY');
 
   return (
@@ -81,7 +82,7 @@ export default function ChatListScreen() {
                 ]}
                 onPress={() => router.push(`/chat/${conv.id}`)}>
                 <View style={styles.avatarWrapper}>
-                  <Image source={{ uri: actor?.role === 'STAFF' ? conv.customerAvatar : conv.staffAvatar }} style={styles.avatar} />
+                  <Image source={remoteImageSource(actor?.role === 'STAFF' ? conv.customerAvatar : conv.staffAvatar)} style={styles.avatar} />
                   <View style={styles.onlineDot} />
                 </View>
 

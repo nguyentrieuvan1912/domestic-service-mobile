@@ -30,7 +30,7 @@ export const PriceSummary: React.FC<PriceSummaryProps> = ({
   totalAmount,
   showDetails = true,
 }) => {
-  const effectivePackagePrice = packagePrice * Math.max(1, staffCount);
+  const effectivePackagePrice = packagePrice;
 
   return (
     <View style={styles.container}>
@@ -75,7 +75,7 @@ export const PriceSummary: React.FC<PriceSummaryProps> = ({
       <View style={styles.totalRow}>
         <View>
           <Text style={styles.totalLabel}>Tổng cộng thanh toán</Text>
-          <Text style={styles.taxNote}>(Đã bao gồm thuế GTGT & bảo hiểm)</Text>
+          <Text style={styles.taxNote}>(Theo báo giá đã lưu trên hệ thống)</Text>
         </View>
         <Text style={styles.totalValue}>{formatVND(totalAmount)}</Text>
       </View>

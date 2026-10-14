@@ -18,7 +18,8 @@ export interface MatchContext {
 export interface MatchingOpportunity {
   id: string; bookingCode: string; serviceId: string; serviceName: string; serviceIcon?: string;
   district: string; startsAt: string; endsAt: string; packageTitle: string; addOnsText?: string;
-  netIncome: number; mode: 'A' | 'B'; positionsRequired: number; positionsRemaining: number;
+  netIncome: number;
+  incomePendingPolicy?: boolean; mode: 'A' | 'B'; positionsRequired: number; positionsRemaining: number;
   requiredCapabilities: string[]; invitedStaffId?: string;
   // No current fixture has coordinates or a verified distance source; numeric legacy distances are omitted.
   distance?: { km: number; source: string };

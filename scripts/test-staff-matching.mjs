@@ -8,7 +8,16 @@ Module._extensions['.ts'] = (module, filename) => {
   module._compile(result.outputText, filename);
 };
 const { StaffRepository: staff } = require('../src/data/staffRepository.ts');
+// This suite covers the existing pure domain fixtures and facade delegation.
+// Backend ownership, persistence and concurrency are checked separately against PostgreSQL.
+const originalLoad = Module._load;
+Module._load = function(specifier, parent, isMain) {
+  if(parent?.filename.endsWith('staffService.ts') && specifier === './connectedStaffRepository') return {StaffRepository:staff};
+  if(parent?.filename.endsWith('staffService.ts') && specifier === '@/api/operations') return {operationSession:()=>null};
+  return originalLoad.call(this,specifier,parent,isMain);
+};
 const { StaffService: service } = require('../src/data/staffService.ts');
+Module._load = originalLoad;
 const { StaffMatchingRepository: repo, MATCHING_DEMO_CONFIG: demo } = require('../src/data/staffMatchingRepository.ts');
 const { evaluateOpportunity, selectMatchingItems, matchingEmptyKind, normalizeSearch } = require('../src/data/staffMatchingRules.ts');
 const { mockStaffCapabilities, mockCapabilityRestrictions } = require('../src/data/staffCapabilities.ts');

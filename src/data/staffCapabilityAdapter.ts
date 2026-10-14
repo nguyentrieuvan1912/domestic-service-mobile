@@ -4,7 +4,7 @@ import { getStaffIdByUserId } from './staffMapping';
 
 export const CAPABILITY_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 export function getCapabilityActor(user: User | null, staff: Staff | null): StaffCapabilityActor | null {
-  if (!user || user.role !== 'STAFF' || !staff || staff.userId !== user.id || getStaffIdByUserId(user.id) !== staff.id) return null;
+  if (!user || user.role !== 'STAFF' || !staff || staff.userId !== user.id || (/^\d+$/.test(user.id) ? user.id !== staff.id : getStaffIdByUserId(user.id) !== staff.id)) return null;
   return { userId: user.id, staffId: staff.id };
 }
 const validInstant = (value?: string) => value === undefined || Number.isFinite(Date.parse(value));

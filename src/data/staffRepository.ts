@@ -41,6 +41,7 @@ export interface OpenOpportunity {
   totalCustomerPaid: number;
   platformFee: number;
   netIncome: number;
+  incomePendingPolicy?: boolean;
   requiredCapabilities?: string[];
   // UI fixture proposal; one assignment per Staff, remaining positions rechecked at claim.
   mode?: 'A' | 'B';
@@ -51,6 +52,7 @@ export interface OpenOpportunity {
 }
 
 export interface AcceptedAssignment {
+  bookingStatus?: string;
   id: string; // bookingId e.g. 'bk-023'
   bookingCode: string;
   staffId: StaffId;
@@ -73,6 +75,7 @@ export interface AcceptedAssignment {
   totalCustomerPaid: number;
   platformFee: number;
   netIncome: number;
+  incomePendingPolicy?: boolean;
   status: JobStepStatus;
   customerId?: string;
   // Local chat presentation metadata until the acceptance DTO is agreed.
@@ -94,7 +97,7 @@ export interface StaffWalletTransaction {
   date: string;
   amount: number;
   type: 'INCOME' | 'WITHDRAW' | 'BONUS' | 'FEE';
-  status: 'SUCCESS' | 'PENDING';
+  status: 'SUCCESS' | 'PENDING' | 'FAILED';
   bookingCode?: string;
 }
 

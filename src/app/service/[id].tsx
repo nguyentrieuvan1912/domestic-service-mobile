@@ -1,6 +1,9 @@
+import { remoteImageSource } from '@/utils/image-source';
+import { useAuth } from '@/context/AuthContext';
+import { operationRequest } from '@/api/operations';
+import { ServiceQuestions } from '@/components/booking/ServiceQuestions';
 import { CatalogDetail, CatalogPage } from '@/api/catalog-types';
 import { catalogDetailView, catalogTemplate } from '@/api/catalog-view';
-import { mockServicePackages } from '@/data/servicePackages';
 import { useCatalogResource } from '@/hooks/use-catalog-resource';
 import { CatalogState } from '@/components/common/CatalogState';
 import React, { useState } from 'react';
@@ -21,11 +24,9 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
-import {
-  getReviewsByServiceId,
-  getRelatedServices,
-  getBundleForService,
-} from '@/data';
+import { usePublicBookingResource } from '@/hooks/use-public-booking-resource';
+import type { ServiceBundle, RelatedServiceItem } from '@/data/serviceBundles';
+import { catalogSummaryView } from '@/api/catalog-view';
 
 const { width } = Dimensions.get('window');
 
@@ -64,18 +65,23 @@ function CatalogDetailLoader({ id }: { id: string }) {
 function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
   const router = useRouter();
   const { service, packages, addOns } = catalogDetailView(detail);
-  const presentationId = catalogTemplate(detail.service)?.id || '';
-  // These existing Person 2 screens remain prototypes, not connected reviews/AI/Booking APIs.
-  const reviews = getReviewsByServiceId(presentationId);
-  const relatedServices = getRelatedServices(presentationId);
-  const serviceBundle = getBundleForService(presentationId);
+  const reviewResource = usePublicBookingResource<{id:number;rating:number;comment:string;createdAt:string}[]>('/services/'+service.id+'/reviews');
+  const reviews = (reviewResource.data || []).map(r=>({...r,customerName:'Khách hàng',customerAvatar:''}));
+  service.reviewCount=reviews.length;service.rating=reviews.length?reviews.reduce((n,r)=>n+r.rating,0)/reviews.length:0;
+  const relatedResource = useCatalogResource<CatalogPage>('/services?size=10');
+  const relatedServices: RelatedServiceItem[] = (relatedResource.data?.items || []).filter(s=>String(s.id)!==service.id).slice(0,3).map(raw=>{const service=catalogSummaryView(raw);return {service,reason:'Dịch vụ đang hoạt động',discountOffer:'',discountedPrice:service.basePrice};});
+  const serviceBundle = React.useMemo<ServiceBundle | undefined>(()=>undefined,[]);
 
+  const [answers,setAnswers]=useState<Record<string,unknown>>({});
   const [activeTab, setActiveTab] = useState<ActiveTab>('CONFIG');
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
     packages.find((p) => p.isPopular)?.id || packages[0]?.id || ''
   );
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const { currentCustomer }=useAuth();
+  const [isFavorite,setIsFavorite]=useState(false),[favoriteBusy,setFavoriteBusy]=useState(false);
+  React.useEffect(()=>{let active=true;setIsFavorite(false);if(currentCustomer)void operationRequest<number[]>('identity','/customer/favorites').then(ids=>{if(active)setIsFavorite(ids.includes(Number(service.id)));}).catch(()=>{});return()=>{active=false;};},[currentCustomer?.id,service.id]);
+  const toggleFavorite=async()=>{if(favoriteBusy)return;setFavoriteBusy(true);try{const result=await operationRequest<{favorite:boolean}>('identity','/customer/favorites/'+service.id,'PUT',{favorite:!isFavorite});setIsFavorite(result.favorite);}catch(e){Alert.alert('Chưa lưu được dịch vụ',e instanceof Error?e.message:'Vui lòng thử lại.');}finally{setFavoriteBusy(false);}};
 
   // Dynamic Service-Specific Configuration States
   // 1. Máy lạnh
@@ -87,10 +93,10 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
   // 2. Chăm sóc trẻ em
   const [childAgeGroup, setChildAgeGroup] = useState<'INFANT' | 'TODDLER' | 'KID'>('TODDLER');
   const [childSpecialNotes, setChildSpecialNotes] = useState('');
-  const [emergencyPhone, setEmergencyPhone] = useState('0909123456');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
 
   // 3. Chăm sóc người cao tuổi
-  const [elderlyAge, setElderlyAge] = useState('78');
+  const [elderlyAge, setElderlyAge] = useState('');
   const [elderlyMobility, setElderlyMobility] = useState<'INDEPENDENT' | 'NEED_SUPPORT' | 'BEDRIDDEN'>('NEED_SUPPORT');
   const [elderlyMedicalNotes, setElderlyMedicalNotes] = useState('');
 
@@ -117,8 +123,9 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
     if (service.dynamicFieldType === 'AC_CLEANING' && acQuantity > 1) {
       total = (selectedPackage?.price ?? service.basePrice) * acQuantity;
     }
-    if (acNeedGas) total += 80000;
 
+
+    const gas=addOns.find(a=>/gas/i.test(a.name));if(acNeedGas&&gas&&!selectedAddOnIds.includes(gas.id))total+=gas.price;
     selectedAddOnIds.forEach((addId) => {
       const add = addOns.find((a) => a.id === addId);
       if (add) total += add.price;
@@ -129,7 +136,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
   const handleBookNow = () => {
     // Pass configured dynamic fields to Booking Flow
-    const customConfig = {
+    const allConfig = {
       acType,
       acQuantity,
       acPosition,
@@ -146,14 +153,20 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
       memberCount,
     };
 
+    const keys:Record<string,string[]>={AC_CLEANING:['acType','acQuantity','acPosition','acNeedGas'],AC_MAINTENANCE:['acType','acQuantity','acPosition','acNeedGas'],CHILD_CARE:['childAgeGroup','childSpecialNotes','emergencyPhone'],ELDERLY_CARE:['elderlyAge','elderlyMobility','elderlyMedicalNotes'],PET_CARE:['petType','petWeight'],COOKING:['dietStyle','memberCount']};
+    const customConfig=Object.fromEntries(Object.entries(allConfig).filter(([key])=>keys[service.dynamicFieldType || 'GENERAL']?.includes(key)));
+    const gas=addOns.find(a=>/gas/i.test(a.name));if(acNeedGas&&!gas){Alert.alert('Chưa có giá bổ sung gas','Admin cần cấu hình hạng mục bổ sung gas trước khi đặt lựa chọn này.');return;}
+    const extras=acNeedGas&&gas?[...new Set([...selectedAddOnIds,gas.id])]:selectedAddOnIds;
     router.push({
       pathname: '/booking/new',
       params: {
         // Booking still uses the original prototype lookup IDs until Person 2 integrates its API.
-        serviceId: presentationId || service.id,
-        packageId: mockServicePackages.find(item => item.serviceId === presentationId && item.name === selectedPackage?.name)?.id || selectedPackage?.id || '',
+        serviceId: service.id,
+        packageId: selectedPackage?.id || '',
         mode: 'MODE_B',
         customConfig: JSON.stringify(customConfig),
+        answers: JSON.stringify(answers),
+        addOnIds: JSON.stringify(extras),
       },
     });
   };
@@ -163,7 +176,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* HERO IMAGE */}
         <View style={styles.heroContainer}>
-          <Image source={{ uri: service.image }} style={styles.heroImage} />
+          <Image source={remoteImageSource(service.image)} style={styles.heroImage} />
           <SafeAreaView style={styles.heroOverlay} edges={['top']}>
             <Pressable
               style={styles.heroNavButton}
@@ -174,7 +187,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
             <Pressable
               style={styles.heroNavButton}
-              onPress={() => setIsFavorite(!isFavorite)}
+              disabled={favoriteBusy} onPress={()=>void toggleFavorite()}
               hitSlop={8}>
               <IconSymbol
                 name={isFavorite ? 'heart' : 'heartOutline'}
@@ -295,7 +308,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                   <Text style={styles.counterValue}>{acQuantity} bộ máy</Text>
                   <Pressable
                     style={styles.counterBtn}
-                    onPress={() => setAcQuantity(acQuantity + 1)}>
+                    onPress={() => setAcQuantity(Math.min(100,acQuantity + 1))}>
                     <Text style={styles.counterBtnText}>+</Text>
                   </Pressable>
                 </View>
@@ -323,7 +336,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                   onPress={() => setAcNeedGas(!acNeedGas)}>
                   <Text style={styles.checkIcon}>{acNeedGas ? '☑' : '☐'}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.checkTitle}>Kiểm tra & Nạp bổ sung gas R32/R410A (+80.000đ)</Text>
+                    <Text style={styles.checkTitle}>Kiểm tra & Nạp bổ sung gas R32/R410A (theo giá hạng mục đã cấu hình)</Text>
                     <Text style={styles.checkDesc}>Đo áp suất gas bằng đồng hồ chuyên dụng trước mặt khách</Text>
                   </View>
                 </Pressable>
@@ -561,7 +574,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                       key={add.id}
                       style={[styles.addonItem, isChecked && styles.addonItemSelected]}
                       onPress={() => toggleAddOn(add.id)}>
-                      <Image source={{ uri: add.image }} style={styles.addonThumb} />
+                      <Image source={remoteImageSource(add.image)} style={styles.addonThumb} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.addonName}>{add.name}</Text>
                         <Text numberOfLines={2} style={styles.addonDesc}>{add.description}</Text>
@@ -619,7 +632,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
                 {relatedServices.map((item) => (
                   <View key={item.service.id} style={styles.relatedCard}>
-                    <Image source={{ uri: item.service.image }} style={styles.relatedThumb} />
+                    <Image source={remoteImageSource(item.service.image)} style={styles.relatedThumb} />
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.relatedName}>{item.service.name}</Text>
@@ -688,13 +701,14 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
               <Text style={styles.totalReviewsText}>Dựa trên {service.reviewCount} đánh giá xác thực</Text>
             </View>
 
+            {reviewResource.error && <Pressable onPress={reviewResource.retry}><Text>{reviewResource.error} • Thử lại</Text></Pressable>}
             {reviews.length === 0 ? (
               <Text style={styles.emptyReviewText}>Chưa có nhận xét nào cho dịch vụ này.</Text>
             ) : (
               reviews.map((rev) => (
                 <View key={rev.id} style={styles.reviewCard}>
                   <View style={styles.revHeader}>
-                    <Image source={{ uri: rev.customerAvatar }} style={styles.revAvatar} />
+                    <Image source={remoteImageSource(rev.customerAvatar)} style={styles.revAvatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.revName}>{rev.customerName}</Text>
                       <Text style={styles.revDate}>{rev.createdAt.split('T')[0]}</Text>
@@ -711,6 +725,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
         <View style={{ height: 120 }} />
       </ScrollView>
 
+      <View style={{padding:16}}><ServiceQuestions fields={detail.requirements} values={answers} change={setAnswers} /></View>
       {/* STICKY BOTTOM BOOKING BAR */}
       <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
         <View style={styles.bottomPriceCol}>

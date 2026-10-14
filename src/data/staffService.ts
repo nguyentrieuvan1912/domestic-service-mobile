@@ -1,5 +1,6 @@
-import {
-  StaffRepository,
+import { operationSession } from '@/api/operations';
+import { StaffRepository } from './connectedStaffRepository';
+import type {
   AcceptedAssignment,
   OpenOpportunity,
   StaffJobItem,
@@ -55,71 +56,76 @@ export {
   STAFF_USER_MAPPINGS,
 };
 
-const DEFAULT_STAFF_ID = 'staff-001';
+const activeStaffId = () => operationSession()?.profile.role === 'STAFF' ? operationSession()!.userId : '';
 
 /**
  * StaffService facade delegating to scoped StaffRepository.
  * Maintains backwards compatibility for components while enforcing repository scoping and immutability.
  */
 export const StaffService = {
+  load: StaffRepository.load,
+  getBankAccounts: StaffRepository.getBankAccounts,
+  addBank: StaffRepository.addBank,
+  reportIssue: StaffRepository.reportIssue,
+  getLoadState: StaffRepository.getLoadState,
   subscribe(fn: () => void) {
     return StaffRepository.subscribe(fn);
   },
 
-  getJobs(staffId: string = DEFAULT_STAFF_ID): StaffJobItem[] {
+  getJobs(staffId: string = activeStaffId()): StaffJobItem[] {
     return StaffRepository.getAssignments(staffId);
   },
 
   getOpenShifts(staffId: string): MatchingOpportunity[] {
-    const userId = getUserIdByStaffId(staffId);
+    const userId = /^\d+$/.test(staffId) ? staffId : getUserIdByStaffId(staffId);
     if (!userId) return [];
     return selectMatchingItems(StaffRepository.getMatchingSnapshot({ userId, staffId }),
       { query: '', district: 'Tất cả', sort: STAFF_MATCHING_POLICY.defaultSort }).map(item => item.opportunity);
   },
 
-  getJobById(id: string, staffId: string = DEFAULT_STAFF_ID): StaffJobItem | OpenOpportunity | undefined {
+  getJobById(id: string, staffId: string = activeStaffId()): StaffJobItem | OpenOpportunity | undefined {
     const result = StaffRepository.getJobDetail(staffId, id);
     if (result.kind === 'ASSIGNMENT') return result.assignment;
     if (result.kind === 'OPEN_OPPORTUNITY') return result.opportunity;
     return undefined;
   },
 
-  getJobDetail(staffId: string = DEFAULT_STAFF_ID, id: string): JobDetailResult {
+  getJobDetail(staffId: string = activeStaffId(), id: string): JobDetailResult {
     return StaffRepository.getJobDetail(staffId, id);
   },
 
-  getActiveJob(staffId: string = DEFAULT_STAFF_ID): StaffJobItem | undefined {
+  getActiveJob(staffId: string = activeStaffId()): StaffJobItem | undefined {
     const jobs = StaffRepository.getAssignments(staffId);
     return jobs.find((j) => j.status === 'IN_PROGRESS' || j.status === 'EN_ROUTE');
   },
 
-  getUpcomingJobs(staffId: string = DEFAULT_STAFF_ID): StaffJobItem[] {
+  getUpcomingJobs(staffId: string = activeStaffId()): StaffJobItem[] {
     const jobs = StaffRepository.getAssignments(staffId);
     return jobs.filter((j) => j.status === 'ACCEPTED' || j.status === 'EN_ROUTE' || j.status === 'IN_PROGRESS');
   },
 
-  getCompletedJobs(staffId: string = DEFAULT_STAFF_ID): StaffJobItem[] {
+  getCompletedJobs(staffId: string = activeStaffId()): StaffJobItem[] {
     const jobs = StaffRepository.getAssignments(staffId);
     return jobs.filter((j) => j.status === 'COMPLETED');
   },
 
-  claimOpenShift(shiftId: string, staffId: string = DEFAULT_STAFF_ID): ClaimOpportunityResult {
+  claimOpenShift(shiftId: string, staffId: string = activeStaffId()): Promise<ClaimOpportunityResult> {
     return StaffRepository.claimOpportunity(staffId, shiftId);
   },
 
   updateJobStatus(
     jobId: string,
     status: JobStepStatus,
-    staffId: string = DEFAULT_STAFF_ID
-  ): { success: boolean; reason?: string; assignment?: AcceptedAssignment } {
+    staffId: string = activeStaffId()
+  ) {
     return StaffRepository.updateJobStatus(staffId, jobId, status);
   },
 
-  toggleChecklistItem(jobId: string, checkId: string, staffId: string = DEFAULT_STAFF_ID) {
+  toggleChecklistItem(jobId: string, checkId: string, staffId: string = activeStaffId()) {
     return StaffRepository.toggleChecklistItem(staffId, jobId, checkId);
   },
 
-  getWallet(staffId: string = DEFAULT_STAFF_ID) {
+  getWallet(staffId: string = activeStaffId()) {
     return StaffRepository.getWallet(staffId);
   },
 
@@ -127,20 +133,21 @@ export const StaffService = {
     amount: number,
     bankName: string,
     accountNumber: string,
-    staffId: string = DEFAULT_STAFF_ID
-  ): boolean {
-    return StaffRepository.withdrawMoney(staffId, amount, bankName, accountNumber);
+    staffId: string = activeStaffId(),
+    requestKey: string = `withdraw-${Date.now()}`
+  ) {
+    return StaffRepository.withdrawMoney(staffId, amount, bankName, accountNumber, requestKey);
   },
 
-  getAvailability(staffId: string = DEFAULT_STAFF_ID) {
+  getAvailability(staffId: string = activeStaffId()) {
     return StaffRepository.getAvailability(staffId);
   },
-  getScheduleSnapshot(staffId: string = DEFAULT_STAFF_ID) {
+  getScheduleSnapshot(staffId: string = activeStaffId()) {
     return StaffRepository.getScheduleSnapshot(staffId);
   },
 
-  toggleShiftSlot(slotId: string, staffId: string = DEFAULT_STAFF_ID) {
-    StaffRepository.toggleShiftSlot(staffId, slotId);
+  toggleShiftSlot(slotId: string, staffId: string = activeStaffId()) {
+    return StaffRepository.toggleShiftSlot();
   },
 
   updateOperatingAreas(
@@ -151,20 +158,20 @@ export const StaffService = {
       selectedDistricts?: string[];
       operatingDistricts?: string[];
     },
-    staffId: string = DEFAULT_STAFF_ID
+    staffId: string = activeStaffId()
   ) {
-    StaffRepository.updateOperatingAreas(staffId, settings);
+    return StaffRepository.updateOperatingAreas();
   },
 
-  getOperationalProfile(staffId: string = DEFAULT_STAFF_ID): StaffOperationalProfile {
+  getOperationalProfile(staffId: string = activeStaffId()): StaffOperationalProfile {
     return StaffRepository.getOperationalProfile(staffId);
   },
 
-  setOnline(isOnline: boolean, staffId: string = DEFAULT_STAFF_ID): void {
-    StaffRepository.setOnline(staffId, isOnline);
+  setOnline(isOnline: boolean, staffId: string = activeStaffId()) {
+    return StaffRepository.setOnline(staffId, isOnline);
   },
 
-  getStaffReviews(staffId: string = DEFAULT_STAFF_ID) {
+  getStaffReviews(staffId: string = activeStaffId()) {
     return StaffRepository.getStaffReviews(staffId);
   },
 };

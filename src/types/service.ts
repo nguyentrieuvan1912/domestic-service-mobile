@@ -70,6 +70,7 @@ export interface Service {
 }
 
 export interface ServicePackage {
+  defaultStaffCount?: number;
   id: string;
   serviceId: string;
   name: string;

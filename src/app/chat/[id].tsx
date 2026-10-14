@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable, Image,
@@ -8,8 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-import { ChatRepository, createChatDraft, getChatActor } from '@/data/chatRepository';
-import { StaffRepository } from '@/data/staffRepository';
+import { ChatRepository, createChatDraft, getChatActor } from '@/data/connectedChatRepository';
+import { StaffRepository } from '@/data/connectedStaffRepository';
 import { canSendChat, CHAT_PHASE_LABELS, CHAT_TIME_ZONE, isOwnChatMessage } from '@/data/chatPolicy';
 import type { ChatActor, ChatBookingPhase } from '@/data/chatPolicy';
 import type { ChatMessage, Conversation } from '@/types/chat';
@@ -25,6 +26,7 @@ export default function ChatDetailScreen() {
     const unsubscribeChat = ChatRepository.subscribe(refresh);
     return () => { unsubscribeBooking(); unsubscribeChat(); };
   }, []);
+  useEffect(() => { if (!currentUser) return; const load = () => { void ChatRepository.loadList(getChatActor(currentUser)).catch(() => {}); }; load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [currentUser?.id]);
   const access = ChatRepository.access(typeof id === 'string' ? id : undefined, actor);
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -96,12 +98,13 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
   useEffect(() => {
     const activeRequests = requests.current;
     void load();
+    const poll = setInterval(load, 4000);
     const unsubscribe = ChatRepository.subscribe(() => {
       try { setMessages(ChatRepository.getMessages(conversationId, actor)); }
       catch { /* Parent immediately replaces content when booking access is revoked. */ }
     });
     return () => {
-      unsubscribe();
+      clearInterval(poll); unsubscribe();
       activeRequests.forEach((controller) => controller.abort());
       activeRequests.clear();
     };
@@ -141,7 +144,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
         <Pressable style={styles.backBtn} onPress={goBack} accessibilityLabel="Quay lại">
           <IconSymbol name="back" size={22} color={BrandColors.gray700} />
         </Pressable>
-        <Image source={{ uri: otherAvatar }} style={styles.headerAvatar} />
+        <Image source={remoteImageSource(otherAvatar)} style={styles.headerAvatar} />
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{otherName}</Text>
           <Text style={styles.headerSubtitle}>{bookingCode} • {CHAT_PHASE_LABELS[phase]}</Text>
@@ -173,7 +176,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
               const delivery = pending?.message.id === message.id ? pending : null;
               return (
                 <View key={message.id} style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
-                  {!isMe && <Image source={{ uri: message.senderAvatar }} style={styles.msgAvatar} />}
+                  {!isMe && <Image source={remoteImageSource(message.senderAvatar)} style={styles.msgAvatar} />}
                   <View style={[styles.bubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
                     <Text style={[styles.bubbleText, isMe ? styles.bubbleTextRight : styles.bubbleTextLeft]}>{message.content}</Text>
                     <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft]}>

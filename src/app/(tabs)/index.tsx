@@ -1,3 +1,5 @@
+import { remoteImageSource } from '@/utils/image-source';
+import { staffView } from '@/hooks/use-booking-detail';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -27,20 +29,15 @@ import { PromotionCard } from '@/components/common/PromotionCard';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
-import {
-  SERVICE_CATEGORIES,
-  mockServices,
-} from '@/data/services';
-import { mockBookings } from '@/data/bookings';
-import { mockPromotions } from '@/data/promotions';
-import {
-  getAddressesByCustomerId,
-  getRecentCompletedBookings,
-  getServiceById,
-  getStaffById,
-  mockServiceBundles,
-  ServiceBundle,
-} from '@/data';
+import { SERVICE_CATEGORIES } from '@/data/services';
+import { useCustomerBookings } from '@/hooks/use-customer-bookings';
+import { useBookingCatalog } from '@/hooks/use-booking-catalog';
+import { bookingServiceView } from '@/data/connectedBookings';
+import type { ServiceBundle } from '@/data/serviceBundles';
+import { useCatalogResource } from '@/hooks/use-catalog-resource';
+import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
+import type { Promotion } from '@/types/service';
+
 
 // Hero banners showcasing diverse family services
 const HERO_BANNERS = [
@@ -97,6 +94,11 @@ const HERO_BANNERS = [
 export default function HomeScreen() {
   const router = useRouter();
   const { currentCustomer } = useAuth();
+  const bookingResource = useCustomerBookings(); const catalog = useBookingCatalog();
+  const services = catalog.services;
+  const getServiceById = (id: string) => services.find(s=>s.id===id) || (bookingResource.bookings.find(b=>b.serviceId===id) ? bookingServiceView(bookingResource.bookings.find(b=>b.serviceId===id)!) : undefined);
+  const getStaffById = (id: string): Staff | undefined => { const b=bookingResource.bookings.find(b=>b.staffId===id && b.staff);return b?.staff ? staffView(b.staff) : undefined; };
+  const serviceBundles: ServiceBundle[] = catalog.packages.slice(0,4).map(p=>{ const service=services.find(s=>s.id===p.serviceId);return {id:p.id,title:p.name,subtitle:p.description,badgeText:'Gói dịch vụ',discountPercent:0,discountAmount:0,originalPrice:p.price,bundlePrice:p.price,primaryServiceId:p.serviceId,includedServiceIds:[p.serviceId],bannerImage:service?.image || '',aiReason:p.recommendedFor || '',tag:service?.name || ''}; });
   const { unreadCount } = useNotifications();
   const { width: windowWidth } = useWindowDimensions();
   const bannerGap = 12;
@@ -137,22 +139,24 @@ export default function HomeScreen() {
   }, [snapInterval]);
 
   // Address
-  const addresses = currentCustomer ? getAddressesByCustomerId(currentCustomer.id) : [];
+  const { addresses } = useCustomerAddresses();
+  const promotionResult = useCatalogResource<(Omit<Promotion, 'id' | 'maxDiscountAmount' | 'usageLimit'> & { id: number; maxDiscountAmount: number | null; usageLimit: number | null })[]>('/promotions');
+  const promotions: Promotion[] = (promotionResult.data || []).map(item => ({ ...item, id: String(item.id), maxDiscountAmount: item.maxDiscountAmount ?? undefined, usageLimit: item.usageLimit ?? 0 }));
   const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
 
   // Upcoming active booking
-  const upcomingBooking = mockBookings.find(
+  const upcomingBooking = bookingResource.bookings.find(
     (b) =>
-      b.customerId === (currentCustomer?.id || 'cust-001') &&
+      b.customerId === currentCustomer?.id &&
       ['CONFIRMED', 'STAFF_ASSIGNED', 'IN_PROGRESS', 'MATCHING'].includes(b.status)
   );
 
   // Popular and Recommended Services
-  const popularServices = mockServices.filter((s) => s.isPopular).slice(0, 6);
-  const recommendedServices = mockServices.filter((s) => !s.isPopular).slice(0, 4);
+  const popularServices = services.slice(0, 6);
+  const recommendedServices = services.slice(6, 10);
 
   // Recent completed bookings for quick re-booking
-  const recentCompletedBookings = getRecentCompletedBookings(currentCustomer?.id || 'cust-001');
+  const recentCompletedBookings = bookingResource.bookings.filter(b=>b.status==='COMPLETED').slice(0,5);
 
   // Quick Rebook Modal state
   const [rebookModalVisible, setRebookModalVisible] = useState(false);
@@ -178,8 +182,8 @@ export default function HomeScreen() {
         rebook: 'true',
         serviceId: selectedRebookBooking.serviceId,
         packageId: selectedRebookBooking.packageId,
-        staffId: rebookKeepStaff ? selectedRebookBooking.staffId : undefined,
-        mode: rebookKeepStaff && selectedRebookBooking.staffId ? 'MODE_A' : 'MODE_B',
+        staffId: rebookKeepStaff && selectedRebookBooking.requiredStaffCount===1 ? selectedRebookBooking.staffId : undefined,
+        mode: rebookKeepStaff && selectedRebookBooking.requiredStaffCount===1 && selectedRebookBooking.staffId ? 'MODE_A' : 'MODE_B',
         addressId: selectedRebookBooking.addressId,
       },
     });
@@ -191,6 +195,7 @@ export default function HomeScreen() {
       pathname: '/booking/new',
       params: {
         serviceId: bundle.primaryServiceId,
+        packageId: bundle.id,
         mode: 'MODE_B',
       },
     });
@@ -227,11 +232,8 @@ export default function HomeScreen() {
               style={styles.profileRow}
               onPress={() => router.push('/(tabs)/profile')}>
               <Image
-                source={{
-                  uri:
-                    currentCustomer?.avatar ||
-                    'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80',
-                }}
+                source={remoteImageSource(currentCustomer?.avatar ||
+                    'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80')}
                 style={styles.userAvatar}
               />
               <View style={styles.userMeta}>
@@ -280,7 +282,7 @@ export default function HomeScreen() {
               </View>
 
               <Text style={styles.upcomingServiceName}>
-                {mockServices.find((s) => s.id === upcomingBooking.serviceId)?.name ||
+                {services.find((s) => s.id === upcomingBooking.serviceId)?.name ||
                   'Dịch vụ gia đình'}
               </Text>
               <Text style={styles.upcomingTime}>
@@ -324,7 +326,7 @@ export default function HomeScreen() {
 
                       <View style={styles.rebookMainRow}>
                         {srv?.image ? (
-                          <Image source={{ uri: srv.image }} style={styles.rebookThumb} />
+                          <Image source={remoteImageSource(srv.image)} style={styles.rebookThumb} />
                         ) : (
                           <View style={styles.rebookThumbPlaceholder}>
                             <IconSymbol name="🧹" style={{ fontSize: 18 }} />
@@ -336,7 +338,7 @@ export default function HomeScreen() {
                           </Text>
                           {staff && (
                             <View style={styles.rebookStaffRow}>
-                              <Image source={{ uri: staff.avatar }} style={styles.rebookStaffAvatar} />
+                              <Image source={remoteImageSource(staff.avatar)} style={styles.rebookStaffAvatar} />
                               <Text style={styles.rebookStaffName} numberOfLines={1}>
                                 {staff.fullName} ({staff.rating}★)
                               </Text>
@@ -462,7 +464,7 @@ export default function HomeScreen() {
                       </Pressable>
                     </View>
 
-                    <Image source={{ uri: banner.image }} style={styles.bannerImage} />
+                    <Image source={remoteImageSource(banner.image)} style={styles.bannerImage} />
                   </LinearGradient>
                 </Pressable>
               ))}
@@ -501,7 +503,7 @@ export default function HomeScreen() {
                   key={cat.id}
                   category={cat}
                   onPress={() => {
-                    const service = mockServices.find((item) => item.categoryId === cat.id);
+                    const service = services.find((item) => item.categoryId === cat.id);
                     if (service) {
                       router.push(`/service/${service.id}`);
                     }
@@ -551,7 +553,7 @@ export default function HomeScreen() {
                     params: { id: service.id },
                   })
                 }>
-                <Image source={{ uri: service.image }} style={styles.popularImage} />
+                <Image source={remoteImageSource(service.image)} style={styles.popularImage} />
                 <View style={styles.popularBody}>
                   <Text numberOfLines={1} style={styles.popularTitle}>
                     {service.name}
@@ -598,12 +600,12 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: 12 }}>
-            {mockServiceBundles.map((bundle) => (
+            {serviceBundles.map((bundle) => (
               <Pressable
                 key={bundle.id}
                 style={styles.bundleCard}
                 onPress={() => setSelectedBundle(bundle)}>
-                <Image source={{ uri: bundle.bannerImage }} style={styles.bundleImage} />
+                <Image source={remoteImageSource(bundle.bannerImage)} style={styles.bundleImage} />
                 <View style={styles.bundleBadgeFloat}>
                   <Text style={styles.bundleBadgeFloatText}>{bundle.badgeText}</Text>
                 </View>
@@ -658,7 +660,7 @@ export default function HomeScreen() {
                     params: { id: service.id },
                   })
                 }>
-                <Image source={{ uri: service.image }} style={styles.recThumb} />
+                <Image source={remoteImageSource(service.image)} style={styles.recThumb} />
                 <View style={styles.recContent}>
                   <Text numberOfLines={1} style={styles.recTitle}>
                     {service.name}
@@ -687,7 +689,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={{ paddingHorizontal: Spacing.three }}>
-            {mockPromotions.slice(0, 2).map((promo) => (
+            {promotions.filter(item => item.isActive).slice(0, 2).map((promo) => (
               <PromotionCard
                 key={promo.id}
                 promotion={promo}
@@ -748,7 +750,7 @@ export default function HomeScreen() {
                   <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
                     {/* Service Info Box */}
                     <View style={styles.modalServiceBox}>
-                      {srv?.image && <Image source={{ uri: srv.image }} style={styles.modalServiceThumb} />}
+                      {srv?.image && <Image source={remoteImageSource(srv.image)} style={styles.modalServiceThumb} />}
                       <View style={{ flex: 1 }}>
                         <Text style={styles.modalServiceName}>{srv?.name}</Text>
                         <Text style={styles.modalServiceSub}>
@@ -765,7 +767,7 @@ export default function HomeScreen() {
                         <Pressable
                           style={[styles.staffOptionRow, rebookKeepStaff && styles.staffOptionRowActive]}
                           onPress={() => setRebookKeepStaff(!rebookKeepStaff)}>
-                          <Image source={{ uri: staff.avatar }} style={styles.staffOptionAvatar} />
+                          <Image source={remoteImageSource(staff.avatar)} style={styles.staffOptionAvatar} />
                           <View style={{ flex: 1 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                               <Text style={styles.staffOptionName}>{staff.fullName}</Text>
@@ -883,7 +885,7 @@ export default function HomeScreen() {
 
               {selectedBundle && (
                 <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
-                  <Image source={{ uri: selectedBundle.bannerImage }} style={styles.modalBundleHero} />
+                  <Image source={remoteImageSource(selectedBundle.bannerImage)} style={styles.modalBundleHero} />
 
                   <View style={styles.modalAiBox}>
                     <Text style={styles.modalAiHeading}>🤖 Phân tích thông minh của AI:</Text>

@@ -16,24 +16,24 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { AddressCard } from '@/components/common/AddressCard';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
-import { getAddressesByCustomerId, mockCustomerAddresses } from '@/data';
+import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
+import { EmptyState } from '@/components/common/EmptyState';
+import { CatalogState } from '@/components/common/CatalogState';
 import { CustomerAddress } from '@/types/user';
 
 export default function AddressManagementScreen() {
   const router = useRouter();
   const { currentCustomer } = useAuth();
 
-  const customerId = currentCustomer?.id || 'cust-001';
-  const [addresses, setAddresses] = useState<CustomerAddress[]>(
-    getAddressesByCustomerId(customerId)
-  );
+  const { addresses, loading, error, retry, mutate } = useCustomerAddresses();
+  const [saving, setSaving] = useState(false);
 
   // Add / Edit Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [title, setTitle] = useState('Nhà riêng');
-  const [recipientName, setRecipientName] = useState(currentCustomer?.fullName || 'Nguyễn Văn A');
-  const [recipientPhone, setRecipientPhone] = useState(currentCustomer?.phone || '0901234001');
+  const [recipientName, setRecipientName] = useState(currentCustomer?.fullName || '');
+  const [recipientPhone, setRecipientPhone] = useState(currentCustomer?.phone || '');
   const [streetAddress, setStreetAddress] = useState('');
   const [district, setDistrict] = useState('Quận 1');
   const [note, setNote] = useState('');
@@ -42,7 +42,10 @@ export default function AddressManagementScreen() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const openAddModal = () => {
+    if (!currentCustomer) { router.push('/auth/login'); return; }
     setEditingAddressId(null);
+    setRecipientName(currentCustomer.fullName);
+    setRecipientPhone(currentCustomer.phone);
     setTitle('Nhà riêng');
     setStreetAddress('');
     setDistrict('Quận 1');
@@ -61,68 +64,37 @@ export default function AddressManagementScreen() {
     setModalVisible(true);
   };
 
-  const handleSave = () => {
-    if (!streetAddress.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số nhà, tên đường.');
+  const handleSave = async () => {
+    if (saving) return;
+    if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim() || !district.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ người nhận, điện thoại và địa chỉ.');
       return;
     }
-
-    if (editingAddressId) {
-      // Edit
-      const updated = addresses.map((a) => {
-        if (a.id === editingAddressId) {
-          return {
-            ...a,
-            title,
-            recipientName,
-            recipientPhone,
-            streetAddress,
-            district,
-            note,
-            fullAddress: `${streetAddress}, ${district}, TP. Hồ Chí Minh`,
-          };
-        }
-        return a;
+    setSaving(true);
+    try {
+      const previous = addresses.find(item => item.id === editingAddressId);
+      await mutate(editingAddressId ? '/customer/addresses/' + editingAddressId : '/customer/addresses', editingAddressId ? 'PUT' : 'POST', {
+        title: title.trim(), recipientName: recipientName.trim(), recipientPhone: recipientPhone.trim(),
+        streetAddress: streetAddress.trim(), district: district.trim(), note: note.trim(),
+        ward: previous?.ward || '', city: previous?.city || 'TP. Hồ Chí Minh', isDefault: previous?.isDefault || false,
       });
-      setAddresses(updated);
-    } else {
-      // Add
-      const newAddr: CustomerAddress = {
-        id: `addr-${Date.now()}`,
-        customerId,
-        title,
-        recipientName,
-        recipientPhone,
-        streetAddress,
-        ward: 'Phường Đa Kao',
-        district,
-        city: 'TP. Hồ Chí Minh',
-        fullAddress: `${streetAddress}, ${district}, TP. Hồ Chí Minh`,
-        latitude: 10.78,
-        longitude: 106.7,
-        isDefault: addresses.length === 0,
-        note,
-      };
-      setAddresses([...addresses, newAddr]);
-    }
-
-    setModalVisible(false);
+      setModalVisible(false);
+    } catch (cause) { Alert.alert('Chưa lưu được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
-
-  const handleSetDefault = (id: string) => {
-    const updated = addresses.map((a) => ({
-      ...a,
-      isDefault: a.id === id,
-    }));
-    setAddresses(updated);
-    Alert.alert('Thành công', 'Đã đặt địa chỉ làm mặc định phục vụ.');
+  const handleSetDefault = async (id: string) => {
+    if (saving) return;
+    setSaving(true);
+    try { await mutate('/customer/addresses/' + id + '/default', 'PATCH'); Alert.alert('Thành công', 'Đã đặt địa chỉ làm mặc định phục vụ.'); }
+    catch (cause) { Alert.alert('Chưa lưu được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
-
-  const handleDelete = () => {
-    if (!deleteTargetId) return;
-    const updated = addresses.filter((a) => a.id !== deleteTargetId);
-    setAddresses(updated);
-    setDeleteTargetId(null);
+  const handleDelete = async () => {
+    if (!deleteTargetId || saving) return;
+    setSaving(true);
+    try { await mutate('/customer/addresses/' + deleteTargetId, 'DELETE'); setDeleteTargetId(null); }
+    catch (cause) { Alert.alert('Chưa xóa được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -133,7 +105,7 @@ export default function AddressManagementScreen() {
           <IconSymbol name="back" size={20} color={BrandColors.gray800} />
         </Pressable>
         <Text style={styles.headerTitle}>Sổ địa chỉ của bạn</Text>
-        <Pressable style={styles.addBtn} onPress={openAddModal}>
+        <Pressable style={styles.addBtn} disabled={saving || loading} onPress={openAddModal}>
           <Text style={styles.addBtnText}>+ Thêm</Text>
         </Pressable>
       </View>
@@ -141,6 +113,9 @@ export default function AddressManagementScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
+        {!currentCustomer ? <EmptyState icon="user" title="Vui lòng đăng nhập" description="Đăng nhập để quản lý sổ địa chỉ của bạn." actionText="Đăng nhập" onAction={() => router.push('/auth/login')} /> :
+          loading || error ? <CatalogState loading={loading} error={error} onRetry={retry} /> :
+          addresses.length === 0 ? <EmptyState icon="location" title="Chưa có địa chỉ" description="Thêm địa chỉ đầu tiên để đặt dịch vụ." /> : null}
         {addresses.map((addr) => (
           <AddressCard
             key={addr.id}
@@ -220,8 +195,8 @@ export default function AddressManagementScreen() {
                 placeholder="Tòa Landmark 2, tầng 15..."
               />
 
-              <Pressable style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Lưu địa chỉ</Text>
+              <Pressable style={styles.saveBtn} disabled={saving} onPress={handleSave}>
+                <Text style={styles.saveBtnText}>{saving ? 'Đang lưu...' : 'Lưu địa chỉ'}</Text>
               </Pressable>
             </ScrollView>
           </View>

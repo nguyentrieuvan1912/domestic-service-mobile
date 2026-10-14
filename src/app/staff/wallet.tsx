@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
+import { EmptyState } from '@/components/common/EmptyState';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Alert,
   Modal,
@@ -19,9 +21,14 @@ import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { useAuth } from '@/context/AuthContext';
 
 export default function StaffWalletScreen() {
+  const { currentStaff } = useAuth(); const router = useRouter();
+  if (!currentStaff) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="user" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
+  return <StaffWalletContent key={currentStaff.id} />;
+}
+function StaffWalletContent() {
   const router = useRouter();
   const { currentStaff } = useAuth();
-  const staffId = currentStaff?.id || 'staff-001';
+  const staffId = currentStaff?.id || '';
 
   const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
   const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'WITHDRAW' | 'BONUS'>('ALL');
@@ -29,8 +36,13 @@ export default function StaffWalletScreen() {
   // Withdraw Modal State
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('1000000');
-  const [selectedBank, setSelectedBank] = useState('Vietcombank (****9821)');
-  const accountName = currentStaff?.fullName?.toUpperCase() || 'NGUYỄN THỊ HOA';
+  const [selectedBank, setSelectedBank] = useState('');
+  const [saving, setSaving] = useState(false);
+  const requestKey = useRef('withdraw-' + Date.now());
+  const [linkVisible, setLinkVisible] = useState(false);
+  const [bankCode, setBankCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const accountName = currentStaff?.fullName?.toUpperCase() || '';
 
   useEffect(() => {
     const update = () => {
@@ -52,37 +64,33 @@ export default function StaffWalletScreen() {
     setWithdrawAmount(val.toString());
   };
 
-  const handleConfirmWithdraw = () => {
-    const amountNum = parseInt(withdrawAmount.replace(/\D/g, ''), 10);
-    if (isNaN(amountNum) || amountNum < 50000) {
-      Alert.alert('Lỗi', 'Số tiền rút tối thiểu là 50.000đ.');
-      return;
-    }
-    if (amountNum > balance.available) {
-      Alert.alert('Số dư không đủ', 'Số tiền rút vượt quá số dư khả dụng hiện có.');
-      return;
-    }
-
-    const success = StaffService.withdrawMoney(amountNum, selectedBank, '9821', staffId);
-    if (success) {
-      setIsWithdrawVisible(false);
-      Alert.alert(
-        'Lệnh rút tiền thành công! 💸',
-        `Yêu cầu rút ${amountNum.toLocaleString('vi-VN')}đ về tài khoản ${selectedBank} đã được xử lý thành công qua hệ thống chuyển tiền nhanh 24/7.`
-      );
-    }
+  const bankAccounts = StaffService.getBankAccounts(staffId);
+  const bankOptions = bankAccounts.filter(bank => bank.status === 'VERIFIED').map(bank => bank.bankCode + ' (****' + bank.accountNumber.slice(-4) + ')');
+  const handleConfirmWithdraw = async () => {
+    if (saving) return;
+    const amountNum = Number(withdrawAmount.replace(/\D/g, ''));
+    if (!Number.isSafeInteger(amountNum) || amountNum < 50000) { Alert.alert('Lỗi', 'Số tiền rút tối thiểu là 50.000đ.'); return; }
+    if (!selectedBank) { Alert.alert('Chưa có tài khoản nhận', 'Liên kết ngân hàng và chờ Admin xác minh trước khi rút.'); return; }
+    setSaving(true);
+    try {
+      await StaffService.withdrawMoney(amountNum, selectedBank, '', staffId, requestKey.current);
+      setIsWithdrawVisible(false); requestKey.current = 'withdraw-' + Date.now();
+      Alert.alert('Đã gửi yêu cầu rút', 'Yêu cầu đã được lưu và đang chờ Admin xử lý. Khoản tiền chưa được chuyển về ngân hàng.');
+    } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
-
-  const bankOptions = [
-    'Vietcombank (****9821)',
-    'MB Bank (****5678)',
-    'Techcombank (****1234)',
-    'Ví MoMo (0912001001)',
-  ];
+  const linkBank = async () => {
+    if (saving) return; setSaving(true);
+    try { await StaffService.addBank(staffId, bankCode.trim(), accountNumber.trim(), accountName); setLinkVisible(false); Alert.alert('Đã lưu', 'Tài khoản ngân hàng đang chờ Admin xác minh.'); }
+    catch (error) { Alert.alert('Chưa lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
+  };
 
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StaffConnectionStatus />
+        <Pressable onPress={() => setLinkVisible(true)} style={{ padding: 12 }}><Text style={{ color: '#047857', fontWeight: '700' }}>Liên kết tài khoản ngân hàng ({bankAccounts.length})</Text></Pressable>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Ví & Thu nhập</Text>
@@ -91,7 +99,7 @@ export default function StaffWalletScreen() {
             onPress={() =>
               Alert.alert(
                 'Quy định đối soát & rút tiền',
-                '• Tiền công từ ca làm sẽ cộng vào số dư khả dụng ngay khi khách hàng xác nhận nghiệm thu.\n• Hỗ trợ rút tiền 24/7 về các tài khoản ngân hàng liên kết, miễn phí giao dịch.'
+                'Thu nhập được ghi nhận sau khi đơn kết thúc và được quyết toán. Yêu cầu rút cần tài khoản ngân hàng đã xác minh và chờ Admin xử lý.'
               )
             }
           >
@@ -258,7 +266,7 @@ export default function StaffWalletScreen() {
                         {isPositive ? '+' : '-'}
                         {tx.amount.toLocaleString('vi-VN')}đ
                       </Text>
-                      <Text style={styles.txStatus}>Thành công</Text>
+                      <Text style={styles.txStatus}>{tx.status === 'SUCCESS' ? 'Đã ghi nhận' : tx.status === 'FAILED' ? 'Đã từ chối' : 'Chờ xử lý'}</Text>
                     </View>
                   </View>
                 );
@@ -268,6 +276,7 @@ export default function StaffWalletScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      <Modal visible={linkVisible} transparent animationType="slide" onRequestClose={() => setLinkVisible(false)}><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Liên kết ngân hàng</Text><Text style={styles.inputLabel}>Mã hoặc tên ngân hàng</Text><TextInput style={styles.readOnlyInput} value={bankCode} onChangeText={setBankCode} /><Text style={styles.inputLabel}>Số tài khoản</Text><TextInput style={styles.readOnlyInput} keyboardType="numeric" value={accountNumber} onChangeText={setAccountNumber} /><Text style={styles.inputLabel}>Chủ tài khoản</Text><Text style={styles.availableHint}>{accountName}</Text><Pressable disabled={saving} onPress={linkBank} style={{ padding: 16 }}><Text style={{ color: '#047857', fontWeight: '700' }}>{saving ? 'Đang lưu…' : 'Lưu tài khoản'}</Text></Pressable><Pressable onPress={() => setLinkVisible(false)} style={{ padding: 12 }}><Text>Đóng</Text></Pressable></View></View></Modal>
       {/* Interactive Withdraw Modal */}
       <Modal
         visible={isWithdrawVisible}
@@ -366,7 +375,7 @@ export default function StaffWalletScreen() {
 
               <Pressable
                 style={styles.confirmWithdrawBtn}
-                onPress={handleConfirmWithdraw}
+                disabled={saving} onPress={handleConfirmWithdraw}
               >
                 <Text style={styles.confirmWithdrawText}>Xác nhận rút tiền ngay</Text>
               </Pressable>

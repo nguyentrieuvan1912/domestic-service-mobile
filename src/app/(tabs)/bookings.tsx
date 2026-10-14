@@ -14,7 +14,9 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { BookingCard } from '@/components/common/BookingCard';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuth } from '@/context/AuthContext';
-import { mockBookings } from '@/data/bookings';
+import { useCustomerBookings } from '@/hooks/use-customer-bookings';
+import { CustomerBookings } from '@/data/connectedBookings';
+import { CatalogState } from '@/components/common/CatalogState';
 import { BookingStatus } from '@/types/booking';
 
 type TabFilter = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
@@ -31,8 +33,7 @@ export default function BookingsScreen() {
   const { currentCustomer } = useAuth();
   const [activeFilter, setActiveFilter] = useState<TabFilter>('ALL');
 
-  const customerId = currentCustomer?.id || 'cust-001';
-  const customerBookings = mockBookings.filter((b) => b.customerId === customerId);
+  const { bookings: customerBookings, loading, error, retry } = useCustomerBookings();
 
   const filteredBookings = customerBookings.filter((b) => {
     switch (activeFilter) {
@@ -55,20 +56,15 @@ export default function BookingsScreen() {
   const handleCancel = (bookingId: string) => {
     Alert.alert(
       'Hủy đơn dịch vụ',
-      'Bạn có chắc chắn muốn hủy đơn hàng này? Theo chính sách hoàn tiền, hủy trước 12h sẽ được hoàn 100% chi phí.',
+      'Bạn có muốn hủy đơn hàng? Khoản tiền đã thu sẽ được xử lý theo chính sách sau khi đối soát.',
       [
         { text: 'Giữ lại đơn', style: 'cancel' },
         {
           text: 'Xác nhận hủy',
           style: 'destructive',
-          onPress: () => {
-            const b = mockBookings.find((item) => item.id === bookingId);
-            if (b) {
-              b.status = 'CANCELLED';
-              b.cancellationReason = 'Khách hàng hủy đơn chủ động qua ứng dụng';
-            }
-            Alert.alert('Thành công', 'Đơn hàng đã được hủy.');
-            setActiveFilter('CANCELLED');
+          onPress: async () => {
+            try { await CustomerBookings.cancel(bookingId, 'Khách hàng hủy đơn chủ động qua ứng dụng'); Alert.alert('Đã lưu', 'Trạng thái hủy đã được lưu trên hệ thống.'); setActiveFilter('CANCELLED'); }
+            catch (cause) { Alert.alert('Chưa hủy được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
           },
         },
       ]
@@ -81,6 +77,7 @@ export default function BookingsScreen() {
       locations={BrandColors.softBgGradientLocations}
       style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {(loading || error) && <CatalogState loading={loading} error={error} onRetry={retry} />}
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Đơn dịch vụ của tôi</Text>

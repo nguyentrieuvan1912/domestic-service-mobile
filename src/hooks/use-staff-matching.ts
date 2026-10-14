@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffRepository } from '@/data/staffRepository';
-import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
+import { StaffRepository } from '@/data/connectedStaffRepository';
+import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
 
 export function useStaffMatching() {
   const { currentUser, currentStaff } = useAuth();

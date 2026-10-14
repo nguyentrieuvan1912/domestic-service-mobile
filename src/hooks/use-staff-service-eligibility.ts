@@ -1,6 +1,6 @@
 import { useStaffCapabilities } from './use-staff-capabilities';
 import { useSyncExternalStore } from 'react';
-import { StaffRepository } from '@/data/staffRepository';
+import { StaffRepository } from '@/data/connectedStaffRepository';
 
 // Same scoped read model as Profile and Account details. Mutations recheck in
 // StaffRepository; a displayed approval is never a substitute for that check.

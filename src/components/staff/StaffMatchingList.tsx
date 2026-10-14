@@ -56,7 +56,7 @@ export function StaffMatchingList({ matching, filter = DEFAULT_MATCH_FILTER, lim
         <Text style={styles.heading}>{job.packageTitle}</Text><Text style={styles.body}>{opportunityTime(job)}</Text>
         <Text style={styles.body}>{job.district} • TP. Hồ Chí Minh</Text>
         <Text style={styles.sub}>{job.mode === 'B' ? 'Nhận vị trí trống' : 'Khách chọn bạn'} • Còn {job.positionsRemaining}/{job.positionsRequired} vị trí</Text>
-        <Text style={styles.income}>Ước tính {job.netIncome.toLocaleString('vi-VN')}đ / nhân viên</Text>
+        <Text style={styles.income}>{job.incomePendingPolicy ? 'Thu nhập chờ quyết toán' : 'Ước tính ' + job.netIncome.toLocaleString('vi-VN') + 'đ / nhân viên'}</Text>
         {job.distance && <Text style={styles.sub}>{job.distance.km} km • {job.distance.source}</Text>}
         <View style={styles.row}><Pressable accessibilityRole="button" style={[styles.secondary, styles.grow]} onPress={() => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })}><Text style={styles.link}>Chi tiết</Text></Pressable><Pressable accessibilityRole="button" style={[styles.primary, styles.grow]} onPress={() => setSelectedId(job.id)}><Text style={styles.light}>Vì sao phù hợp</Text></Pressable></View>
       </View>)}
@@ -89,7 +89,7 @@ export function StaffMatchExplanation({ matching, opportunityId, onClose, onClai
   return <Modal visible transparent animationType="slide" onRequestClose={() => { if (!busy) onClose(); }}><View style={styles.scrim}><SafeAreaView edges={['bottom']} style={styles.sheet}>
     <View style={styles.row}><Text style={[styles.title, styles.grow]}>{available ? 'Vì sao phù hợp' : 'Điều kiện nhận ca'}</Text><Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={styles.close}><IconSymbol name="close" size={22} color={BrandColors.gray700} /></Pressable></View>
     <ScrollView contentContainerStyle={styles.sheetContent}>
-      {item ? <><Text style={styles.heading}>{item.opportunity.serviceName}</Text><Text style={styles.body}>{opportunityTime(item.opportunity)}</Text><Text style={styles.body}>{item.opportunity.district} • Ước tính {item.opportunity.netIncome.toLocaleString('vi-VN')}đ / nhân viên</Text>
+      {item ? <><Text style={styles.heading}>{item.opportunity.serviceName}</Text><Text style={styles.body}>{opportunityTime(item.opportunity)}</Text><Text style={styles.body}>{item.opportunity.district} • {item.opportunity.incomePendingPolicy ? 'Thu nhập chờ quyết toán' : item.opportunity.netIncome.toLocaleString('vi-VN') + 'đ / nhân viên'}</Text>
         <Text style={styles.body}>{item.opportunity.mode === 'B' ? 'Nhận vị trí trống' : 'Khách chọn bạn'} • Còn {item.opportunity.positionsRemaining}/{item.opportunity.positionsRequired} vị trí. Bạn sẽ nhận một vị trí.</Text>
         {item.eligibility.checks.map((check, index) => <View style={styles.check} key={`${check.code}-${index}`}><Text style={[styles.heading, !check.passed && styles.error]}>{check.passed ? '✓' : '!'} {check.label}</Text><Text style={styles.body}>{check.detail}</Text></View>)}
       </> : <Text style={styles.error}>{matching.status === 'LOADING' ? 'Đang kiểm tra lại điều kiện…' : 'Ca không còn khả dụng. Tải lại danh sách để xem ca khác.'}</Text>}

@@ -1,5 +1,7 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,7 +22,7 @@ import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
+import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
 import { selectMatchingItems } from '@/data/staffMatchingRules';
 import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
 import { EmptyState } from '@/components/common/EmptyState';
@@ -38,7 +40,7 @@ function StaffDashboardContent() {
   const matching = useStaffMatching();
   const [matchFilter, setMatchFilter] = useState(DEFAULT_MATCH_FILTER);
   const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
-  const staffId = currentStaff?.id || 'staff-001';
+  const staffId = currentStaff?.id || '';
 
   const [profile, setProfile] = useState<StaffOperationalProfile>(() => StaffService.getOperationalProfile(staffId));
   const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
@@ -62,8 +64,8 @@ function StaffDashboardContent() {
     return unsubscribe;
   }, [staffId]);
 
-  const handleToggleOnline = (value: boolean) => {
-    if (matching.actor) StaffMatchingRepository.setOnline(matching.actor, value);
+  const handleToggleOnline = async (value: boolean) => {
+    if (matching.actor) try { await StaffMatchingRepository.setOnline(matching.actor, value); } catch (error) { Alert.alert('Chưa lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
   };
 
   return (
@@ -77,7 +79,7 @@ function StaffDashboardContent() {
                 style={styles.profileRow}
                 onPress={() => router.push('/staff/profile')}
               >
-                <Image source={{ uri: staffAvatar }} style={styles.avatar} />
+                <Image source={remoteImageSource(staffAvatar)} style={styles.avatar} />
                 <View>
                   <View style={styles.nameBadgeRow}>
                     <Text style={styles.greeting}>{staffName}</Text>
@@ -179,7 +181,7 @@ function StaffDashboardContent() {
 
                   <View style={styles.activeJobActionColumn}>
                     <Text style={styles.activeJobIncome}>
-                      +{activeJob.netIncome.toLocaleString('vi-VN')}đ
+                      {activeJob.incomePendingPolicy ? 'Chờ quyết toán' : '+'+activeJob.netIncome.toLocaleString('vi-VN')+'đ'}
                     </Text>
                     <Pressable
                       style={styles.activeJobBtn}

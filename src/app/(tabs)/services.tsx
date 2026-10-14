@@ -1,4 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import { remoteImageSource } from '@/utils/image-source';
+import { useFocusEffect } from 'expo-router';
+import { identityRequest } from '@/api/identity';
+import { operationRequest } from '@/api/operations';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,49 +20,6 @@ type CommunityPost = {
   media?: CommunityMedia[];
 };
 
-const INITIAL_POSTS: CommunityPost[] = [
-  {
-    id: 'admin-welcome', author: 'CleanMaster',
-    avatar: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=160&auto=format&fit=crop&q=80',
-    createdAt: 'Hôm nay, 09:30', topic: 'Thông báo',
-    content: 'Chào mừng bạn đến Cộng đồng CleanMaster. Chia sẻ mẹo chăm nhà, hỏi kinh nghiệm và kết nối với những người cùng khu vực TP.HCM nhé!',
-    likes: 48, comments: [{ id: 'c-admin-1', author: 'Minh Anh', content: 'Mong chờ thêm nhiều mẹo hay ạ!' }], isSponsored: true,
-  },
-  {
-    id: 'post-1', author: 'Thảo Vy',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80',
-    createdAt: '2 giờ trước', topic: 'Mẹo nhà cửa',
-    content: 'Mọi người có cách nào khử mùi ẩm trong tủ quần áo mùa mưa ở TP.HCM không? Mình đã thử than hoạt tính mà mùi vẫn còn nhẹ.',
-    likes: 12, comments: [{ id: 'c-1', author: 'Hải Yến', content: 'Bạn thử vệ sinh tủ, để túi hút ẩm và mở cửa tủ 15 phút mỗi ngày nhé.' }],
-  },
-  {
-    id: 'post-2', author: 'Anh Khoa',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&auto=format&fit=crop&q=80',
-    createdAt: 'Hôm qua', topic: 'Chia sẻ trải nghiệm',
-    content: 'Vừa dùng dịch vụ vệ sinh máy lạnh. Nhà mát hơn hẳn và nhân viên có bạt che nên không bị bắn nước ra tường. Rất đáng làm định kỳ.',
-    likes: 31, comments: [],
-  },
-  {
-    id: 'post-one-image', author: 'Ngọc Bích',
-    avatar: 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=160&auto=format&fit=crop&q=80',
-    createdAt: 'Hôm qua', topic: 'Góc nhà đẹp',
-    content: 'Một buổi chiều dọn lại góc bếp, thêm chút cây xanh là căn nhà thấy dễ chịu hẳn. Mọi người thường giữ bếp gọn bằng mẹo gì vậy?',
-    likes: 26, comments: [],
-    media: [{ uri: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=900&auto=format&fit=crop&q=80', type: 'image', fileName: 'goc-bep-nha-bich.jpg' }],
-  },
-  {
-    id: 'post-many-images', author: 'Quỳnh Như',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80',
-    createdAt: '3 ngày trước', topic: 'Trước & sau dọn dẹp',
-    content: 'Chia sẻ vài góc nhà sau ngày tổng vệ sinh cuối tuần. Cảm giác về nhà thấy thư giãn hơn rất nhiều!',
-    likes: 57, comments: [{ id: 'c-many-images', author: 'Thanh Hà', content: 'Gọn gàng và ấm cúng quá chị ơi!' }],
-    media: [
-      { uri: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop&q=80', type: 'image', fileName: 'phong-khach.jpg' },
-      { uri: 'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=600&auto=format&fit=crop&q=80', type: 'image', fileName: 'phong-ngu.jpg' },
-      { uri: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=600&auto=format&fit=crop&q=80', type: 'image', fileName: 'ban-an.jpg' },
-    ],
-  },
-];
 
 function VideoAttachment({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (videoPlayer) => {
@@ -73,15 +34,19 @@ function MediaGallery({ media, onImagePress }: { media: CommunityMedia[]; onImag
   return <View style={[styles.mediaGallery, media.length === 1 && styles.singleMediaGallery]}>
     {media.map((item) => item.type === 'image'
       ? <Pressable key={item.uri} onPress={() => onImagePress?.(images, images.findIndex((image) => image.uri === item.uri))} style={[styles.galleryImage, media.length === 1 && styles.singleGalleryImage]}>
-        <Image source={{ uri: item.uri }} style={styles.galleryImageContent} />
+        <Image source={remoteImageSource(item.uri)} style={styles.galleryImageContent} />
       </Pressable>
       : <VideoAttachment key={item.uri} uri={item.uri} />)}
   </View>;
 }
 
 export default function CommunityScreen() {
-  const { currentCustomer } = useAuth();
-  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const { currentCustomer, accessToken } = useAuth();
+  const [posts,setPosts]=useState<CommunityPost[]>([]);
+  const [error,setError]=useState(''),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[attempt,setAttempt]=useState(0);
+  type RawPost={id:number;author:string;avatar:string;createdAt:string;status:string;content:string;likes:number;isLiked:boolean;comments:{id:number;author:string;content:string}[]};
+  const updatePosts=(rows:RawPost[])=>{setPosts(rows.map(p=>({...p,id:String(p.id),avatar:p.avatar || '',createdAt:new Date(p.createdAt).toLocaleString('vi-VN'),topic:p.status==='PENDING'?'Chờ Admin duyệt':p.status==='HIDDEN'?'Đã ẩn':'Cộng đồng',comments:p.comments.map(c=>({...c,id:String(c.id)}))})));setLikedPostIds(rows.filter(p=>p.isLiked).map(p=>String(p.id)));};
+  useFocusEffect(useCallback(()=>{let active=true;const controller=new AbortController();setPosts([]);setLikedPostIds([]);setLoading(true);void identityRequest<RawPost[]>('/community/posts',undefined,accessToken || undefined,'GET',controller.signal).then(rows=>{if(active){updatePosts(rows);setError('');}}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false;controller.abort();};},[currentCustomer?.id,accessToken,attempt]));
   const [draft, setDraft] = useState('');
   const [selectedMedia, setSelectedMedia] = useState<CommunityMedia[]>([]);
   const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
@@ -92,19 +57,10 @@ export default function CommunityScreen() {
   const displayName = currentCustomer?.fullName || 'Bạn';
   const totalPosts = useMemo(() => posts.filter((post) => !post.isSponsored).length, [posts]);
 
-  const publishPost = () => {
-    const content = draft.trim();
-    if (!content && selectedMedia.length === 0) {
-      Alert.alert('Chưa có nội dung', 'Hãy viết vài dòng hoặc chọn ảnh/video để chia sẻ với cộng đồng nhé.');
-      return;
-    }
-    setPosts((current) => [{
-      id: `local-${Date.now()}`, author: displayName,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80',
-      createdAt: 'Vừa xong', topic: 'Chia sẻ mới', content, likes: 0, comments: [], media: selectedMedia,
-    }, ...current]);
-    setDraft('');
-    setSelectedMedia([]);
+  const publishPost = async () => {
+    if(saving)return;setSaving(true);setError('');
+    try{const result=await operationRequest<{id:number;status:string}>('identity','/community/posts','POST',{content:draft.trim(),media:selectedMedia});setDraft('');setSelectedMedia([]);setAttempt(x=>x+1);Alert.alert('Đã lưu bài viết',result.status==='PENDING'?'Bài đã lưu, chờ Admin kiểm duyệt.':'Bài đã được công bố.');}
+    catch(e){setError(e instanceof Error?e.message:'Chưa đăng được bài.');}finally{setSaving(false);}
   };
 
   const pickMedia = async () => {
@@ -127,16 +83,14 @@ export default function CommunityScreen() {
     }
   };
 
-  const toggleLike = (postId: string) => setLikedPostIds((current) => current.includes(postId)
-    ? current.filter((id) => id !== postId) : [...current, postId]);
-
-  const submitComment = (postId: string) => {
-    const content = commentDrafts[postId]?.trim();
-    if (!content) return;
-    setPosts((current) => current.map((post) => post.id === postId ? {
-      ...post, comments: [...post.comments, { id: `comment-${Date.now()}`, author: displayName, content }],
-    } : post));
-    setCommentDrafts((current) => ({ ...current, [postId]: '' }));
+  const toggleLike = async (postId:string) => {
+    try{const result=await operationRequest<{isLiked:boolean;likes:number}>('identity','/community/posts/'+postId+'/like','PATCH',{liked:!likedPostIds.includes(postId)});setPosts(current=>current.map(p=>p.id===postId?{...p,likes:result.likes}:p));setLikedPostIds(current=>result.isLiked?[...new Set([...current,postId])]:current.filter(id=>id!==postId));}
+    catch(e){setError(e instanceof Error?e.message:'Chưa lưu được lượt thích.');}
+  };
+  const submitComment = async (postId:string) => {
+    if(!commentDrafts[postId]?.trim())return;
+    try{await operationRequest('identity','/community/posts/'+postId+'/comments','POST',{content:commentDrafts[postId].trim()});setCommentDrafts(current=>({...current,[postId]:''}));setAttempt(x=>x+1);}
+    catch(e){setError(e instanceof Error?e.message:'Chưa lưu được bình luận.');}
   };
 
   const openImageViewer = (images: CommunityMedia[], index: number) => {
@@ -150,6 +104,7 @@ export default function CommunityScreen() {
     <LinearGradient colors={BrandColors.softBgGradient} style={styles.gradient}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <View>{loading && <Text>Đang tải cộng đồng...</Text>}{error && <Pressable onPress={()=>setAttempt(x=>x+1)}><Text style={{color:'#B91C1C'}}>{error} • Thử lại</Text></Pressable>}</View>
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>Cộng đồng</Text>
@@ -157,7 +112,7 @@ export default function CommunityScreen() {
             </View>
             <View style={styles.memberCount}>
               <IconSymbol name="users" size={16} color={BrandColors.primary} />
-              <Text style={styles.memberText}>{totalPosts + 128} thành viên</Text>
+              <Text style={styles.memberText}>{totalPosts} bài viết</Text>
             </View>
           </View>
 
@@ -177,7 +132,7 @@ export default function CommunityScreen() {
                 <IconSymbol name="plus" size={18} color={BrandColors.primary} />
                 <Text style={styles.mediaButtonText}>Ảnh / Video</Text>
               </Pressable>
-              <Pressable style={styles.publishButton} onPress={publishPost}>
+              <Pressable style={styles.publishButton} disabled={saving} onPress={()=>void publishPost()}>
                 <IconSymbol name="send" size={16} color="#FFFFFF" />
                 <Text style={styles.publishText}>Đăng bài</Text>
               </Pressable>
@@ -186,14 +141,14 @@ export default function CommunityScreen() {
 
           <View style={styles.backendHint}>
             <IconSymbol name="warning" size={18} color="#B45309" />
-            <Text style={styles.backendHintText}>Khi có backend, quản trị viên có thể duyệt bài và đăng thông báo hoặc nội dung tài trợ tại đây.</Text>
+            <Text style={styles.backendHintText}>Bài viết được lưu trên hệ thống và chờ Admin duyệt. Ảnh/video cần cấu hình lưu trữ trước khi đăng.</Text>
           </View>
 
           {posts.map((post) => {
             const isLiked = likedPostIds.includes(post.id);
             return <View key={post.id} style={[styles.post, post.isSponsored && styles.sponsoredPost]}>
               <View style={styles.postHeader}>
-                <Image source={{ uri: post.avatar }} style={styles.postAvatar} />
+                <Image source={remoteImageSource(post.avatar)} style={styles.postAvatar} />
                 <View style={styles.postMeta}>
                   <View style={styles.authorRow}>
                     <Text style={styles.author}>{post.author}</Text>
@@ -206,7 +161,7 @@ export default function CommunityScreen() {
               <Text style={styles.postContent}>{post.content}</Text>
               {post.media && <MediaGallery media={post.media} onImagePress={openImageViewer} />}
               <View style={styles.postStats}>
-                <Text style={styles.statsText}>{post.likes + (isLiked ? 1 : 0)} lượt thích</Text>
+                <Text style={styles.statsText}>{post.likes} lượt thích</Text>
                 <Text style={styles.statsText}>{post.comments.length} bình luận</Text>
               </View>
               <View style={styles.actions}>
@@ -239,7 +194,7 @@ export default function CommunityScreen() {
                   <Text style={styles.closeViewerText}>×</Text>
                 </Pressable>
               </View>
-              {fullscreenImages[fullscreenIndex] && <Image source={{ uri: fullscreenImages[fullscreenIndex].uri }} style={styles.fullscreenImage} resizeMode="contain" />}
+              {fullscreenImages[fullscreenIndex] && <Image source={remoteImageSource(fullscreenImages[fullscreenIndex].uri)} style={styles.fullscreenImage} resizeMode="contain" />}
               {fullscreenImages.length > 1 && <View style={styles.viewerNavigation}>
                 <Pressable style={[styles.viewerArrow, fullscreenIndex === 0 && styles.viewerArrowDisabled]} disabled={fullscreenIndex === 0} onPress={() => setFullscreenIndex((current) => current - 1)}>
                   <Text style={styles.viewerArrowText}>‹</Text>

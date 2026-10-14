@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState, useEffect } from 'react';
 import {
   Alert,
@@ -18,7 +19,7 @@ import { BookingChatLink } from '@/components/common/BookingChatLink';
 import { useAuth } from '@/context/AuthContext';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
+import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
 import { StaffMatchExplanation, opportunityTime } from '@/components/staff/StaffMatchingList';
 import { EmptyState } from '@/components/common/EmptyState';
 
@@ -32,7 +33,7 @@ function StaffJobDetailContent() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentStaff } = useAuth();
-  const staffId = currentStaff?.id || 'staff-001';
+  const staffId = currentStaff?.id || '';
   const matching = useStaffMatching();
   const [showMatch, setShowMatch] = useState(false);
 
@@ -142,8 +143,8 @@ function StaffJobDetailContent() {
           { text: 'Chưa' },
           {
             text: 'Xác nhận bắt đầu',
-            onPress: () => {
-              const res = StaffService.updateJobStatus(assignment.id, 'EN_ROUTE', staffId);
+            onPress: async () => {
+              const res = await StaffService.updateJobStatus(assignment.id, 'EN_ROUTE', staffId);
               if (!res.success && res.reason) {
                 Alert.alert('Lỗi', res.reason);
               }
@@ -159,8 +160,8 @@ function StaffJobDetailContent() {
           { text: 'Chưa' },
           {
             text: 'Bắt đầu làm việc ngay',
-            onPress: () => {
-              const res = StaffService.updateJobStatus(assignment.id, 'IN_PROGRESS', staffId);
+            onPress: async () => {
+              const res = await StaffService.updateJobStatus(assignment.id, 'IN_PROGRESS', staffId);
               if (!res.success && res.reason) {
                 Alert.alert('Lỗi', res.reason);
               }
@@ -171,17 +172,17 @@ function StaffJobDetailContent() {
     } else if (assignment.status === 'IN_PROGRESS') {
       Alert.alert(
         'Nghiệm thu & Hoàn thành',
-        `Bạn đã hoàn thành các hạng mục công việc và khách hàng đã nghiệm thu?\nThu nhập +${assignment.netIncome.toLocaleString('vi-VN')}đ sẽ được cộng ngay vào ví của bạn!`,
+        'Xác nhận các hạng mục đã hoàn thành? Thu nhập được ghi nhận sau khi quyết toán dịch vụ.',
         [
           { text: 'Kiểm tra lại' },
           {
             text: 'Hoàn thành ca làm',
-            onPress: () => {
-              const res = StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId);
+            onPress: async () => {
+              const res = await StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId);
               if (res.success) {
                 Alert.alert(
                   'Chúc mừng bạn đã hoàn thành ca! 🎉',
-                  `Đã cộng +${assignment.netIncome.toLocaleString('vi-VN')}đ vào số dư khả dụng của bạn. Hãy kiểm tra mục Ví & Thu nhập.`
+                  'Trạng thái hoàn thành đã được lưu. Thu nhập sẽ hiển thị khi đơn được quyết toán.'
                 );
               } else if (res.reason) {
                 Alert.alert('Không thể hoàn thành', res.reason);
@@ -193,9 +194,9 @@ function StaffJobDetailContent() {
     }
   };
 
-  const handleToggleChecklist = (checkId: string) => {
+  const handleToggleChecklist = async (checkId: string) => {
     if (!assignment) return;
-    const res = StaffService.toggleChecklistItem(assignment.id, checkId, staffId);
+    const res = await StaffService.toggleChecklistItem(assignment.id, checkId, staffId);
     if (res.assignment) {
       setDetailResult({ kind: 'ASSIGNMENT', assignment: res.assignment });
     }
@@ -245,8 +246,8 @@ function StaffJobDetailContent() {
       'Báo cáo sự cố ca làm',
       'Vui lòng chọn loại sự cố bạn gặp phải:',
       [
-        { text: 'Khách không có nhà / không liên lạc được' },
-        { text: 'Khối lượng công việc phát sinh quá nhiều' },
+        { text: 'Khách không có nhà / không liên lạc được', onPress: async () => { try { await StaffService.reportIssue(staffId, commonItem.id, 'Khách không có nhà / không liên lạc được'); Alert.alert('Đã gửi', 'Sự cố đã được lưu để Admin xử lý.'); } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); } } },
+        { text: 'Khối lượng công việc phát sinh quá nhiều', onPress: async () => { try { await StaffService.reportIssue(staffId, commonItem.id, 'Khối lượng công việc phát sinh quá nhiều'); Alert.alert('Đã gửi', 'Sự cố đã được lưu để Admin xử lý.'); } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); } } },
         { text: 'Khác (Liên hệ tổng đài 1900 6868)' },
         { text: 'Đóng', style: 'cancel' },
       ]
@@ -289,7 +290,7 @@ function StaffJobDetailContent() {
               disabled={!eligibility.allowed} accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed }}
               accessibilityLabel={eligibility.reason ?? 'Nhận ca làm việc này'} onPress={() => setShowMatch(true)}>
               <Text style={styles.primaryActionText}>
-                {eligibility.allowed ? `Nhận ca làm việc này ngay (+${commonItem.netIncome.toLocaleString('vi-VN')}đ)` : 'Chưa đủ điều kiện nhận ca'}
+                {eligibility.allowed ? commonItem.incomePendingPolicy ? 'Nhận ca làm việc này (thu nhập chờ quyết toán)' : `Nhận ca làm việc này ngay (+${commonItem.netIncome.toLocaleString('vi-VN')}đ)` : 'Chưa đủ điều kiện nhận ca'}
               </Text>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={() => matching.status === 'ERROR' ? matching.retry() : setShowMatch(true)}><Text style={{ color: BrandColors.primaryDark, fontWeight: '600' }}>{matching.status === 'ERROR' ? 'Thử lại kiểm tra điều kiện' : 'Vì sao phù hợp / Điều kiện chưa đạt'}</Text></Pressable>
@@ -402,7 +403,7 @@ function StaffJobDetailContent() {
         {isAssignment && <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Khách hàng liên hệ</Text>
           <View style={styles.customerRow}>
-            {commonItem.customerAvatar ? <Image source={{ uri: commonItem.customerAvatar }} style={styles.customerAvatar} /> : <View style={[styles.customerAvatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 }]}><IconSymbol name="user" size={24} color={BrandColors.gray500} /></View>}
+            {commonItem.customerAvatar ? <Image source={remoteImageSource(commonItem.customerAvatar)} style={styles.customerAvatar} /> : <View style={[styles.customerAvatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 }]}><IconSymbol name="user" size={24} color={BrandColors.gray500} /></View>}
             <View style={styles.customerInfo}>
               <Text style={styles.customerName}>{commonItem.customerName}</Text>
               <Text style={styles.customerPhone}>{commonItem.customerPhone ? `📞 ${commonItem.customerPhone}` : 'Chưa có số điện thoại liên hệ'}</Text>
@@ -479,6 +480,7 @@ function StaffJobDetailContent() {
           ) : null}
         </View>
 
+        {assignment?.bookingStatus==='MATCHING' && <View style={styles.card}><Text>Đơn đang chờ đủ nhân viên xác nhận. Bạn có thể xem thông tin ca và chuẩn bị trước.</Text></View>}
         {/* Work Checklist (Only for accepted assignments) */}
         {isAssignment && assignment?.checklist && assignment.checklist.length > 0 && (
           <View style={styles.card}>
@@ -525,13 +527,13 @@ function StaffJobDetailContent() {
           <View style={styles.financeRow}>
             <Text style={styles.financeLabel}>Phí vận hành ước tính:</Text>
             <Text style={styles.financeFee}>
-              -{commonItem.platformFee.toLocaleString('vi-VN')}đ
+              {commonItem.incomePendingPolicy ? 'Chờ quyết toán' : '-'+commonItem.platformFee.toLocaleString('vi-VN')+'đ'}
             </Text>
           </View>
           <View style={[styles.financeRow, styles.financeTotalRow]}>
             <Text style={styles.financeTotalLabel}>{isAssignment ? 'Thu nhập ca của bạn:' : 'Thu nhập ước tính / nhân viên:'}</Text>
             <Text style={styles.financeTotalAmount}>
-              +{commonItem.netIncome.toLocaleString('vi-VN')}đ
+              {commonItem.incomePendingPolicy ? 'Chờ quyết toán' : '+'+commonItem.netIncome.toLocaleString('vi-VN')+'đ'}
             </Text>
           </View>
           <Text style={styles.financeNote}>

@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState } from 'react';
 import { View, Text, Image, Pressable, Modal, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +24,7 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props)
     const blocked = !isSelected && conflictsWithSelection(extra, options, selectedKeys);
     return (
       <View key={extra.key} style={[styles.card, isSelected && styles.selectedCard]}>
-        <Image source={{ uri: extra.image }} style={styles.image} accessibilityIgnoresInvertColors />
+        <Image source={remoteImageSource(extra.image)} style={styles.image} accessibilityIgnoresInvertColors />
         <View style={styles.info}>
           <Text style={styles.kind}>{extra.kind === 'ADD_ON' ? 'Bổ sung' : 'Dịch vụ liên quan'}</Text>
           <Text style={styles.name}>{extra.name}</Text>

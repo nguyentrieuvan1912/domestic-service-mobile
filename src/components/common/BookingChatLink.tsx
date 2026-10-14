@@ -2,8 +2,8 @@ import React, { useEffect, useReducer } from 'react';
 import { Pressable, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { ChatRepository, getChatActor } from '@/data/chatRepository';
-import { StaffRepository } from '@/data/staffRepository';
+import { ChatRepository, getChatActor } from '@/data/connectedChatRepository';
+import { StaffRepository } from '@/data/connectedStaffRepository';
 
 /** Resolve an authorized conversation at render and again at press time. Never route a booking ID as a chat ID. */
 export function BookingChatLink({ bookingId, staffId, style, textStyle, label = 'Nhắn tin' }: {
@@ -21,6 +21,7 @@ export function BookingChatLink({ bookingId, staffId, style, textStyle, label = 
     const unsubscribeChat = ChatRepository.subscribe(refresh);
     return () => { unsubscribeBooking(); unsubscribeChat(); };
   }, []);
+  useEffect(() => { if (!currentUser) return; const load = () => { void ChatRepository.loadList(getChatActor(currentUser)).catch(() => {}); }; load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [currentUser?.id]);
   const resolve = () => ChatRepository.resolveForBooking(bookingId, getChatActor(currentUser), staffId);
   const access = resolve();
   const enabled = access.kind === 'READY';

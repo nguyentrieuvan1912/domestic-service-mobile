@@ -1,3 +1,6 @@
+import { remoteImageSource } from '@/utils/image-source';
+import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
+import { EmptyState } from '@/components/common/EmptyState';
 import React from 'react';
 import {
   Alert,
@@ -16,9 +19,14 @@ import { useAuth } from '@/context/AuthContext';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffService } from '@/data/staffService';
 import { useStaffCapabilities } from '@/hooks/use-staff-capabilities';
-import { EmptyState } from '@/components/common/EmptyState';
+
 
 export default function StaffProfileScreen() {
+  const { currentStaff } = useAuth(); const router = useRouter();
+  if (!currentStaff) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="user" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
+  return <StaffProfileContent key={currentStaff.id} />;
+}
+function StaffProfileContent() {
   const router = useRouter();
   const { currentStaff, logout } = useAuth();
   const capabilityResource = useStaffCapabilities();
@@ -41,7 +49,7 @@ export default function StaffProfileScreen() {
         text: 'Đăng xuất',
         style: 'destructive',
         onPress: () => {
-          logout();
+          void logout().catch(() => Alert.alert('Đăng xuất', 'Đã thoát trên ứng dụng; chưa kết nối được backend để thu hồi phiên.'));
           router.replace('/auth/login');
         },
       },
@@ -51,6 +59,7 @@ export default function StaffProfileScreen() {
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StaffConnectionStatus />
         {/* Top Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Hồ sơ & Đánh giá</Text>
@@ -63,7 +72,7 @@ export default function StaffProfileScreen() {
           {/* Staff Hero Identity Card */}
           <Pressable style={styles.identityCard} onPress={() => router.push('/staff/personal-info')}>
             <View style={styles.identityTop}>
-              <Image source={{ uri: staff.avatar }} style={styles.avatar} />
+              <Image source={remoteImageSource(staff.avatar)} style={styles.avatar} />
               <View style={styles.identityInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.staffName}>{staff.fullName}</Text>
@@ -94,12 +103,12 @@ export default function StaffProfileScreen() {
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{staff.satisfactionRate}%</Text>
+                <Text style={styles.kpiValue}>{profile.reviewCount ? Math.round(StaffService.getStaffReviews(staffId).filter(r=>r.rating===5).length/profile.reviewCount*100)+'%' : '—'}</Text>
                 <Text style={styles.kpiLabel}>Hài lòng 5★</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{staff.completedBookingsCount ?? '—'}</Text>
+                <Text style={styles.kpiValue}>{StaffService.getCompletedJobs(staffId).length}</Text>
                 <Text style={styles.kpiLabel}>Ca thành công</Text>
               </View>
             </View>

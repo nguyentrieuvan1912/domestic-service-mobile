@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -5,7 +6,7 @@ import { Booking } from '@/types/booking';
 import { BookingStatusBadge } from './BookingStatusBadge';
 import { formatVND } from './Badge';
 import { IconSymbol } from './IconSymbol';
-import { getServiceById, getStaffById } from '@/data';
+import { bookingServiceView, ConnectedBooking } from '@/data/connectedBookings';
 
 interface BookingCardProps {
   booking: Booking;
@@ -22,8 +23,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   onReview,
   onRebook,
 }) => {
-  const service = getServiceById(booking.serviceId);
-  const staff = booking.staffId ? getStaffById(booking.staffId) : undefined;
+  const service = bookingServiceView(booking as ConnectedBooking);
+  const staff = (booking as ConnectedBooking & { staff?: { fullName: string; avatar: string } }).staff;
 
   const isCompleted = booking.status === 'COMPLETED';
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
@@ -46,7 +47,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
       {/* Middle row: Service image, title & package */}
       <View style={styles.serviceRow}>
         {service?.image ? (
-          <Image source={{ uri: service.image }} style={styles.serviceImage} />
+          <Image source={remoteImageSource(service.image)} style={styles.serviceImage} />
         ) : (
           <View style={styles.imagePlaceholder}>
             <IconSymbol name="🏡" style={{ fontSize: 20 }} />
@@ -61,7 +62,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           </Text>
           {staff ? (
             <View style={styles.staffAssignedRow}>
-              <Image source={{ uri: staff.avatar }} style={styles.staffThumb} />
+              <Image source={remoteImageSource(staff.avatar)} style={styles.staffThumb} />
               <Text style={styles.staffAssignedName}>{staff.fullName}</Text>
             </View>
           ) : (
