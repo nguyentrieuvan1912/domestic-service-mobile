@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const {favouriteDurationIssue:issue,shorterFavouritePackage:lower,roundedBookingMinutes:round}=require('../src/utils/favourite-staff-duration.ts');
+const packages=[120,150,180,210,240,300].map(minutes=>({id:String(minutes),name:'Gói '+minutes/60+' giờ',isActive:true,durationMinutes:minutes,defaultStaffCount:1}));
+assert.equal(issue(240,0,0),'');
+assert(issue(240,0,1),'Even a zero-minute addon is blocked for a four-hour package');
+assert(issue(240,30,1));assert(issue(210,60,1));assert(issue(300,0,0));
+assert.equal(issue(210,30,1),'');assert.equal(issue(180,60,2),'');
+assert.equal(round(210,31),270);
+assert.equal(lower(packages,240,30,1).id,'210');
+assert.equal(lower(packages,210,60,1).id,'180');
+assert.equal(lower(packages,240,31,1).id,'180');
+assert.equal(lower(packages,240,30,1,1,180).id,'150','Also respects the employee availability end');
+assert.equal(lower(packages,120,180,1),undefined,'Never invent a shorter package');
+assert.equal(lower(packages.map(p=>({...p,isActive:false})),240,30,1),undefined);
+assert.equal(lower(packages,240,0,1).id,'210','Four-hour package must be reduced even for no-duration addon');
+console.log('Favourite staff: four-hour total cap, zero-minute addon rule, rounded durations, largest fitting lower package, employee availability, unavailable/inactive packages passed.');

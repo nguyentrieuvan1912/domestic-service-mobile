@@ -1,3 +1,5 @@
+import { StaffResponseDecision } from '@/components/booking/StaffResponseWaiting';
+import { needsStaffResponse } from '@/utils/staff-response';
 import { remoteImageSource } from '@/utils/image-source';
 import { staffView } from '@/hooks/use-booking-detail';
 import React, { useState, useRef, useEffect } from 'react';
@@ -144,10 +146,13 @@ export default function HomeScreen() {
   const promotions: Promotion[] = (promotionResult.data || []).map(item => ({ ...item, id: String(item.id), maxDiscountAmount: item.maxDiscountAmount ?? undefined, usageLimit: item.usageLimit ?? 0 }));
   const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
 
+  const waitingBookings = bookingResource.bookings.filter(needsStaffResponse);
+  const expiredBooking = waitingBookings.find(booking => booking.staffWaitState === 'EXPIRED');
+
   // Upcoming active booking
   const upcomingBooking = bookingResource.bookings.find(
     (b) =>
-      b.customerId === currentCustomer?.id &&
+      b.customerId === currentCustomer?.id && !needsStaffResponse(b) &&
       ['CONFIRMED', 'STAFF_ASSIGNED', 'IN_PROGRESS', 'MATCHING'].includes(b.status)
   );
 
@@ -254,6 +259,18 @@ export default function HomeScreen() {
 
             </View>
           </View>
+
+          {expiredBooking && <StaffResponseDecision key={expiredBooking.id} booking={expiredBooking} />}
+          {waitingBookings.map(booking => <Pressable key={booking.id} style={styles.upcomingBox}
+            onPress={() => router.push({ pathname: '/booking/waiting', params: { id: booking.id } })}>
+            <View style={styles.upcomingHeader}><View style={styles.upcomingDotRow}>
+              <IconSymbol name="clock" size={18} color={BrandColors.primary} />
+              <Text style={styles.upcomingTitle}>{booking.staffWaitState === 'EXPIRED' ? 'Hết giờ chờ • Cần xác nhận' : 'Đang chờ nhân viên nhận'}</Text>
+            </View><IconSymbol name="chevronRight" size={18} color={BrandColors.primary} /></View>
+            <Text style={styles.upcomingServiceName}>{booking.service.name || booking.service.serviceName || 'Đơn dịch vụ'}</Text>
+            <Text style={styles.upcomingTime}>{String(booking.staff?.fullName || 'Nhân viên đã chọn')} • {booking.bookingCode}</Text>
+            <Text style={styles.upcomingTime}>{booking.staffWaitState === 'EXPIRED' ? 'Nhấn để chờ thêm 3 phút hoặc tìm nhân viên khác' : 'Nhấn để xem thời gian chờ và phản hồi của nhân viên'}</Text>
+          </Pressable>)}
 
           {/* Address Selector Pill */}
           <Pressable
@@ -695,7 +712,7 @@ export default function HomeScreen() {
                 promotion={promo}
                 onApply={() => {
                   router.push({
-                    pathname: '/(tabs)/services',
+                    pathname: '/catalog',
                   });
                 }}
               />

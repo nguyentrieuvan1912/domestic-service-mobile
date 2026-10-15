@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -18,13 +19,15 @@ export function useStaffMatching() {
   useFocusEffect(useCallback(() => {
     if (!query.actor) return;
     const controller = new AbortController();
-    const timer = setInterval(() => setClock(Date.now()), 30000); // Local expiry/clock refresh; no push subscription.
+    const refresh = () => { if (!controller.signal.aborted && AppState.currentState !== 'background') void StaffMatchingRepository.refresh(query.actor!, controller.signal).catch(() => {}); };
+    const timer = setInterval(refresh, 5000);
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
     void StaffMatchingRepository.load(query.actor, controller.signal).then(() => {
       if (!controller.signal.aborted) { setClock(Date.now()); setState({ key: query.key, status: 'READY' }); }
     }).catch((error: unknown) => {
       if (!controller.signal.aborted) setState({ key: query.key, status: 'ERROR', error: error instanceof Error ? error.message : 'Chưa tải được việc phù hợp.' });
     });
-    return () => { controller.abort(); clearInterval(timer); };
+    return () => { controller.abort(); clearInterval(timer); foreground.remove(); };
   }, [query]));
   const scoped = state.key === key ? state : { key, status: 'LOADING' as const };
   const data = useMemo(() => actor && scoped.status === 'READY'

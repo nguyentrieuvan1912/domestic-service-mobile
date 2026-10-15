@@ -107,12 +107,13 @@ export interface Promotion {
   description: string;
   discountType: DiscountType;
   discountValue: number;
-  maxDiscountAmount?: number;
+  maxDiscountAmount?: number | null;
   minimumBookingAmount: number;
   startDate: string;
   endDate: string;
-  usageLimit: number;
+  usageLimit: number | null;
   usedCount: number;
   isActive: boolean;
+  serviceIds?: (string | number)[];
 }
 

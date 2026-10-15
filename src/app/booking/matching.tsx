@@ -33,7 +33,7 @@ type MatchingState =
 
 export default function MatchingStaffScreen() {
   const router=useRouter();const {bookingId}=useLocalSearchParams<{bookingId?:string}>();const data=useBookingDetail(bookingId);
-  if(!data.booking)return <SafeAreaView><Text>{data.loading?'Đang tải trạng thái đơn...':data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable><Pressable onPress={()=>router.back()}><Text>Quay lại</Text></Pressable></SafeAreaView>;
+  if(!data.booking)return <SafeAreaView><Text>{data.loading?'Đang tải trạng thái đơn...':data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable><Pressable onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)')}><Text>Quay lại</Text></Pressable></SafeAreaView>;
   return <MatchingContent booking={data.booking} assignedStaff={data.staff} />;
 }
 function MatchingContent({booking,assignedStaff}: {booking:ConnectedBooking;assignedStaff?:Staff}) {

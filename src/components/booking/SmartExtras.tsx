@@ -9,11 +9,12 @@ import { BookingExtra, conflictsWithSelection, getExtraTotals, getSuggestedExtra
 interface Props {
   options: BookingExtra[];
   selectedKeys: string[];
-  onToggle: (key: string) => void;
+  onToggle: (key: string) => boolean | void;
   onClear: () => void;
+  warning?: string;
 }
 
-export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props) {
+export function SmartExtras({ options, selectedKeys, onToggle, onClear, warning }: Props) {
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'ADD_ON' | 'SERVICE'>('ALL');
   const suggested = getSuggestedExtras(options);
@@ -34,12 +35,13 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props)
             <Text style={styles.duration}>{extra.minutes > 0 ? ` · ${extra.minutes} phút${extra.kind === 'SERVICE' ? ' dự kiến' : ''}` : ' · Không thêm thời gian'}</Text>
           </Text>
           {blocked && <Text style={styles.blocked}>Đã có hạng mục tương tự. Bỏ mục đã chọn nếu muốn đổi.</Text>}
+          {isSelected && !!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${isSelected ? 'Bỏ' : 'Thêm'} ${extra.name}`}
             accessibilityState={{ disabled: blocked, selected: isSelected }}
             disabled={blocked}
-            onPress={() => onToggle(extra.key)}
+            onPress={() => { if(onToggle(extra.key) === false) setShowAll(false); }}
             style={[styles.addButton, isSelected && styles.removeButton, blocked && styles.disabledButton]}>
             <Text style={[styles.addText, isSelected && styles.removeText]}>
               {isSelected ? '✓ Đã thêm · Bỏ' : blocked ? 'Trùng hạng mục' : '+ Thêm'}
@@ -71,6 +73,7 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props)
       {selected.length > 0 && (
         <View style={styles.chosenSection}>
           <Text style={styles.title}>Đã chọn thêm ({selected.length})</Text>
+          {!!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
           {selected.map(extra => (
             <View key={extra.key} style={styles.chosenRow}>
               <View style={styles.info}>
@@ -78,7 +81,7 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props)
                 <Text style={styles.scope}>+{formatVND(extra.price)}</Text>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel={`Bỏ ${extra.name}`}
-                onPress={() => onToggle(extra.key)} style={styles.closeButton}>
+                onPress={() => { if(onToggle(extra.key) === false) setShowAll(false); }} style={styles.closeButton}>
                 <Text style={styles.seeAllText}>Bỏ</Text>
               </Pressable>
             </View>
@@ -127,6 +130,7 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props)
               {!options.some(e => filter === 'ALL' || e.kind === filter) && <Text style={styles.empty}>Chưa có lựa chọn trong nhóm này.</Text>}
             </ScrollView>
             <View style={styles.sheetFooter}>
+              {!!warning && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.warning}>{warning}</Text>}
               <Text style={styles.totalLabel}>Đã thêm {selected.length} mục · +{formatVND(addOnsTotal + servicesTotal)}</Text>
               <Pressable accessibilityRole="button" onPress={() => setShowAll(false)} style={styles.doneButton}>
                 <Text style={styles.doneText}>Xong · Quay lại đặt dịch vụ</Text>
@@ -140,6 +144,7 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear }: Props)
 }
 
 const styles = StyleSheet.create({
+  warning: { color: '#B91C1C', backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, fontSize: 12, lineHeight: 18, marginTop: 8 },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 },
   title: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: BrandColors.gray900 },
   previewBadge: { fontSize: 10, color: BrandColors.primaryDark, backgroundColor: BrandColors.primaryLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.full },

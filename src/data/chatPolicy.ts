@@ -24,7 +24,8 @@ export function getChatBookingPhase(status: string, awaitingAcceptance = false):
     return 'CLOSED';
   }
   if (status === 'IN_PROGRESS' && awaitingAcceptance) return 'AWAITING_ACCEPTANCE';
-  return ['ACCEPTED', 'EN_ROUTE', 'IN_PROGRESS', 'CONFIRMED', 'STAFF_ASSIGNED', 'ASSIGNED'].includes(status) ? 'ACTIVE' : 'CLOSED';
+  // A room exists only after this staff accepts; a multi-staff booking may still be MATCHING.
+  return ['MATCHING', 'ACCEPTED', 'EN_ROUTE', 'IN_PROGRESS', 'CONFIRMED', 'STAFF_ASSIGNED', 'ASSIGNED'].includes(status) ? 'ACTIVE' : 'CLOSED';
 }
 
 export function canSendChat(phase: ChatBookingPhase, policy: ChatPolicy = DEFAULT_CHAT_POLICY): boolean {

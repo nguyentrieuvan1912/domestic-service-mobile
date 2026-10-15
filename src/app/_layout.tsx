@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { StaffScheduleReminder } from '@/components/staff/StaffScheduleReminder';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* ignore */
@@ -43,7 +44,8 @@ function AuthStack() {
           <Stack.Screen name="staff/personal-info" options={{ headerShown: false }} />
           <Stack.Screen name="service/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="catalog/index" options={{ headerShown: false }} />
-          <Stack.Screen name="booking/new" options={{ headerShown: false }} />
+          <Stack.Screen name="booking/waiting" options={{ headerShown: false }} />
+            <Stack.Screen name="booking/new" options={{ headerShown: false }} />
           <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="booking/matching" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="booking/review" options={{ presentation: 'modal', headerShown: false }} />
@@ -55,6 +57,7 @@ function AuthStack() {
           <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>
+        {isAuthenticated && <StaffScheduleReminder />}
     </>
 
   );

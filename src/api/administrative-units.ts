@@ -7,8 +7,8 @@ let pending: Promise<AdministrativeDirectory> | null = null;
 export function loadHcmAdministrativeUnits(): Promise<AdministrativeDirectory> {
   if (!pending) pending = identityRequest<AdministrativeDirectory>('/administrative-units/hcm').then(directory => {
     directory.items.sort((a,b) => a.name.localeCompare(b.name, 'vi'));
-    // Keep old IDs only for historical schedules. New choices come from the owning DB.
-    for (const unit of directory.items) if (!STAFF_AREA_OPTIONS.some(area => area.name === unit.name)) STAFF_AREA_OPTIONS.push({ id: `hcm-${unit.id}`, name: unit.name });
+    // All operational choices come from the current directory, with stable database IDs.
+    STAFF_AREA_OPTIONS.splice(0, STAFF_AREA_OPTIONS.length, ...directory.items.map(unit => ({ id: `hcm-${unit.id}`, name: unit.name })));
     return directory;
   }).catch(error => { pending = null; throw error; });
   return pending;

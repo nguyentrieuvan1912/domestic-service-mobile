@@ -1,7 +1,7 @@
 export interface AvailabilityInterval { startsAt: string; endsAt: string }
 export interface AvailabilityDay { date: string; intervals: AvailabilityInterval[] }
-export interface AvailabilityDraft { days: AvailabilityDay[]; areaIds: string[]; matchNotifications: boolean }
-export interface SavedAvailability extends AvailabilityDraft { revision: number; updatedAt: string }
+export interface AvailabilityDraft { days: AvailabilityDay[]; areaIds: string[]; matchNotifications: boolean; weekStart?: string; confirmedDates?: string[] }
+export interface SavedAvailability extends AvailabilityDraft { revision: number; updatedAt: string; registeredWeekStarts?: string[] }
 export interface ScheduleBooking extends AvailabilityInterval { id: string; bookingCode: string; district: string; status: string }
 export interface AvailabilitySnapshot { saved: SavedAvailability; bookings: ScheduleBooking[]; unknownBookingCodes: string[] }
 export interface AvailabilityActor { userId: string; staffId: string }

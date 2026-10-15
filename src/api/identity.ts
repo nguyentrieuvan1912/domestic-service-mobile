@@ -2,6 +2,7 @@ import { API_BASE_URL } from './catalog';
 import { UserRole, UserStatus, Staff } from '@/types/user';
 export interface IdentityUser { id: number; fullName: string; email: string; phone: string; role: UserRole; status: UserStatus }
 export interface IdentityProfile extends IdentityUser {
+  birthYear?: number | null;
   isVerified?: boolean;
   avatar: string; createdAt: string; gender: 'MALE' | 'FEMALE' | 'OTHER' | null; dateOfBirth: string | null;
   totalBookings: number; rewardPoints: number; identityCard: string | null; bio: string | null; experienceYears: number | null; rating: number | null;

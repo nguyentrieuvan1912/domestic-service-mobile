@@ -2,9 +2,10 @@ import { remoteImageSource } from '@/utils/image-source';
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, Pressable, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, AppState,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useChatInbox } from '@/hooks/use-chat-inbox';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
@@ -19,6 +20,7 @@ export default function ChatDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const router = useRouter();
   const { currentUser, currentRole } = useAuth();
+  useChatInbox();
   const actor = useMemo(() => getChatActor(currentUser), [currentUser]);
   const [, refresh] = useReducer((value: number) => value + 1, 0);
   useEffect(() => {
@@ -26,7 +28,6 @@ export default function ChatDetailScreen() {
     const unsubscribeChat = ChatRepository.subscribe(refresh);
     return () => { unsubscribeBooking(); unsubscribeChat(); };
   }, []);
-  useEffect(() => { if (!currentUser) return; const load = () => { void ChatRepository.loadList(getChatActor(currentUser)).catch(() => {}); }; load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [currentUser?.id]);
   const access = ChatRepository.access(typeof id === 'string' ? id : undefined, actor);
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -74,6 +75,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
   const listRef = useRef<ScrollView>(null);
   const requests = useRef(new Set<AbortController>());
   const sending = useRef(false);
+  const reading = useRef(false);
   const isLocked = !canSendChat(phase);
   const lockReason = phase === 'AWAITING_ACCEPTANCE'
     ? 'Tạm khóa gửi tin trong thời gian chờ nghiệm thu theo chính sách của ca.'
@@ -83,6 +85,8 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
   const conversationId = conversation.id;
 
   const load = useCallback(() => {
+    if (reading.current || AppState.currentState === 'background') return;
+    reading.current = true;
     const controller = new AbortController();
     requests.current.add(controller);
     void ChatRepository.load(conversationId, actor, controller.signal).then((next) => {
@@ -92,10 +96,10 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
         setLoadError(error instanceof Error ? error.message : 'Chưa tải được tin nhắn.');
         setLoadState('ERROR');
       }
-    }).finally(() => { requests.current.delete(controller); });
+    }).finally(() => { reading.current = false; requests.current.delete(controller); });
   }, [actor, conversationId]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     const activeRequests = requests.current;
     void load();
     const poll = setInterval(load, 4000);
@@ -108,7 +112,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
       activeRequests.forEach((controller) => controller.abort());
       activeRequests.clear();
     };
-  }, [actor, conversationId, load]);
+  }, [actor, conversationId, load]));
 
   const send = async (retry?: ChatMessage) => {
     if (sending.current || isLocked || loadState !== 'READY') return;

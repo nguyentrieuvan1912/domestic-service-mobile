@@ -12,6 +12,7 @@ import type { NotificationActor } from './notificationAdapter';
 import { notificationInvitationFixtures, notificationWithdrawalFixtures } from './notificationTargetFixtures';
 
 export type NotificationDestination =
+  | { pathname: '/chat/[id]'; params: { id: string } }
   | { pathname: '/staff/wallet' }
   | { pathname: '/staff/job-detail'; params: { id: string } }
   | { pathname: '/booking/[id]'; params: { id: string } };

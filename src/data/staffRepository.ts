@@ -19,7 +19,14 @@ import { addCalendarDays, localDate, scheduleDates, intervalFor, normalizeDraft,
 
 export type { JobStepStatus, StaffId, UserId };
 
-export interface OpenOpportunity {
+export interface StaffJobOrderDetails {
+  paymentMethod?: string;
+  paymentStatus?: string;
+  city?: string;
+  relatedServicesText?: string;
+  workSelections?: { label: string; value: string }[];
+}
+export interface OpenOpportunity extends StaffJobOrderDetails {
   id: string; // e.g. 'open-101'
   bookingCode: string;
   serviceId: string;
@@ -51,7 +58,9 @@ export interface OpenOpportunity {
   status: 'OPEN';
 }
 
-export interface AcceptedAssignment {
+export interface AcceptedAssignment extends StaffJobOrderDetails {
+  cancellationReason?: string;
+  responseTimedOut?: boolean;
   bookingStatus?: string;
   id: string; // bookingId e.g. 'bk-023'
   bookingCode: string;

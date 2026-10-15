@@ -44,6 +44,14 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test:weekly": "node scripts/test-weekly-availability.mjs",
+    "test:customer-booking": "node scripts/test-customer-booking-time.mjs",
+    "test:booking-timing": "node scripts/test-booking-timing-notice.mjs",
+    "test:booking-promotions": "node scripts/test-booking-promotions.mjs",
+    "test:favourite-duration": "node scripts/test-favourite-staff-duration.mjs",
+    "test:staff-response": "node scripts/test-staff-response.mjs",
+    "test:staff-profile": "node scripts/test-staff-profile.mjs",
+    "test:schedule-reminder": "node scripts/test-staff-schedule-reminder.mjs",
     "test": "node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs && node scripts/test-staff-availability.mjs && node scripts/test-staff-matching.mjs && node scripts/test-connected-operations.mjs && node scripts/test-remembered-login.mjs"
   },
   "private": true

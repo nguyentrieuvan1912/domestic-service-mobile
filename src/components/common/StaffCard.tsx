@@ -25,23 +25,13 @@ export const StaffCard: React.FC<StaffCardProps> = ({
       onPress={onSelect}>
       <View style={styles.topRow}>
         <View style={styles.avatarWrapper}>
-          <Image source={remoteImageSource(staff.avatar)} style={styles.avatar} />
+          <Image source={remoteImageSource(staff.avatar || '/api/v1/identity/staff-avatar.png')} style={styles.avatar} />
           {staff.isOnline && <View style={styles.onlineDot} />}
         </View>
 
         <View style={styles.infoCol}>
           <View style={styles.nameRow}>
             <Text style={styles.staffName}>{staff.fullName}</Text>
-            {staff.isVerified ? (
-              <View style={styles.verifiedBadge}>
-                <IconSymbol name="check" size={10} color="#059669" />
-                <Text style={styles.verifiedText}>Đã xác minh</Text>
-              </View>
-            ) : (
-              <View style={styles.unverifiedBadge}>
-                <Text style={styles.unverifiedText}>Chưa xác minh</Text>
-              </View>
-            )}
           </View>
 
           <View style={styles.statsRow}>

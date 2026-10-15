@@ -77,7 +77,7 @@ export default function BookingsScreen() {
       locations={BrandColors.softBgGradientLocations}
       style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {(loading || error) && <CatalogState loading={loading} error={error} onRetry={retry} />}
+        {!!(loading || error) && <CatalogState loading={loading} error={error} onRetry={retry} />}
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Đơn dịch vụ của tôi</Text>

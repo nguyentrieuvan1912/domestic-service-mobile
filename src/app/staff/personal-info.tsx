@@ -1,3 +1,4 @@
+import { staffBirthLabel } from '@/utils/staff-profile';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -39,9 +40,9 @@ export default function StaffPersonalInfoScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarSection}>
-          <Image source={remoteImageSource(staff?.avatar || 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80')} style={styles.avatar} />
+          <Image source={remoteImageSource(staff?.avatar || '/api/v1/identity/staff-avatar.png')} style={styles.avatar} />
           <Text style={styles.avatarName}>{staff?.fullName || 'Chưa đăng nhập'}</Text>
-          <Text style={styles.avatarHint}>Ảnh đại diện sẽ được cập nhật sau khi có kết nối máy chủ.</Text>
+          <Text style={styles.avatarHint}>Ảnh đại diện được đồng bộ từ hồ sơ tài khoản.</Text>
         </View>
 
         <View style={styles.card}>
@@ -63,7 +64,7 @@ export default function StaffPersonalInfoScreen() {
           <ReadOnlyRow label="Họ và tên" value={staff?.fullName || 'Chưa đăng nhập'} />
           <ReadOnlyRow label="Mã nhân viên" value={staff?.id ? `NV-${staff.id.replace('staff-', '').padStart(3, '0')}` : 'Chưa đăng nhập'} />
           <ReadOnlyRow label="CCCD" value={staff?.idCardNumber || 'Chưa cập nhật'} />
-          <ReadOnlyRow label="Ngày sinh" value={staff?.dateOfBirth || 'Chưa cập nhật'} />
+          <ReadOnlyRow label="Ngày sinh" value={staff ? staffBirthLabel(staff) : 'Chưa cập nhật'} />
           <ReadOnlyRow label="Kinh nghiệm" value={`${staff?.experienceYears ?? 0} năm`} last />
         </View>
 

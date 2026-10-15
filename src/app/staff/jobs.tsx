@@ -21,6 +21,7 @@ import { selectMatchingItems } from '@/data/staffMatchingRules';
 import { STAFF_AREA_OPTIONS } from '@/data/staffAreas';
 import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
 import { EmptyState } from '@/components/common/EmptyState';
+import { MatchingModePicker, matchingModeCounts } from '@/components/staff/MatchingModePicker';
 
 type TabKey = 'upcoming' | 'open' | 'completed';
 
@@ -32,10 +33,12 @@ export default function StaffJobsScreen() {
 }
 function StaffJobsContent() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; source?: string }>();
   const { currentStaff } = useAuth();
   const staffId = currentStaff?.id || 'staff-001';
   const matching = useStaffMatching();
+  const [matchMode, setMatchMode] = useState<'A' | 'B'>(params.source === 'B' ? 'B' : 'A');
+  const counts = matchingModeCounts(matching.data);
   const [sort, setSort] = useState(DEFAULT_MATCH_FILTER.sort);
   const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
 
@@ -43,6 +46,7 @@ function StaffJobsContent() {
     params.tab === 'open' ? 'open' : params.tab === 'completed' ? 'completed' : 'upcoming'
   );
   const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => { if (params.tab === 'open') setActiveTab('open'); if (params.source === 'A' || params.source === 'B') setMatchMode(params.source); }, [params.tab, params.source]);
   const [selectedDistrict, setSelectedDistrict] = useState('Tất cả');
 
   const [jobs, setJobs] = useState<StaffJobItem[]>([]);
@@ -59,7 +63,7 @@ function StaffJobsContent() {
   const upcomingList = jobs.filter(
     (j) => j.status === 'ACCEPTED' || j.status === 'EN_ROUTE' || j.status === 'IN_PROGRESS'
   );
-  const completedList = jobs.filter((j) => j.status === 'COMPLETED');
+  const completedList = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CANCELLED');
 
   const currentList = activeTab === 'upcoming' ? upcomingList : completedList;
 
@@ -86,6 +90,8 @@ function StaffJobsContent() {
         return { label: 'Đang di chuyển', bg: '#DBEAFE', text: '#1D4ED8' };
       case 'ACCEPTED':
         return { label: 'Đã nhận ca', bg: '#FEF3C7', text: '#B45309' };
+      case 'CANCELLED':
+        return { label: 'Đã hủy', bg: '#FEE2E2', text: '#B91C1C' };
       case 'COMPLETED':
         return { label: 'Đã hoàn thành', bg: '#F1F5F9', text: '#475569' };
       default:
@@ -143,6 +149,7 @@ function StaffJobsContent() {
           </Pressable>
         </View>
 
+        {activeTab === 'open' && <View style={{ paddingHorizontal: Spacing.three, paddingBottom: Spacing.two }}><MatchingModePicker value={matchMode} onChange={setMatchMode} invitations={counts.A} open={counts.B} /></View>}
         {/* Search & Filter */}
         <View style={styles.filterSection}>
           <View style={styles.searchBar}>
@@ -189,14 +196,14 @@ function StaffJobsContent() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         >
-          {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
+          {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort, mode: matchMode }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol name="calendar" size={44} color={BrandColors.gray300} />
               <Text style={styles.emptyTitle}>Không có ca làm việc nào</Text>
               <Text style={styles.emptySub}>
                 {activeTab === 'upcoming'
                   ? 'Bạn chưa có ca làm việc nào sắp tới. Hãy chuyển sang tab "Việc mới" để nhận thêm ca.'
-                  : 'Chưa có lịch sử ca hoàn thành.'}
+                  : 'Chưa có lịch sử ca làm việc.'}
               </Text>
             </View>
           ) : (
@@ -253,6 +260,9 @@ function StaffJobsContent() {
                     </View>
                   </View>
 
+                  {job.cancellationReason && <View style={styles.notesBox}><Text style={[styles.notesText, { color: '#B91C1C' }]}>{job.cancellationReason}</Text>
+                    {job.responseTimedOut && <Text style={[styles.notesText, { color: '#92400E' }]}>Hãy chú ý lời mời và phản hồi sớm hơn để có doanh thu tốt hơn.</Text>}
+                  </View>}
                   {job.notes ? (
                     <View style={styles.notesBox}>
                       <Text style={styles.notesText} numberOfLines={2}>
@@ -290,6 +300,7 @@ function StaffJobsContent() {
                               ? 'Cập nhật đã đến nơi 📍'
                               : job.status === 'COMPLETED'
                               ? 'Xem lại nghiệm thu'
+                              : job.status === 'CANCELLED' ? 'Xem lịch sử hủy'
                               : 'Bắt đầu di chuyển →'}
                           </Text>
                         </Pressable>

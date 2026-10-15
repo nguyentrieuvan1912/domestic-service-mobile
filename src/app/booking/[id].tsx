@@ -1,3 +1,5 @@
+import { needsStaffResponse } from '@/utils/staff-response';
+import { bookingTravelStatus } from '@/utils/booking-travel-status';
 import { remoteImageSource } from '@/utils/image-source';
 import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState } from 'react';
@@ -11,7 +13,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
@@ -26,7 +28,8 @@ import type { Staff } from '@/types/user';
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter(); const data = useBookingDetail(id);
-  if (!data.booking) return <SafeAreaView style={styles.container}><Pressable onPress={() => router.back()}><Text>← Quay lại</Text></Pressable><Text>{data.loading ? 'Đang tải đơn hàng...' : data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable></SafeAreaView>;
+  if (!data.booking) return <SafeAreaView style={styles.container}><Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}><Text>← Quay lại</Text></Pressable><Text>{data.loading ? 'Đang tải đơn hàng...' : data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable></SafeAreaView>;
+  if(needsStaffResponse(data.booking)) return <Redirect href={{pathname:'/booking/waiting',params:{id:data.booking.id}}} />;
   return <BookingDetailContent initial={data.booking} staff={data.staff} invoice={data.invoice} />;
 }
 function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedBooking; staff?: Staff; invoice?: StoredInvoice }) {
@@ -35,6 +38,7 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const service = bookingServiceView(booking);
   const isCompleted = booking.status === 'COMPLETED';
+  const travel = bookingTravelStatus(booking);
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
@@ -61,7 +65,7 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Top Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+        <Pressable style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} hitSlop={8}>
           <IconSymbol name="back" size={20} color={BrandColors.gray800} />
         </Pressable>
         <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
@@ -144,7 +148,7 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
               <View style={{ flex: 1 }}>
                 <Text style={styles.staffName}>{staff.fullName}</Text>
                 <RatingStars rating={staff.rating} size={12} reviewCount={staff.reviewCount} />
-                <Text style={styles.staffExp}>{staff.experienceYears} năm kinh nghiệm • Đã xác minh</Text>
+                <Text style={styles.staffExp}>{staff.experienceYears} năm kinh nghiệm</Text>
               </View>
             </View>
 
@@ -182,6 +186,14 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
               <View style={styles.timelineCol}>
                 <Text style={styles.timelineStepTitle}>Điều phối & Phân công thợ</Text>
                 <Text style={styles.timelineStepTime}>Thợ nhận việc và chuẩn bị di chuyển</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineStep} accessibilityLabel={`Thợ đang di chuyển tới. ${travel.description}`}>
+              <View style={[styles.timelineDot, travel.active && styles.timelineDotActive]} />
+              <View style={styles.timelineCol}>
+                <Text style={styles.timelineStepTitle}>Thợ đang di chuyển tới</Text>
+                <Text style={styles.timelineStepTime}>{travel.description}</Text>
               </View>
             </View>
 

@@ -1,3 +1,4 @@
+import { staffRating } from '@/utils/staff-profile';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { User, Customer, Staff, UserRole } from '@/types/user';
 import { IdentityProfile, IdentitySession, identityRequest } from '@/api/identity';
@@ -37,8 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } : null);
     setCurrentStaff(profile.role === 'STAFF' ? {
       id: user.id, userId: user.id, fullName: user.fullName, phone: user.phone, email: user.email, avatar: user.avatar,
-      gender: profile.gender === 'FEMALE' ? 'FEMALE' : 'MALE', dateOfBirth: profile.dateOfBirth || '',
-      isVerified: !!profile.isVerified, idCardNumber: profile.identityCard || '', experienceYears: profile.experienceYears ?? 0, rating: profile.rating ?? 0,
+      gender: profile.gender || 'OTHER', dateOfBirth: profile.dateOfBirth || '', birthYear: profile.birthYear || undefined,
+      isVerified: !!profile.isVerified, idCardNumber: profile.identityCard || '', experienceYears: profile.experienceYears ?? 0, rating: staffRating(profile.rating, profile.reviewCount),
       reviewCount: profile.reviewCount, completionRate: profile.completionRate ?? 0, satisfactionRate: profile.satisfactionRate ?? 0, status: profile.staffStatus || 'OFFLINE', isOnline: profile.isOnline,
       bio: profile.bio || '', competencies: [], operatingDistricts: [], createdAt: user.createdAt,
     } : null);

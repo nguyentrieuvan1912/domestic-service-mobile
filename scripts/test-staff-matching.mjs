@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createRequire, Module } from 'node:module';
 import { readFileSync } from 'node:fs';
+// Domain fixtures include a restriction expiring on 15/10/2026.
+// Keep their clock inside that interval instead of depending on the test run date.
+Date.now = () => Date.parse('2026-10-08T07:00:00+07:00');
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 Module._extensions['.ts'] = (module, filename) => {
@@ -172,3 +175,17 @@ assert.equal(repo.read(tuan).context.actor.staffId, tuan.staffId);
 assert.ok(mockStaffs.some(staff => staff.id === tuan.staffId));
 assert.ok(areaIdsForNames(['Bình Thạnh']).length);
 console.log('Matching: owned pure eligibility/reasons, capability/restriction/online, schedule/buffer boundaries, privacy, filters/sorts/empty states, abort/retry, stale claims and multi-position races passed.');
+
+const {matchingModeCounts}=require('../src/utils/staff-matching-mode.ts');
+const splitSnapshot={context:{actor:{staffId:'42'}},items:[
+ {opportunity:{id:'a',mode:'A',invitedStaffId:'42',startsAt:'2026-10-16T02:00:00Z',serviceName:'Dọn nhà',packageTitle:'2 giờ',district:'Phường Sài Gòn',bookingCode:'A'},eligibility:{allowed:true}},
+ {opportunity:{id:'a-offline',mode:'A',invitedStaffId:'42',startsAt:'2026-10-16T06:00:00Z',serviceName:'Dọn nhà',packageTitle:'2 giờ',district:'Phường Sài Gòn',bookingCode:'A2'},eligibility:{allowed:false}},
+ {opportunity:{id:'foreign',mode:'A',invitedStaffId:'99',startsAt:'2026-10-16T02:00:00Z',serviceName:'Dọn nhà',packageTitle:'2 giờ',district:'Phường Sài Gòn',bookingCode:'OTHER'},eligibility:{allowed:true}},
+ {opportunity:{id:'b',mode:'B',startsAt:'2026-10-16T02:00:00Z',serviceName:'Dọn nhà',packageTitle:'2 giờ',district:'Phường Sài Gòn',bookingCode:'B'},eligibility:{allowed:true}},
+ {opportunity:{id:'b-blocked',mode:'B',startsAt:'2026-10-16T02:00:00Z',serviceName:'Dọn nhà',packageTitle:'2 giờ',district:'Phường Sài Gòn',bookingCode:'B2'},eligibility:{allowed:false}},
+]};
+assert.deepEqual(matchingModeCounts(splitSnapshot),{A:2,B:1});assert.deepEqual(matchingModeCounts(),{A:0,B:0});
+assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'A'}).map(item=>item.opportunity.id),['a','a-offline']);
+assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'B'}).map(item=>item.opportunity.id),['b']);
+assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'A',query:'không có'}),[]);
+console.log('Matching modes: own invitations counted even while ineligible; foreign invitations excluded; open jobs require eligibility; search remains scoped.');

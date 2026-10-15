@@ -16,14 +16,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/context/AuthContext';
 import { ChatRepository, getChatActor } from '@/data/connectedChatRepository';
 import { CHAT_TIME_ZONE } from '@/data/chatPolicy';
+import { useChatInbox } from '@/hooks/use-chat-inbox';
 
 export default function ChatListScreen() {
   const router = useRouter();
   const { currentUser } = useAuth();
   const actor = getChatActor(currentUser);
-  const [, refresh] = useReducer((value: number) => value + 1, 0);
-  useEffect(() => ChatRepository.subscribe(refresh), []);
-  useEffect(() => { if (!currentUser) return; const load = () => { void ChatRepository.loadList(getChatActor(currentUser)).catch(() => {}); }; load(); const timer = setInterval(load, 5000); return () => clearInterval(timer); }, [currentUser?.id]);
+  useChatInbox();
   const conversations = ChatRepository.list().filter((conversation) =>
     ChatRepository.access(conversation.id, actor).kind === 'READY');
 

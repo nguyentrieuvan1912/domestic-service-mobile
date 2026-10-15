@@ -1,3 +1,4 @@
+import { staffRating } from '@/utils/staff-profile';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -6,7 +7,8 @@ import { operationRequest } from '@/api/operations';
 import type { Staff } from '@/types/user';
 export interface StoredInvoice { id: number; bookingId: number; invoiceNumber: string; issuedAt: string; status: string; totalAmount: number }
 export function staffView(raw: Record<string, unknown>): Staff {
-  return { ...raw, id: String(raw.id), userId: String(raw.id), avatar: String(raw.avatar || ''), phone: '', email: '', fullName: String(raw.fullName || ''), dateOfBirth: String(raw.dateOfBirth || ''), rating: Number(raw.rating || 0), reviewCount: Number(raw.reviewCount || 0), completedBookingsCount: Number(raw.completedBookingsCount || 0), isVerified: !!raw.isVerified, operatingDistricts: [], competencies: Array.isArray(raw.competencies)?raw.competencies.map(String):[], specialties: [], bio: String(raw.bio || ''), gender: raw.gender === 'FEMALE' ? 'FEMALE' : 'MALE', experienceYears: Number(raw.experienceYears || 0), status: String(raw.status || 'OFFLINE'), isOnline: !!raw.isOnline, idCardNumber: '', completionRate: 0, satisfactionRate: 0, createdAt: '' } as Staff;
+  const eligibleServices = Array.isArray(raw.eligibleServices) ? raw.eligibleServices.map(item => ({ id: String(item.id), name: String(item.name) })) : [];
+  return { ...raw, eligibleServices, id: String(raw.id), userId: String(raw.id), avatar: String(raw.avatar || '/api/v1/identity/staff-avatar.png'), phone: '', email: '', fullName: String(raw.fullName || ''), dateOfBirth: String(raw.dateOfBirth || ''), birthYear: raw.birthYear ? Number(raw.birthYear) : undefined, rating: staffRating(Number(raw.rating ?? 5), Number(raw.reviewCount || 0)), reviewCount: Number(raw.reviewCount || 0), completedBookingsCount: Number(raw.completedBookingsCount || 0), isVerified: !!raw.isVerified, operatingDistricts: Array.isArray(raw.operatingDistricts)?raw.operatingDistricts.map(String):[], competencies: Array.isArray(raw.competencies)?raw.competencies.map(String):[], specialties: eligibleServices.map(item => item.name), bio: String(raw.bio || ''), gender: raw.gender === 'FEMALE' ? 'FEMALE' : raw.gender === 'MALE' ? 'MALE' : 'OTHER', experienceYears: Number(raw.experienceYears || 0), status: String(raw.status || 'OFFLINE'), isOnline: !!raw.isOnline, idCardNumber: '', completionRate: 0, satisfactionRate: 0, createdAt: '' } as Staff;
 }
 export function useBookingDetail(id: string | undefined) {
   const { currentCustomer } = useAuth();

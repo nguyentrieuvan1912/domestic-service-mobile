@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { createRequire, Module } from 'node:module';
+import { readFileSync } from 'node:fs';
+const require=createRequire(import.meta.url),ts=require('typescript');
+Module._extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {customerSlotIssue:issue}=require('../src/utils/customer-booking-time.ts');
+const now=Date.parse('2026-10-15T10:00:00+07:00');
+assert.equal(issue('2026-10-15T12:00:00+07:00',120,now),'');
+assert.match(issue('2026-10-15T11:59:59+07:00',120,now),/2 giờ/);
+assert.match(issue('2026-10-15T12:00:00+07:00',120,now+1),/2 giờ/,'Clock advancing must invalidate a stale selection');
+assert.equal(issue('2026-10-15T18:00:00+07:00',120,now),'');
+assert.match(issue('2026-10-15T18:30:00+07:00',120,now),/20:00/);
+assert.match(issue('2026-10-15T19:30:00+07:00',300,now),/cùng ngày/);
+assert.equal(issue('2026-10-21T08:00:00+07:00',60,now),'');
+assert.match(issue('2026-10-22T08:00:00+07:00',60,now),/6 ngày/);
+console.log('Customer booking: exact 2-hour boundary, elapsed-clock revalidation, full duration, closing time and Vietnam date horizon passed.');
