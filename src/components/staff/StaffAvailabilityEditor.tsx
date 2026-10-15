@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,8 @@ import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
 import { StaffAvailabilityRepository, availabilityDraft } from '@/data/connectedStaffRepository';
 import { StaffRepository } from '@/data/connectedStaffRepository';
 import { STAFF_AREA_OPTIONS } from '@/data/staffAreas';
+import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
+import { administrativeSearchKey } from '@/api/administrative-units';
 import { bookingBuffer, bookingWorkMinutes, displayDate, displayTime, intervalFor, localDate, normalizeDraft, scheduleDates, SCHEDULE_TIME_OPTIONS } from '@/data/staffAvailabilityRules';
 import type { AvailabilityActor, AvailabilityDraft, AvailabilitySnapshot } from '@/types/staff-availability';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -26,6 +28,8 @@ export function StaffAvailabilityScreen() {
   return <AvailabilityEditor key={actor.userId} actor={actor} />;
 }
 function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
+  const administrative = useAdministrativeUnits();
+  const [areaSearch, setAreaSearch] = useState('');
   const router = useRouter();
   const navigation = useNavigation();
   const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
@@ -136,9 +140,12 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
             {bookings.map(booking => { const buffer = bookingBuffer(booking); return <View key={booking.id} style={styles.booking}><Text style={styles.heading}>{booking.bookingCode} • {displayTime(booking.startsAt)}–{displayTime(booking.endsAt)}</Text><Text style={styles.body}>{booking.district} • {(bookingWorkMinutes(booking) / 60).toLocaleString('vi-VN')} giờ công</Text><Text style={styles.sub}>Vùng đệm: {displayTime(buffer.startsAt)}–{displayTime(booking.startsAt)} và {displayTime(booking.endsAt)}–{displayTime(buffer.endsAt)}. Không nhận ca khác trong vùng này.</Text></View>; })}
             {!!snapshot.unknownBookingCodes.length && <Text style={styles.error}>Chưa có giờ hợp lệ: {snapshot.unknownBookingCodes.join(', ')}. Cần xác minh trước khi lưu hoặc nhận thêm.</Text>}
           </View>
-          <View style={styles.card}><Text style={styles.heading}>Khu vực nhận việc • {draft.areaIds.length} đã chọn</Text><Text style={styles.body}>Chọn ít nhất một khu vực. Khu vực có ca đã nhận cần được giữ lại.</Text><View style={styles.wrap}>
-            {STAFF_AREA_OPTIONS.map(area => { const selected = draft.areaIds.includes(area.id); return <Pressable disabled={saving} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} key={area.id} style={[styles.chip, selected && styles.selectedChip]} onPress={() => changeDraft({ ...draft, areaIds: selected ? draft.areaIds.filter(id => id !== area.id) : [...draft.areaIds, area.id] })}><Text style={selected ? styles.light : styles.label}>{selected ? '✓ ' : '+ '}{area.name}</Text></Pressable>; })}
-          </View><Text style={styles.sub}>Chưa có vị trí làm mốc để chọn bán kính. Việc phù hợp được kiểm tra theo khu vực đã lưu.</Text></View>
+          <View style={styles.card}><Text style={styles.heading}>Phường/xã nhận việc • {draft.areaIds.length} đã chọn</Text><Text style={styles.body}>Chọn phường/xã mới. Địa bàn cũ có ca đã nhận cần được giữ lại.</Text>
+            <TextInput accessibilityLabel="Tìm phường/xã nhận việc" placeholder="Nhập tên phường/xã, có hoặc không dấu" value={areaSearch} onChangeText={setAreaSearch} style={{ borderWidth: 1, borderColor: BrandColors.gray300, borderRadius: 10, padding: 10, marginVertical: 8 }} />
+            {administrative.loading && <ActivityIndicator color={BrandColors.primary} />}{!!administrative.error && <Pressable onPress={administrative.retry}><Text style={styles.error}>{administrative.error} Tải lại.</Text></Pressable>}
+            <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 240 }}><View style={styles.wrap}>
+            {STAFF_AREA_OPTIONS.filter(area => administrative.units.some(unit => unit.name === area.name) || draft.areaIds.includes(area.id)).filter(area => administrativeSearchKey(area.name).includes(administrativeSearchKey(areaSearch))).map(area => { const selected = draft.areaIds.includes(area.id); return <Pressable disabled={saving} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} key={area.id} style={[styles.chip, selected && styles.selectedChip]} onPress={() => changeDraft({ ...draft, areaIds: selected ? draft.areaIds.filter(id => id !== area.id) : [...draft.areaIds, area.id] })}><Text style={selected ? styles.light : styles.label}>{selected ? '✓ ' : '+ '}{area.name}{!administrative.units.some(unit => unit.name === area.name) ? ' (địa bàn cũ)' : ''}</Text></Pressable>; })}
+          </View></ScrollView><Text style={styles.sub}>Việc phù hợp được kiểm tra theo phường/xã đã lưu.</Text></View>
           <View style={styles.card}><View style={styles.row}><View style={styles.grow}><Text style={styles.heading}>Nhận thông báo việc phù hợp</Text><Text style={styles.body}>Bạn vẫn cần xác nhận khi nhận ca. Tùy chọn này không tự nhận việc.</Text></View><Switch disabled={saving} value={draft.matchNotifications} onValueChange={value => { changeDraft({ ...draft, matchNotifications: value }); }} trackColor={{ true: BrandColors.primary, false: BrandColors.gray300 }} /></View></View>
           {!!notice && <Text accessibilityLiveRegion="polite" style={styles.success}>{notice}</Text>}
           <Pressable disabled={saving} accessibilityRole="button" onPress={requestReload} style={styles.secondary}><Text style={styles.link}>Tải lại lịch đã lưu</Text></Pressable>

@@ -19,12 +19,15 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import type { Customer } from '@/types/user';
 import type { BookingMode } from '@/types/booking';
 
+import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
+import { WardSelect } from '@/components/common/WardSelect';
+
 interface RequireAddressViewProps {
   mode?: BookingMode | null;
   currentCustomer?: Customer | null;
   onManageAddresses: () => void;
   onBack: () => void;
-  mutateAddress: (path: string, method: string, body?: object) => Promise<void>;
+  mutateAddress: (path: string, method: string, body?: object) => Promise<any>;
   onAddressCreated?: () => void;
 }
 
@@ -39,6 +42,7 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
   mutateAddress,
   onAddressCreated,
 }) => {
+  const administrative = useAdministrativeUnits();
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -47,6 +51,7 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
   const [recipientName, setRecipientName] = useState(currentCustomer?.fullName || '');
   const [recipientPhone, setRecipientPhone] = useState(currentCustomer?.phone || '');
   const [streetAddress, setStreetAddress] = useState('');
+  const [ward, setWard] = useState('');
   const [district, setDistrict] = useState('Quận 1');
   const [note, setNote] = useState('');
 
@@ -55,6 +60,7 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
     setRecipientName(currentCustomer?.fullName || '');
     setRecipientPhone(currentCustomer?.phone || '');
     setStreetAddress('');
+    setWard('');
     setDistrict('Quận 1');
     setNote('');
     setModalVisible(true);
@@ -62,8 +68,14 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
 
   const handleSave = async () => {
     if (saving) return;
-    if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim() || !district.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập đầy đủ tên người nhận, số điện thoại, địa chỉ và quận/huyện.');
+    if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim()) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập đầy đủ tên người nhận, số điện thoại và địa chỉ cụ thể.');
+      return;
+    }
+
+    const selectedWard = administrative.units.find(unit => unit.name === ward.trim());
+    if (!selectedWard && !district.trim()) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng chọn phường/xã hoặc quận/huyện.');
       return;
     }
 
@@ -74,9 +86,9 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
         streetAddress: streetAddress.trim(),
-        district: district.trim(),
+        district: selectedWard ? '' : district.trim(),
+        ward: selectedWard ? selectedWard.name : '',
         note: note.trim(),
-        ward: '',
         city: 'TP. Hồ Chí Minh',
         isDefault: true,
       });
@@ -144,10 +156,10 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
             <View style={styles.modeNoticeTextCol}>
               <View style={styles.modeBadgeRow}>
                 <Text style={styles.modeNoticeHeading}>
-                  {isModeA ? 'Chế độ: Chọn nhân viên' : 'Chế độ: Đặt dịch vụ'}
+                  {isModeA ? 'Chọn nhân viên trực tiếp' : 'Đặt dịch vụ'}
                 </Text>
                 <View style={styles.tagPill}>
-                  <Text style={styles.tagPillText}>Mode A</Text>
+                  <Text style={styles.tagPillText}>{isModeA ? 'Tự chọn' : 'Tự động'}</Text>
                 </View>
               </View>
               <Text style={styles.modeNoticeDesc}>
@@ -366,6 +378,17 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
                   onChangeText={setDistrict}
                   placeholder="Nhập hoặc chọn quận / huyện"
                   placeholderTextColor={BrandColors.gray400}
+                />
+
+                {/* Phường / Xã */}
+                <Text style={styles.fieldLabel}>Phường / Xã (TP. Hồ Chí Minh)</Text>
+                <WardSelect
+                  value={ward}
+                  onChange={setWard}
+                  units={administrative.units}
+                  loading={administrative.loading}
+                  error={administrative.error}
+                  retry={administrative.retry}
                 />
 
                 {/* Ghi chú chỉ đường */}

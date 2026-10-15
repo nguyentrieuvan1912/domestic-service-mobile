@@ -28,7 +28,7 @@ const SLIDES = [
     id: 'slide-2',
     icon: '⚡',
     title: 'Đặt dịch vụ siêu nhanh',
-    desc: 'Chỉ 3 bước tạo lịch hẹn. Hỗ trợ tự chọn nhân viên quen thuộc (Mode A) hoặc điều phối tự động trong 5 phút (Mode B).',
+    desc: 'Chỉ 3 bước tạo lịch hẹn. Hỗ trợ tự chọn nhân viên quen thuộc hoặc điều phối tự động trong 5 phút.',
     badge: 'Nhanh chóng',
   },
   {

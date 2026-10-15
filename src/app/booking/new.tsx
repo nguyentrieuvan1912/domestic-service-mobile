@@ -146,7 +146,17 @@ export default function NewBookingScreen() {
       <RequireAddressView
         mode={params.mode || (params.staffId ? 'MODE_A' : 'MODE_A')}
         currentCustomer={currentCustomer}
-        onManageAddresses={() => router.push('/account/addresses')}
+        onManageAddresses={() =>
+          router.push({
+            pathname: '/account/addresses',
+            params: {
+              fromBooking: '1',
+              mode: params.mode,
+              serviceId: params.serviceId,
+              staffId: params.staffId,
+            },
+          })
+        }
         onBack={() => router.back()}
         mutateAddress={addressResource.mutate}
         onAddressCreated={() => addressResource.retry()}
@@ -234,6 +244,13 @@ function ConnectedNewBooking({ catalog, addresses }: { catalog: ReturnType<typeo
   const [selectedAddressId, setSelectedAddressId] = useState<string>(
     params.addressId || addresses[0]?.id || ''
   );
+  useEffect(() => {
+    if (params.addressId && addresses.some(a => a.id === params.addressId)) {
+      setSelectedAddressId(params.addressId);
+    } else if (!selectedAddressId && addresses.length > 0) {
+      setSelectedAddressId(addresses.find(a => a.isDefault)?.id || addresses[0].id);
+    }
+  }, [params.addressId, addresses]);
   const selectedAddress =
     addresses.find((a) => a.id === selectedAddressId) || addresses[0];
 
@@ -795,7 +812,17 @@ function ConnectedNewBooking({ catalog, addresses }: { catalog: ReturnType<typeo
 
                   <Pressable
                     style={styles.addAddressDashedBtn}
-                    onPress={() => router.push('/account/addresses')}>
+                    onPress={() =>
+                      router.push({
+                        pathname: '/account/addresses',
+                        params: {
+                          fromBooking: '1',
+                          mode: selectedMode || undefined,
+                          serviceId: service.id,
+                          staffId: selectedStaffId || undefined,
+                        },
+                      })
+                    }>
                     <IconSymbol name="plus" size={16} color={BrandColors.primary} />
                     <Text style={styles.addAddressDashedText}>Thêm địa chỉ mới</Text>
                   </Pressable>
@@ -1940,7 +1967,16 @@ function ConnectedNewBooking({ catalog, addresses }: { catalog: ReturnType<typeo
 
                   <Pressable
                     style={styles.addAddressDashedBtn}
-                    onPress={() => router.push('/account/addresses')}>
+                    onPress={() =>
+                      router.push({
+                        pathname: '/account/addresses',
+                        params: {
+                          fromBooking: '1',
+                          mode: selectedMode || undefined,
+                          serviceId: service.id,
+                        },
+                      })
+                    }>
                     <IconSymbol name="plus" size={16} color={BrandColors.primary} />
                     <Text style={styles.addAddressDashedText}>Thêm địa chỉ mới</Text>
                   </Pressable>

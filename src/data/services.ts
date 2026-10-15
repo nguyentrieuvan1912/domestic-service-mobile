@@ -40,8 +40,8 @@ export const mockServices: Service[] = [
     isPopular: true,
     isActive: true,
     status: 'ACTIVE',
-    highlightBadges: ['Nhân viên lý lịch rõ ràng', 'Hỗ trợ Mode A & B', 'Bảo hiểm hư hại'],
-    detailedDescription: 'Dịch vụ vệ sinh nhà theo giờ là giải pháp dọn dẹp hàng ngày phổ biến nhất. Khách hàng có thể tự chọn nhân viên quen thuộc (Mode A) hoặc để hệ thống tìm kiếm người gần nhất (Mode B). Nhân viên đã được thẩm định tư pháp, đào tạo tác phong chuẩn 5 sao.',
+    highlightBadges: ['Nhân viên lý lịch rõ ràng', 'Tự chọn hoặc điều phối nhanh', 'Bảo hiểm hư hại'],
+    detailedDescription: 'Dịch vụ vệ sinh nhà theo giờ là giải pháp dọn dẹp hàng ngày phổ biến nhất. Khách hàng có thể tự chọn nhân viên quen thuộc hoặc để hệ thống tìm kiếm người gần nhất. Nhân viên đã được thẩm định tư pháp, đào tạo tác phong chuẩn 5 sao.',
     benefits: [
       'Nhân viên đã xác thực danh tính & lý lịch tư pháp số 2',
       'Được đào tạo kỹ năng dọn dẹp, phân loại rác và bảo quản đồ dùng gia đình',

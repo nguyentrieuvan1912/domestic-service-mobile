@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { identityRequest } from '@/api/identity';
@@ -7,24 +7,97 @@ import type { CustomerAddress } from '@/types/user';
 export function useCustomerAddresses() {
   const { currentCustomer, accessToken, refreshProfile } = useAuth();
   const owner = currentCustomer?.id;
-  const [state, setState] = useState<{ owner?: string; data: CustomerAddress[]; loading: boolean; error: string }>({ data: [], loading: true, error: '' });
-  const [attempt, setAttempt] = useState(0);
-  useFocusEffect(useCallback(() => {
-    const controller = new AbortController();
-    if (!owner || !accessToken) { setState({ owner, data: [], loading: false, error: '' }); return; }
-    setState({ owner, data: [], loading: true, error: '' });
-    void identityRequest<(Omit<CustomerAddress, 'id' | 'customerId'> & { id: number; customerId: number })[]>('/customer/addresses', undefined, accessToken, 'GET', controller.signal)
-      .then(data => { if (!controller.signal.aborted) setState({ owner, data: data.map(item => ({ ...item, id: String(item.id), customerId: String(item.customerId) })), loading: false, error: '' }); })
-      .catch(error => { if (!controller.signal.aborted) setState({ owner, data: [], loading: false, error: error.message }); });
-    return () => controller.abort();
-  }, [owner, accessToken, attempt]));
+  const [state, setState] = useState<{ owner?: string; data: CustomerAddress[]; loading: boolean; error: string }>({
+    data: [],
+    loading: true,
+    error: '',
+  });
+
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchAddresses = useCallback(async (): Promise<CustomerAddress[]> => {
+    if (!owner || !accessToken) {
+      if (isMountedRef.current) {
+        setState({ owner, data: [], loading: false, error: '' });
+      }
+      return [];
+    }
+
+    if (isMountedRef.current) {
+      setState(prev => ({ ...prev, loading: true, error: '' }));
+    }
+
+    try {
+      const data = await identityRequest<any>(
+        '/customer/addresses',
+        undefined,
+        accessToken,
+        'GET'
+      );
+
+      const rawList = Array.isArray(data)
+        ? data
+        : data && typeof data === 'object' && Array.isArray(data.data)
+        ? data.data
+        : data && typeof data === 'object' && Array.isArray(data.addresses)
+        ? data.addresses
+        : [];
+
+      const list: CustomerAddress[] = rawList.map((item: any) => ({
+        ...item,
+        id: String(item.id),
+        customerId: String(item.customerId || owner),
+      }));
+
+      if (isMountedRef.current) {
+        setState({ owner, data: list, loading: false, error: '' });
+      }
+      return list;
+    } catch (error) {
+      if (isMountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Chưa tải được danh sách địa chỉ.',
+        }));
+      }
+      return [];
+    }
+  }, [owner, accessToken]);
+
+  // Load when owner or token changes
+  useEffect(() => {
+    void fetchAddresses();
+  }, [fetchAddresses]);
+
+  // Re-fetch whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      void fetchAddresses();
+    }, [fetchAddresses])
+  );
+
   const mutate = async (path: string, method: string, body?: object) => {
     if (!owner || !accessToken) throw new Error('Vui lòng đăng nhập tài khoản khách hàng.');
-    await identityRequest(path, body, accessToken, method);
-    setAttempt(value => value + 1);
-    // An address has already been committed even if refreshing profile fails.
+    const result = await identityRequest<any>(path, body, accessToken, method);
+    // Reload addresses immediately so state is updated before mutate resolves
+    await fetchAddresses();
     void refreshProfile().catch(() => {});
+    return result;
   };
-  return { addresses: state.owner === owner ? state.data : [], loading: state.owner === owner ? state.loading : !!owner,
-    error: state.owner === owner ? state.error : '', retry: () => setAttempt(value => value + 1), mutate };
+
+  return {
+    addresses: state.owner === owner ? state.data : [],
+    loading: state.owner === owner ? state.loading : !!owner,
+    error: state.owner === owner ? state.error : '',
+    retry: () => void fetchAddresses(),
+    refresh: () => void fetchAddresses(),
+    mutate,
+  };
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,9 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { AddressCard } from '@/components/common/AddressCard';
@@ -20,13 +21,34 @@ import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
 import { EmptyState } from '@/components/common/EmptyState';
 import { CatalogState } from '@/components/common/CatalogState';
 import { CustomerAddress } from '@/types/user';
+import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
+import { WardSelect } from '@/components/common/WardSelect';
 
 export default function AddressManagementScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    fromBooking?: string;
+    selectedId?: string;
+    mode?: string;
+    serviceId?: string;
+    staffId?: string;
+  }>();
   const { currentCustomer } = useAuth();
 
-  const { addresses, loading, error, retry, mutate } = useCustomerAddresses();
+  const { addresses, loading, error, retry, mutate, refresh } = useCustomerAddresses();
+  const administrative = useAdministrativeUnits();
   const [saving, setSaving] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(params.selectedId || '');
+
+  // Auto select default address or first address when available
+  useEffect(() => {
+    if (addresses.length > 0) {
+      if (!selectedAddressId || !addresses.some(a => a.id === selectedAddressId)) {
+        const defaultOne = addresses.find(a => a.isDefault)?.id || addresses[0].id;
+        setSelectedAddressId(defaultOne);
+      }
+    }
+  }, [addresses, selectedAddressId]);
 
   // Add / Edit Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -35,7 +57,8 @@ export default function AddressManagementScreen() {
   const [recipientName, setRecipientName] = useState(currentCustomer?.fullName || '');
   const [recipientPhone, setRecipientPhone] = useState(currentCustomer?.phone || '');
   const [streetAddress, setStreetAddress] = useState('');
-  const [district, setDistrict] = useState('Quận 1');
+  const [ward, setWard] = useState('');
+  const [legacyAddress, setLegacyAddress] = useState('');
   const [note, setNote] = useState('');
 
   // Delete modal state
@@ -48,7 +71,7 @@ export default function AddressManagementScreen() {
     setRecipientPhone(currentCustomer.phone);
     setTitle('Nhà riêng');
     setStreetAddress('');
-    setDistrict('Quận 1');
+    setWard(''); setLegacyAddress('');
     setNote('');
     setModalVisible(true);
   };
@@ -59,29 +82,78 @@ export default function AddressManagementScreen() {
     setRecipientName(addr.recipientName);
     setRecipientPhone(addr.recipientPhone);
     setStreetAddress(addr.streetAddress);
-    setDistrict(addr.district);
+    setWard(administrative.units.some(unit => unit.name === addr.ward) ? addr.ward : '');
+    setLegacyAddress(addr.district || !administrative.units.some(unit => unit.name === addr.ward) ? addr.fullAddress : '');
     setNote(addr.note || '');
     setModalVisible(true);
   };
 
+  const handleConfirmSelect = (addr: CustomerAddress) => {
+    setSelectedAddressId(addr.id);
+    if (params.fromBooking) {
+      router.replace({
+        pathname: '/booking/new',
+        params: {
+          addressId: addr.id,
+          mode: params.mode as any,
+          serviceId: params.serviceId,
+          staffId: params.staffId,
+        },
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (saving) return;
-    if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim() || !district.trim()) {
+    if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ người nhận, điện thoại và địa chỉ.');
       return;
     }
+    const selectedWard = administrative.units.find(unit => unit.name === ward.trim());
+    if (!selectedWard) { Alert.alert('Chọn phường/xã', 'Vui lòng chọn một phường/xã trong danh sách TP. Hồ Chí Minh.'); return; }
     setSaving(true);
     try {
       const previous = addresses.find(item => item.id === editingAddressId);
-      await mutate(editingAddressId ? '/customer/addresses/' + editingAddressId : '/customer/addresses', editingAddressId ? 'PUT' : 'POST', {
+      const isFirst = addresses.length === 0;
+      const saved = await mutate(editingAddressId ? '/customer/addresses/' + editingAddressId : '/customer/addresses', editingAddressId ? 'PUT' : 'POST', {
         title: title.trim(), recipientName: recipientName.trim(), recipientPhone: recipientPhone.trim(),
-        streetAddress: streetAddress.trim(), district: district.trim(), note: note.trim(),
-        ward: previous?.ward || '', city: previous?.city || 'TP. Hồ Chí Minh', isDefault: previous?.isDefault || false,
+        streetAddress: streetAddress.trim(), district: '', note: note.trim(),
+        ward: selectedWard.name, city: 'TP. Hồ Chí Minh', isDefault: previous?.isDefault || isFirst,
       });
+
       setModalVisible(false);
+      const newId = saved?.id ? String(saved.id) : undefined;
+      if (newId) {
+        setSelectedAddressId(newId);
+      }
+
+      if (params.fromBooking) {
+        Alert.alert(
+          'Thêm địa chỉ thành công',
+          'Đã lưu địa chỉ vào hệ thống. Bạn có muốn sử dụng địa chỉ này để tiếp tục đặt dịch vụ?',
+          [
+            { text: 'Ở lại quản lý', style: 'cancel' },
+            {
+              text: 'Tiếp tục đặt dịch vụ',
+              onPress: () => {
+                router.replace({
+                  pathname: '/booking/new',
+                  params: {
+                    addressId: newId,
+                    mode: params.mode as any,
+                    serviceId: params.serviceId,
+                    staffId: params.staffId,
+                  },
+                });
+              },
+            },
+          ]
+        );
+      }
     } catch (cause) { Alert.alert('Chưa lưu được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
+
   const handleSetDefault = async (id: string) => {
     if (saving) return;
     setSaving(true);
@@ -89,6 +161,7 @@ export default function AddressManagementScreen() {
     catch (cause) { Alert.alert('Chưa lưu được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
+
   const handleDelete = async () => {
     if (!deleteTargetId || saving) return;
     setSaving(true);
@@ -104,31 +177,86 @@ export default function AddressManagementScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
           <IconSymbol name="back" size={20} color={BrandColors.gray800} />
         </Pressable>
-        <Text style={styles.headerTitle}>Sổ địa chỉ của bạn</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>Sổ địa chỉ của bạn</Text>
+          {params.fromBooking && (
+            <Text style={styles.headerSubtitle}>Chọn địa chỉ để đặt dịch vụ</Text>
+          )}
+        </View>
         <Pressable style={styles.addBtn} disabled={saving || loading} onPress={openAddModal}>
           <Text style={styles.addBtnText}>+ Thêm</Text>
         </Pressable>
       </View>
 
+      {/* From Booking Notice */}
+      {params.fromBooking && addresses.length > 0 && (
+        <View style={styles.bookingNoticeBar}>
+          <IconSymbol name="location" size={18} color={BrandColors.primary} />
+          <Text style={styles.bookingNoticeText}>
+            Chạm vào địa chỉ bên dưới để chọn và tiếp tục đặt lịch
+          </Text>
+        </View>
+      )}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
-        {!currentCustomer ? <EmptyState icon="user" title="Vui lòng đăng nhập" description="Đăng nhập để quản lý sổ địa chỉ của bạn." actionText="Đăng nhập" onAction={() => router.push('/auth/login')} /> :
-          loading || error ? <CatalogState loading={loading} error={error} onRetry={retry} /> :
-          addresses.length === 0 ? <EmptyState icon="location" title="Chưa có địa chỉ" description="Thêm địa chỉ đầu tiên để đặt dịch vụ." /> : null}
+        {!currentCustomer ? (
+          <EmptyState
+            icon="user"
+            title="Vui lòng đăng nhập"
+            description="Đăng nhập để quản lý sổ địa chỉ của bạn."
+            actionText="Đăng nhập"
+            onAction={() => router.push('/auth/login')}
+          />
+        ) : loading && addresses.length === 0 ? (
+          <CatalogState loading={loading} onRetry={retry} />
+        ) : error && addresses.length === 0 ? (
+          <CatalogState error={error} onRetry={retry} />
+        ) : addresses.length === 0 ? (
+          <EmptyState
+            icon="location"
+            title="Chưa có địa chỉ"
+            description="Thêm địa chỉ đầu tiên để đặt dịch vụ."
+            actionText="+ Thêm địa chỉ mới"
+            onAction={openAddModal}
+          />
+        ) : null}
+
         {addresses.map((addr) => (
           <AddressCard
             key={addr.id}
             address={addr}
             showActions
+            isSelected={addr.id === selectedAddressId}
+            onSelect={() => handleConfirmSelect(addr)}
             onEdit={() => openEditModal(addr)}
             onDelete={() => setDeleteTargetId(addr.id)}
             onSetDefault={() => handleSetDefault(addr.id)}
           />
         ))}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: params.fromBooking && addresses.length > 0 ? 90 : 40 }} />
       </ScrollView>
+
+      {/* Bottom bar when coming from booking flow */}
+      {params.fromBooking && addresses.length > 0 && (
+        <View style={styles.bottomBar}>
+          <Pressable
+            style={styles.selectBtn}
+            onPress={() => {
+              const selected = addresses.find(a => a.id === selectedAddressId) || addresses[0];
+              if (selected) handleConfirmSelect(selected);
+            }}>
+            <LinearGradient
+              colors={BrandColors.primaryGradient}
+              style={styles.selectGradient}>
+              <IconSymbol name="check" size={18} color="#FFFFFF" />
+              <Text style={styles.selectBtnText}>Sử dụng địa chỉ này để đặt dịch vụ</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      )}
 
       {/* Add / Edit Modal */}
       <Modal
@@ -179,15 +307,17 @@ export default function AddressManagementScreen() {
                 placeholder="Số 123 Nguyễn Thị Minh Khai"
               />
 
-              <Text style={styles.fieldLabel}>Quận / Huyện</Text>
-              <TextInput
-                style={styles.input}
-                value={district}
-                onChangeText={setDistrict}
-                placeholder="Quận 1"
+              <Text style={styles.fieldLabel}>Phường / Xã (TP. Hồ Chí Minh)</Text>
+              <WardSelect
+                value={ward}
+                onChange={setWard}
+                units={administrative.units}
+                loading={administrative.loading}
+                error={administrative.error}
+                retry={administrative.retry}
               />
 
-              <Text style={styles.fieldLabel}>Ghi chú chỉ đường / số phòng</Text>
+              <Text style={styles.fieldLabel}>Ghi chú chỉ đường / số phòng (tùy chọn)</Text>
               <TextInput
                 style={styles.input}
                 value={note}
@@ -241,10 +371,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitleWrap: {
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: BrandColors.gray900,
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: BrandColors.primaryDark,
+    marginTop: 2,
   },
   addBtn: {
     backgroundColor: BrandColors.primary,
@@ -257,8 +396,55 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
+  bookingNoticeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: BrandColors.primaryLight,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#A7F3D0',
+  },
+  bookingNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.primaryDark,
+  },
   scrollContent: {
     padding: Spacing.three,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    padding: Spacing.three,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  selectBtn: {
+    borderRadius: BorderRadius.full,
+    overflow: 'hidden',
+  },
+  selectGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  selectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

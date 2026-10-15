@@ -1,4 +1,5 @@
 import { STAFF_AREA_OPTIONS, areaNamesForIds } from './staffAreas';
+import { loadHcmAdministrativeUnits } from '@/api/administrative-units';
 import { operationRequest, operationSession, subscribeSession } from '@/api/operations';
 import { adaptCapabilityRestriction, adaptStaffCapability } from './staffCapabilityAdapter';
 import type { AcceptedAssignment, OpenOpportunity, StaffOperationalProfile, StaffWalletBalance, StaffWalletTransaction, JobDetailResult, ClaimOpportunityResult } from './staffRepository';
@@ -46,6 +47,7 @@ async function load(signal?: AbortSignal) {
         operationRequest<{ balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string }[] }>('finance', '/staff/me/wallet', 'GET', undefined, signal),
         operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET', undefined, signal),
         operationRequest<{ id: number; customerId: number; rating: number; comment: string; createdAt: string; tags: string[] }[]>('booking', '/reviews', 'GET', undefined, signal),
+        loadHcmAdministrativeUnits(),
       ]);
       if (active.token !== operationSession()?.token || signal?.aborted) return;
       assignments = rawAssignments.map(raw=>{const assignment=assignmentView(raw);const income=wallet.incomes.find(i=>String(i.bookingId)===assignment.id && i.status==='SETTLED');return income?{...assignment,netIncome:income.staffAmount,platformFee:income.platformFee,incomePendingPolicy:false}:assignment;});
