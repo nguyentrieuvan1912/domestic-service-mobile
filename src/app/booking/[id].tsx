@@ -39,6 +39,8 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
   const service = bookingServiceView(booking);
   const isCompleted = booking.status === 'COMPLETED';
   const travel = bookingTravelStatus(booking);
+  const savedSelections=Object.entries({...booking.service.configuration,...booking.service.answers}).filter(([,value]) => value != null && String(value).trim() !== '');
+  const acceptedStaff=booking.assignments.filter(item => ['ACCEPTED','COMPLETED'].includes(item.status));
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
@@ -117,7 +119,7 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
             <View style={{ flex: 1 }}>
               <Text style={styles.serviceName}>{service?.name}</Text>
               <Text style={styles.packageLabel}>
-                {booking.mode === 'MODE_A' ? 'Tự chọn thợ' : 'Hệ thống điều phối'} • {booking.requiredStaffCount} thợ
+                {booking.mode === 'MODE_A' ? 'Tự chọn nhân viên' : 'Khách đăng việc'} • {booking.requiredStaffCount} nhân viên
               </Text>
               <Text style={styles.scheduleText}>
                 🕒 {booking.bookingDate} • {booking.startTime} - {booking.endTime}
@@ -125,6 +127,11 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
             </View>
           </View>
 
+          {booking.mode === 'MODE_B' && ['PENDING','MATCHING'].includes(booking.status) && <View style={styles.addonSection}>
+            <Text style={styles.subHeading}>Lịch đã lưu — chờ nhân viên phù hợp nhận</Text>
+            <Text style={styles.scheduleText}>Đã nhận {acceptedStaff.length}/{booking.requiredStaffCount} nhân viên. Bạn có thể rời màn hình; lịch vẫn được giữ trên hệ thống.</Text>
+          </View>}
+          {(booking.service.quantity || 1) > 1 && <Text style={styles.scheduleText}>Số lượng gói: {booking.service.quantity}</Text>}
           {/* Add-ons list */}
           {booking.addOns && booking.addOns.length > 0 && (
             <View style={styles.addonSection}>
@@ -139,6 +146,13 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
           )}
         </View>
 
+        {savedSelections.length > 0 && <View style={styles.sectionBox}>
+          <Text style={styles.sectionHeading}>Nhu cầu đã lưu cùng lịch</Text>
+          {savedSelections.map(([key,value]) => <View key={key} style={{ marginBottom: 12 }}>
+            <Text style={styles.subHeading}>{booking.service.answerLabels?.[key] || booking.service.configurationLabels?.[key] || key}</Text>
+            <Text style={styles.scheduleText}>{typeof value === 'boolean' ? value ? 'Có' : 'Không' : Array.isArray(value) ? value.join(', ') : String(value)}</Text>
+          </View>)}
+        </View>}
         {/* Staff Card (If assigned) */}
         {staff && booking.status !== 'MATCHING' && booking.status !== 'NO_STAFF_FOUND' && (
           <View style={styles.sectionBox}>

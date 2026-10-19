@@ -1,4 +1,5 @@
 import { STAFF_AREA_OPTIONS, areaNamesForIds } from './staffAreas';
+import { reuseSnapshot } from '@/utils/stable-snapshot';
 import { displayTime, localDate } from './staffAvailabilityRules';
 import { ChatRepository } from './connectedChatRepository';
 import { loadHcmAdministrativeUnits } from '@/api/administrative-units';
@@ -45,8 +46,10 @@ async function loadSchedule(signal?: AbortSignal) {
       const raw = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'GET', undefined, signal);
       if (active.token !== operationSession()?.token || signal?.aborted) return;
       // A pending read must not replace a newer schedule saved while it was in flight.
-      if (!scheduleLoaded || raw.saved.revision >= schedule.saved.revision) schedule = areaView(raw);
-      scheduleLoaded = true; scheduleFailure = ''; notify();
+      const nextSchedule = !scheduleLoaded || raw.saved.revision >= schedule.saved.revision ? reuseSnapshot(schedule, areaView(raw)) : schedule;
+      const changed=nextSchedule !== schedule || !scheduleLoaded || !!scheduleFailure;
+      schedule=nextSchedule; scheduleLoaded = true; scheduleFailure = '';
+      if(changed) notify();
     } catch (error) {
       if (active.token !== operationSession()?.token || signal?.aborted) return;
       scheduleFailure = error instanceof Error ? error.message : 'Chưa kiểm tra được lịch làm việc.';
@@ -98,12 +101,14 @@ async function refreshWork(signal?: AbortSignal) {
       operationRequest<{ items: { opportunity: Record<string, unknown>; eligibility: MatchItem['eligibility'] }[] }>('booking', '/staff/me/matching', 'GET', undefined, signal),
     ]);
     if (active.token !== operationSession()?.token || signal?.aborted) return;
-    assignments = rawAssignments.map(raw => {
+    const nextAssignments = reuseSnapshot(assignments, rawAssignments.map(raw => {
       const next = assignmentView(raw), previous = assignments.find(item => item.id === next.id);
       return previous?.incomePendingPolicy === false ? { ...next, netIncome: previous.netIncome, platformFee: previous.platformFee, incomePendingPolicy: false } : next;
-    });
-    matchItems = rawMatching.items.map(item => ({ ...item, opportunity: { ...item.opportunity, id: String(item.opportunity.id), serviceId: String(item.opportunity.serviceId), invitedStaffId: item.opportunity.invitedStaffId == null ? undefined : String(item.opportunity.invitedStaffId) } as unknown as MatchItem['opportunity'] }));
-    notify();
+    }));
+    const nextMatchItems = reuseSnapshot(matchItems, rawMatching.items.map(item => ({ ...item, opportunity: { ...item.opportunity, id: String(item.opportunity.id), serviceId: String(item.opportunity.serviceId), invitedStaffId: item.opportunity.invitedStaffId == null ? undefined : String(item.opportunity.invitedStaffId) } as unknown as MatchItem['opportunity'] })));
+    const changed=nextAssignments !== assignments || nextMatchItems !== matchItems;
+    assignments=nextAssignments; matchItems=nextMatchItems;
+    if(changed) notify();
   })();
   workRefresh = task;
   try { await task; } finally { if (workRefresh === task) workRefresh = null; }
@@ -144,7 +149,11 @@ export const StaffRepository = {
       const chatActor = { userId: staff, participantId: staff, role: 'STAFF' as const, name: active.profile.fullName, avatar: active.profile.avatar };
       try { await ChatRepository.loadList(chatActor); if (ChatRepository.resolveForBooking(id, chatActor, staff).kind !== 'READY') await ChatRepository.loadList(chatActor); } catch { /* Claim is committed; the focused inbox retries chat loading. */ }
       notify(); await refreshAfterWrite(); return { success: true, assignment }; }
-    catch (error) { return { success: false, reason: error instanceof Error ? error.message : 'Chưa nhận được ca.', errorCode: 'NOT_ELIGIBLE' }; }
+    catch (error) {
+      // Another staff member may have claimed the last position while this screen was open.
+      try { await refreshWork(); } catch { /* Preserve the original claim error. */ }
+      return { success: false, reason: error instanceof Error ? error.message : 'Chưa nhận được ca.', errorCode: 'NOT_ELIGIBLE' };
+    }
   },
   async updateJobStatus(staff: string, id: string, status: JobStepStatus) {
     assertStaff(staff);

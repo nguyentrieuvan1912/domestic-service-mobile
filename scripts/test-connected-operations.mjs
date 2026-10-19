@@ -53,3 +53,40 @@ console.log('Connected chat: accepted-booking lookup, bounded receipt, unread up
 const {getChatBookingPhase,canSendChat}=require('../src/data/chatPolicy.ts');
 assert(canSendChat(getChatBookingPhase('MATCHING')),'An accepted staff can chat while a team booking awaits other staff');
 for(const state of ['CANCELLED','COMPLETED','REFUNDED','REJECTED'])assert(!canSendChat(getChatBookingPhase(state)));
+
+// Polling must deliver real changes without repeatedly rerendering unchanged screens.
+ops.connectOperationsSession(customer,'quiet-inbox-session');
+let chatEvents=0;const stopChat=chat.subscribe(()=>chatEvents++);
+global.fetch=async()=>new Response(JSON.stringify([conversation]));
+await chat.loadList(chatActor);const stableInbox=chat.list(), initialChatEvents=chatEvents;
+for(let i=0;i<20;i++)await chat.loadList(chatActor);
+assert.equal(chat.list(),stableInbox);assert.equal(chatEvents,initialChatEvents);
+global.fetch=async()=>new Response(JSON.stringify([{...conversation,unreadCountCustomer:3}]));
+await chat.loadList(chatActor);assert.equal(chatEvents,initialChatEvents+1);stopChat();
+
+const notifications=require('../src/data/connectedNotifications.ts');
+notifications.setCustomerNotificationSession(String(customer.id),'quiet-notification-session');
+const notificationActor={userId:String(customer.id),role:'CUSTOMER'};
+const notice={id:60001,userId:customer.id,referenceId:90001,type:'BOOKING_CREATED',isRead:false};
+global.fetch=async()=>new Response(JSON.stringify([notice]));
+await notifications.NotificationRepository.load(notificationActor);
+const stableNotices=notifications.NotificationRepository.getSnapshot(notificationActor), noticeRevision=notifications.NotificationRepository.getRevision();
+for(let i=0;i<20;i++)await notifications.NotificationRepository.load(notificationActor);
+assert.equal(notifications.NotificationRepository.getSnapshot(notificationActor),stableNotices);
+assert.equal(notifications.NotificationRepository.getRevision(),noticeRevision);
+global.fetch=async()=>new Response(JSON.stringify([{...notice,isRead:true}]));
+await notifications.NotificationRepository.load(notificationActor);
+assert.equal(notifications.NotificationRepository.getRevision(),noticeRevision+1);
+
+ops.connectOperationsSession(employee,'quiet-staff-session');
+const {StaffMatchingRepository:matching}=require('../src/data/connectedStaffRepository.ts');
+const staffActor={userId:String(employee.id),staffId:String(employee.id)};
+let jobStatus='ACCEPTED',reads=0;
+global.fetch=async(url)=>{reads++;return new Response(JSON.stringify(url.endsWith('/assignments')?[{id:90001,staffId:employee.id,customerId:customer.id,serviceId:5,status:jobStatus}]:{items:[],checkedAt:String(reads)}));};
+await matching.refresh(staffActor);const workRevision=staff.getStoreRevision();
+for(let i=0;i<20;i++)await matching.refresh(staffActor);
+assert.equal(staff.getStoreRevision(),workRevision);
+jobStatus='COMPLETED';await matching.refresh(staffActor);assert.equal(staff.getStoreRevision(),workRevision+1);
+const beforeShared=reads;await Promise.all([matching.refresh(staffActor),matching.refresh(staffActor)]);
+assert.equal(reads-beforeShared,2,'Concurrent refreshes share one assignments/matching request pair');
+console.log('Polling performance: 20 identical chat, notification and job polls caused zero extra store updates; real unread/job changes were delivered and concurrent job requests were deduplicated.');

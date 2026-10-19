@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { catalogGet } from '@/api/catalog';
 import { catalogDetailView, catalogTemplate } from '@/api/catalog-view';
 import type { CatalogDetail, CatalogPage } from '@/api/catalog-types';
@@ -18,6 +18,13 @@ export function useBookingCatalog() {
     };
     void load(); return () => controller.abort();
   }, [attempt]);
-  const views = state.details.map(catalogDetailView);
-  return { ...state, services: views.map(v => v.service), packages: views.flatMap(v => v.packages), addOns: views.flatMap(v => v.addOns), resolveId: (id?: string) => state.details.find(d => String(d.service.id) === id || catalogTemplate(d.service)?.id === id)?.service.id.toString(), retry: () => setAttempt(x => x + 1) };
+  // Keep derived references stable across parent refreshes so package/extras
+  // calculations can keep their memoized results.
+  const views = useMemo(() => {
+    const details=state.details.map(catalogDetailView);
+    return { services: details.map(v => v.service), packages: details.flatMap(v => v.packages), addOns: details.flatMap(v => v.addOns) };
+  }, [state.details]);
+  const resolveId=useCallback((id?: string) => state.details.find(d => String(d.service.id) === id || catalogTemplate(d.service)?.id === id)?.service.id.toString(), [state.details]);
+  const retry=useCallback(() => setAttempt(x => x + 1), []);
+  return { ...state, ...views, resolveId, retry };
 }

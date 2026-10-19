@@ -13,7 +13,7 @@ export function bookingRetryDraft(booking: ConnectedBooking) {
     date: booking.bookingDate, time: booking.startTime.slice(0, 5),
     durationMinutes: Math.ceil((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 60000),
     extraKeys: [...booking.addOns.map(item => 'addon:' + item.addOnId), ...related.map(id => 'service:' + id)],
-    answers: object(snapshot.answers), configuration,
+    answers: object(snapshot.answers), configuration, quantity: Number(snapshot.quantity || configuration.acQuantity || 1),
     promotionCode: booking.promotionCode || '', notes: booking.notes || '',
     previousStaffId: previous?.staffId || booking.staffId || '',
     previousStaffName: String(booking.staff?.fullName || previous?.staffSnapshot?.fullName || 'Nhân viên đã chọn'),

@@ -50,6 +50,8 @@ export function selectMatchingItems(snapshot: MatchingSnapshot, filter: Matching
   const query = normalizeSearch(filter.query);
   return snapshot.items.filter(item => (item.eligibility.allowed || filter.mode === 'A')
     && (!filter.mode || item.opportunity.mode === filter.mode)
+    && (!filter.serviceId || item.opportunity.serviceId === filter.serviceId)
+    && (!filter.date || localDate(item.opportunity.startsAt) === filter.date)
     && (item.opportunity.mode !== 'A' || item.opportunity.invitedStaffId === snapshot.context.actor.staffId)
     && (!filter.district || filter.district === 'Tất cả' || item.opportunity.district === filter.district)
     && normalizeSearch([item.opportunity.serviceName, item.opportunity.packageTitle, item.opportunity.district, item.opportunity.bookingCode].join(' ')).includes(query))

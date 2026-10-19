@@ -13,14 +13,27 @@ export interface EmailChallenge { challengeId: string; email: string; expiresAt:
 export interface EmailVerified { verificationToken: string; email: string; expiresAt: string }
 export async function identityRequest<T>(path: string, body?: object, token?: string, method = body ? 'POST' : 'GET', signal?: AbortSignal): Promise<T> {
   if (!API_BASE_URL) throw new Error('Chưa cấu hình địa chỉ backend.');
-  let response: Response;
-  try { response = await fetch(`${API_BASE_URL}/api/v1/identity${path}`, {
-    method, signal, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  }); } catch { throw new Error('Không thể kết nối hệ thống. Vui lòng thử lại.'); }
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(error?.detail || 'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  const cancel = () => controller.abort(signal?.reason);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    let response: Response;
+    try { response = await fetch(`${API_BASE_URL}/api/v1/identity${path}`, {
+      method, signal: controller.signal, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    }); } catch { throw new Error('Không thể kết nối hệ thống. Vui lòng thử lại.'); }
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.detail || 'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin.');
+    }
+    return response.status === 204 ? undefined as T : await response.json() as T;
+  } catch (error) {
+    if (controller.signal.aborted && !signal?.aborted) throw new Error('Kết nối quá lâu. Vui lòng thử lại.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', cancel);
   }
-  return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }

@@ -15,9 +15,10 @@ import {
   NativeScrollEvent,
   Modal,
   Alert,
+  AppState,
   LayoutAnimation,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -95,6 +96,7 @@ const HERO_BANNERS = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const isFocused=useIsFocused();
   const { currentCustomer } = useAuth();
   const bookingResource = useCustomerBookings(); const catalog = useBookingCatalog();
   const services = catalog.services;
@@ -127,8 +129,9 @@ export default function HomeScreen() {
 
   // Auto-scroll carousel: Tự chuyển đổi qua lại mượt mà mỗi 3.8s
   useEffect(() => {
+    if(!isFocused) return;
     const timer = setInterval(() => {
-      if (isInteractingRef.current) return;
+      if (isInteractingRef.current || AppState.currentState !== 'active') return;
       const nextIndex = (activeIndexRef.current + 1) % HERO_BANNERS.length;
       bannerScrollRef.current?.scrollTo({
         x: nextIndex * snapInterval,
@@ -138,7 +141,7 @@ export default function HomeScreen() {
     }, 3800);
 
     return () => clearInterval(timer);
-  }, [snapInterval]);
+  }, [snapInterval,isFocused]);
 
   // Address
   const { addresses } = useCustomerAddresses();

@@ -21,8 +21,9 @@ import {
   Easing,
   ActivityIndicator,
   BackHandler,
+  AppState,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect, useIsFocused } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -41,7 +42,10 @@ import { RequireAddressView } from '@/components/booking/RequireAddressView';
 import { operationRequest } from '@/api/operations';
 import { ConnectedBooking, CustomerBookings, bookingView } from '@/data/connectedBookings';
 import { staffView } from '@/hooks/use-booking-detail';
-import { ServiceQuestions } from '@/components/booking/ServiceQuestions';
+import { serviceAnswersIssue } from '@/utils/service-requirements';
+import { serviceSetupSteps } from '@/utils/service-setup';
+import { ServiceSetupWizard } from '@/components/booking/ServiceSetupWizard';
+import { ServiceQuantity, ServiceAnswersSummary } from '@/components/booking/ServiceQuestions';
 import type { Staff, CustomerAddress } from '@/types/user';
 import { BookingMode } from '@/types/booking';
 import { PaymentMethod } from '@/types/payment';
@@ -231,6 +235,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
     rebook?: string;
     addOnIds?: string;
     customConfig?: string;
+    quantity?: string;
     answers?: string;
   }>();
 
@@ -249,12 +254,19 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
   // Step index
   const [currentStep, setCurrentStep] = useState<number>(retry ? 3 : 0);
+  const [serviceSetupIndex,setServiceSetupIndex]=useState(0);
+  const [questionWizardOpen,setQuestionWizardOpen]=useState(false);
+  const [questionIndex,setQuestionIndex]=useState(0);
 
   // Instant & buttery-smooth step transition (eliminates all blinking and delay)
   const triggerStepTransition = (nextStep: number) => {
     if(saving)return;
     setFavouritePending(null);
     if(nextStep>currentStep&&!createdBooking){
+      if ((selectedMode==='MODE_B' && currentStep===0) || (selectedMode==='MODE_A' && currentStep===5)) {
+        const issue = serviceAnswersIssue(serviceDetail?.requirements || [], answers);
+        if(issue){setSubmitError(issue);if(selectedMode==='MODE_A'){setQuestionIndex(0);setQuestionWizardOpen(true);}else{setServiceSetupIndex(0);Alert.alert('Hoàn tất nhu cầu dịch vụ',issue);}return;}
+      }
       if((selectedMode==='MODE_A'&&currentStep>=1)||(selectedMode==='MODE_B'&&currentStep>=3)){
         if(!validateBookingTiming())return;
       }
@@ -275,12 +287,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   const serviceAddOns = useMemo(() => catalog.addOns.filter(p=>p.serviceId===service.id), [catalog.addOns,service.id]);
   const extraOptions = useMemo(() => buildBookingExtras(service, serviceAddOns, catalog.services, catalog.packages), [service,serviceAddOns,catalog.services,catalog.packages]);
   const [availableStaffs, setAvailableStaffs] = useState<Staff[]>([]);
-  const [directory, setDirectory] = useState<Staff[]>([]);
   const [staffLoading,setStaffLoading]=useState(false),[staffError,setStaffError]=useState(''),[staffAttempt,setStaffAttempt]=useState(0);
   const [pickedStaff,setPickedStaff]=useState<Staff>();
   const [serviceFilters,setServiceFilters]=useState<string[]>(retry ? [retry.serviceId] : []);
   const [bookingClock,setBookingClock]=useState(Date.now);
-  useEffect(()=>{const timer=setInterval(()=>setBookingClock(Date.now()),30000);return()=>clearInterval(timer);},[]);
+  useFocusEffect(useCallback(()=>{setBookingClock(Date.now());const timer=setInterval(()=>{if(AppState.currentState==='active')setBookingClock(Date.now());},30000);return()=>clearInterval(timer);},[]));
 
   // Address
   const [selectedAddressId, setSelectedAddressId] = useState<string>(
@@ -314,7 +325,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
     params.staffId || ''
   );
   const selectedStaff =
-    availableStaffs.find((s) => s.id === selectedStaffId) || (pickedStaff?.id === selectedStaffId ? pickedStaff : directory.find(s=>s.id===selectedStaffId));
+    availableStaffs.find((s) => s.id === selectedStaffId) || (pickedStaff?.id === selectedStaffId ? pickedStaff : undefined);
 
   // Service Package & Staff count (Mode B)
   const staffReviewResource=usePublicBookingResource<{id:number;rating:number;comment:string;createdAt:string}[]>('/staff/'+(selectedStaff?.id || '0')+'/reviews', selectedMode==='MODE_A' && currentStep===4 && !!selectedStaff?.id);
@@ -349,7 +360,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   };
   const chooseService = (id: string) => {
     if (id === service.id) return;
-    setSelectedServiceId(id);
+    setSelectedServiceId(id);setUnitQuantity(1);setServiceSetupIndex(0);setQuestionIndex(0);setQuestionWizardOpen(false);
     setSelectedPackageId(getPackagesByServiceId(id)[0]?.id || '');
     // A different primary service must not silently retain/charge unrelated extras.
     setSelectedExtraKeys([]); setAnswers({}); setRequiredStaffCount(getPackagesByServiceId(id)[0]?.defaultStaffCount || 1);setSelectedDurationHours(getPackagesByServiceId(id)[0]?.durationHours || 1);
@@ -383,10 +394,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
   const [radarStatusText, setRadarStatusText] = useState('Đang tìm nhân viên phù hợp năng lực, khu vực và lịch làm việc...');
   // Mode B stays in MATCHING until a staff member accepts it in the staff flow.
-  // The local flag only exposes that state in this prototype preview.
-  const [isModeBStaffAccepted, setIsModeBStaffAccepted] = useState(false);
   const [createdBooking, setCreatedBooking] = useState<ConnectedBooking | null>(null);
-  const modeBMatchedStaff = directory.find(s => s.id === createdBooking?.staffId);
+  const modeBAcceptedStaff = createdBooking?.assignments.filter(item => ['ACCEPTED','COMPLETED'].includes(item.status)) || [];
+  const isModeBStaffAccepted=!!createdBooking && ['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(createdBooking.status) && modeBAcceptedStaff.length >= createdBooking.requiredStaffCount;
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {if(retry)return retry.answers;try {const data=JSON.parse(params.answers || '{}');return data && typeof data==='object' && !Array.isArray(data)?data:{};}catch{return {};}});
   const [quote, setQuote] = useState<{ baseAmount:number; addOnAmount:number; discountAmount:number; totalAmount:number; durationMinutes:number } | null>(null);
   const [quoteResolvedKey, setQuoteResolvedKey] = useState('');
@@ -396,8 +406,12 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   const actualPackage = selectedMode === 'MODE_A' ? packages.find(p => p.durationHours === selectedDurationHours) || selectedPackage : selectedPackage;
   let configuration:Record<string,unknown>=retry?.configuration || {};if(!retry)try{const parsed=JSON.parse(params.customConfig || '{}');if(parsed && typeof parsed==='object' && !Array.isArray(parsed))configuration=parsed;}catch{}
   const configuredServiceId=retry?.serviceId || catalog.resolveId(params.serviceId);
-  const quantity=service.id===configuredServiceId && ['AC_CLEANING','AC_MAINTENANCE'].includes(service.dynamicFieldType || '') ? Number(configuration.acQuantity || 1) : 1;
-  const quoteBody = { quantity,configuration:service.id===configuredServiceId?configuration:{},serviceId:service.id, packageId:actualPackage?.id, requiredStaffCount: selectedMode === 'MODE_A' ? 1 : requiredStaffCount, addOnIds:selectedAddOnIds, relatedServiceIds:selectedRelatedServiceIds, promotionCode:selectedPromoCode, answers };
+  const serviceDetail=catalog.details.find(d=>String(d.service.id)===service.id);
+  const setupSteps=useMemo(()=>serviceDetail?serviceSetupSteps(serviceDetail):[],[serviceDetail]);
+  const questionSteps=useMemo(()=>serviceDetail?serviceSetupSteps(serviceDetail,true):[],[serviceDetail]);
+  const [unitQuantity,setUnitQuantity]=useState(() => Math.max(1, Math.min(100, Math.trunc(Number(params.quantity || retry?.quantity || configuration.acQuantity || 1) || 1))));
+  const quantity=serviceDetail?.service.priceUnit==='ITEM'?unitQuantity:1;
+  const quoteBody = { quantity,configuration:service.id===configuredServiceId?{...configuration,...('acQuantity' in configuration?{acQuantity:quantity}:{})}:{},serviceId:service.id, packageId:actualPackage?.id, requiredStaffCount: selectedMode === 'MODE_A' ? 1 : requiredStaffCount, addOnIds:selectedAddOnIds, relatedServiceIds:selectedRelatedServiceIds, promotionCode:selectedPromoCode, answers };
   const quoteKey = JSON.stringify(quoteBody);
   const startsAt = selectedDateIso+'T'+selectedTimeSlot+':00+07:00';
 
@@ -417,9 +431,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
   const basePricingKey=JSON.stringify({...quoteBody,promotionCode:''});
   useEffect(()=>{setPromotionFailures({});setPromoFeedback('');},[basePricingKey]);
-  const quoteEnabled=!createdBooking && selectedMode!==null && (selectedMode==='MODE_B'||currentStep>=5);
+  const isFocused=useIsFocused();
+  const questionnaireIssue=useMemo(()=>serviceAnswersIssue(serviceDetail?.requirements || [],answers),[serviceDetail,answers]);
+  const quoteEnabled=isFocused && !questionnaireIssue && !createdBooking && selectedMode!==null && (selectedMode==='MODE_B'||currentStep>=5);
   useEffect(() => {
-    if(!quoteEnabled){if(!createdBooking){setQuote(null);setQuoteResolvedKey('');setQuoteLoading(false);}return;}
+    if(!quoteEnabled){if(!createdBooking){setQuote(null);setQuoteResolvedKey('');setQuoteLoading(false);setQuoteError('');}return;}
     const controller=new AbortController(),generation=++pricingGeneration.current;quoteAbort.current=controller;let active=true;
     setQuoteLoading(true);setQuoteError('');
     const timer=setTimeout(()=>{
@@ -433,11 +449,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
         if(selectedPromoCode){setPromotionFailures(previous=>({...previous,[selectedPromoCode]:message}));setPromoFeedback(message);setSelectedPromoCode('');}
         else{setQuote(null);setQuoteResolvedKey('');setQuoteError(message);}
       }).finally(()=>{if(active&&generation===pricingGeneration.current)setQuoteLoading(false);});
-    },180);
+    },350);
     return()=>{active=false;clearTimeout(timer);controller.abort();};
   },[quoteKey,quoteEnabled,pricingAttempt]);
-  const directoryEnabled=selectedMode==='MODE_B'&&!!createdBooking?.staffId;
-  useEffect(() => { if(!directoryEnabled)return;let active=true; void Promise.all([operationRequest<Record<string,unknown>[]>('identity','/staff-directory'),operationRequest<Record<string,unknown>[]>('booking','/public/staff-stats')]).then(([rows,stats])=>{if(active)setDirectory(rows.map(raw=>staffView({...raw,...stats.find(x=>String(x.staffId)===String(raw.id))})));}).catch(e=>{if(active)setSubmitError(e.message)}); return()=>{active=false;}; },[directoryEnabled]);
   const staffSearchMinutes=selectedMode==='MODE_A'&&currentStep<5?discoveryMinutes:quoteReady?quote!.durationMinutes:computedBookingMinutes;
   const searchTimeValid=!customerSlotIssue(startsAt,staffSearchMinutes,bookingClock);
   useEffect(() => {
@@ -454,7 +468,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
       .finally(()=>{if(active)setStaffLoading(false);});
     return()=>{active=false;controller.abort();};
   },[selectedMode,selectedAddressId,startsAt,staffSearchMinutes,staffAttempt,currentStep<3,!!createdBooking,searchTimeValid,serviceFilters]);
-  useEffect(() => { if(!createdBooking || !['PENDING','MATCHING','STAFF_ASSIGNED'].includes(createdBooking.status)) return; let active=true,inFlight=false; const poll=async()=>{if(inFlight)return;inFlight=true;try{const next=await CustomerBookings.detail(createdBooking.id);if(!active)return;setCreatedBooking(next);if(['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(next.status)){if(selectedMode==='MODE_A')setCurrentStep(9);else setIsModeBStaffAccepted(true);}else if(['CANCELLED','NO_STAFF_FOUND','REJECTED'].includes(next.status))setRadarStatusText('Đơn đã kết thúc: '+next.status);}catch(e){if(active)setSubmitError(e instanceof Error?e.message:'Chưa tải được trạng thái đơn.');}finally{inFlight=false;}}; const timer=setInterval(()=>void poll(),4000); return()=>{active=false;clearInterval(timer);}; },[createdBooking?.id,createdBooking?.status,selectedMode]);
+  useEffect(() => { if(!isFocused || !createdBooking || !['PENDING','MATCHING','STAFF_ASSIGNED'].includes(createdBooking.status)) return; let active=true,inFlight=false; const poll=async()=>{if(inFlight || AppState.currentState!=='active')return;inFlight=true;try{const next=await CustomerBookings.detail(createdBooking.id);if(!active)return;setCreatedBooking(next);if(['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(next.status)){if(selectedMode==='MODE_A')setCurrentStep(9);}else if(['CANCELLED','NO_STAFF_FOUND','REJECTED'].includes(next.status))setRadarStatusText('Đơn đã kết thúc: '+next.status);}catch(e){if(active)setSubmitError(e instanceof Error?e.message:'Chưa tải được trạng thái đơn.');}finally{inFlight=false;}}; const timer=setInterval(()=>void poll(),4000); const foreground=AppState.addEventListener('change',state=>{if(state==='active')void poll();}); return()=>{active=false;clearInterval(timer);foreground.remove();}; },[createdBooking?.id,createdBooking?.status,selectedMode,isFocused]);
   const validateBookingTiming = () => {
     if(selectedMode==='MODE_A' && currentStep>=5 && favouriteIssue){setFavouritePending({packageId:actualPackage?.id || '',keys:selectedExtraKeys});return false;}
     const fullSelection = selectedMode === 'MODE_A' ? currentStep >= 5 : currentStep >= 3;
@@ -477,7 +491,10 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
     return true;
   };
   const submitBooking = async () => {
-    if(saving || !validateBookingTiming())return; setSaving(true);setSubmitError('');
+    if(saving || !validateBookingTiming())return;
+    const answerIssue=serviceAnswersIssue(serviceDetail?.requirements || [],answers);
+    if(answerIssue){setSubmitError(answerIssue);Alert.alert('Hoàn tất nhu cầu dịch vụ',answerIssue);return;}
+    setSaving(true);setSubmitError('');
     try { const timeIssue=customerSlotIssue(startsAt,quote?.durationMinutes||actualPackage?.durationMinutes||60);if(timeIssue)throw new Error(timeIssue);
       if(selectedMode==='MODE_A'&&(staffLoading||staffError||!availableStaffs.find(item=>item.id===selectedStaffId)?.eligibleServices?.some(item=>item.id===service.id)))throw new Error(staffError||'Vui lòng kiểm tra lại nhân viên phù hợp trước khi đặt đơn.');
       if(!quote)throw new Error(quoteError || 'Đang chờ báo giá từ backend.');
@@ -490,6 +507,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   const CLEANING_DURATIONS = packages.filter(p=>p.durationMinutes*quantity<=240&&(p.defaultStaffCount||1)===1).map(p=>({hours:p.durationHours,title:p.name,area:p.maxArea || '',unitType:p.recommendedFor || '',desc:p.description,isPopular:false,price:p.price}));
 
   useEffect(() => {
+    if(!isFocused) return;
     // Mode A Step 8: Waiting for staff response
     if (selectedMode === 'MODE_A' && currentStep === 8) {
       Animated.loop(
@@ -579,7 +597,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
         useNativeDriver: true,
       }).start();
     }
-  }, [selectedMode, currentStep]);
+  }, [selectedMode, currentStep,isFocused,isModeBStaffAccepted]);
 
   const basePrice = quoteReady?quote!.baseAmount:(actualPackage?.price||service.basePrice)*quantity*Math.ceil((selectedMode==='MODE_A'?1:requiredStaffCount)/(actualPackage?.defaultStaffCount||1));
   const addOnsTotal = quoteReady?quote!.addOnAmount:extraTotals.selected.reduce((sum,item)=>sum+(item.kind==='ADD_ON'?item.price:catalog.services.find(s=>s.id===item.id)?.basePrice||item.price),0);
@@ -612,6 +630,8 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
   // Back navigation
   const handleBack = () => {
+    if(questionWizardOpen){if(questionIndex>0)setQuestionIndex(questionIndex-1);else setQuestionWizardOpen(false);return;}
+    if(selectedMode==='MODE_B' && currentStep===0 && serviceSetupIndex>0){setServiceSetupIndex(serviceSetupIndex-1);return;}
     if (selectedMode === null) {
       goBack();
       return;
@@ -662,6 +682,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
   // Header with visual step progress bar
   const renderHeader = (title: string, stepCurrent: number, stepTotal: number) => {
+    if(selectedMode==='MODE_B') { stepCurrent=setupSteps.length+stepCurrent-1;stepTotal=setupSteps.length+5; }
     const progressPercent = `${Math.round(((stepCurrent + 1) / stepTotal) * 100)}%`;
     return (
       <View style={styles.headerWrapper}>
@@ -716,6 +737,13 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   // =========================================================================
   // FLOW 0: Screen Chọn cách bắt đầu (Mode A vs Mode B)
   // =========================================================================
+  if(questionWizardOpen && serviceDetail && questionSteps.length>0) {
+    return <ServiceSetupWizard detail={serviceDetail} steps={questionSteps} index={questionIndex}
+      answers={answers} packageId={selectedPackageId} quantity={unitQuantity} staffCount={1}
+      setAnswers={setAnswers} setQuantity={setUnitQuantity} setStaffCount={setRequiredStaffCount} setPackage={setSelectedPackageId}
+      setIndex={setQuestionIndex} back={handleBack} complete={()=>setQuestionWizardOpen(false)} nextSection="Gói dịch vụ và công việc thêm" />;
+  }
+
   if (selectedMode === null) {
     return (
       <LinearGradient
@@ -805,11 +833,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                 <View style={styles.modeTitleRow}>
                   <Text style={styles.modeCardTitle}>Chọn dịch vụ</Text>
                   <View style={styles.modeBadgeModeB}>
-                    <Text style={styles.modeBadgeTextB}>Tự động</Text>
+                    <Text style={styles.modeBadgeTextB}>Đăng việc</Text>
                   </View>
                 </View>
                 <Text style={styles.modeCardSubtitle}>
-                  Chọn gói công việc cần làm, hệ thống tự động ghép nhân viên phù hợp.
+                  Chọn dịch vụ và thời gian. Lịch được lưu, chờ nhân viên phù hợp chủ động nhận việc.
                 </Text>
               </View>
               <IconSymbol name="chevronRight" size={18} color={BrandColors.gray400} />
@@ -1490,7 +1518,13 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                 <ScrollView contentContainerStyle={[styles.stepContent,selectionWarning?{paddingBottom:180}:undefined]} showsVerticalScrollIndicator={false}>
                   <Text style={styles.sectionHeaderTitle}>Dịch vụ nhân viên có thể thực hiện</Text>
                   <View style={styles.skillWrap}>{(pickedStaff?.eligibleServices||selectedStaff.eligibleServices||[]).map(item=><Pressable key={item.id} style={[styles.filterChip,item.id===service.id&&styles.filterChipActive]} onPress={()=>chooseService(item.id)}><Text style={[styles.filterChipText,item.id===service.id&&styles.filterChipTextActive]}>{item.id===service.id?'✓ ':''}{item.name}</Text></Pressable>)}</View>
-                  <ServiceQuestions fields={catalog.details.find(d=>String(d.service.id)===service.id)?.requirements || []} values={answers} change={setAnswers} />
+                  {serviceDetail?.service.priceUnit==='ITEM' && <ServiceQuantity value={unitQuantity} change={setUnitQuantity} />}
+                  {questionSteps.length>0 && <View style={styles.summaryDetailCard}>
+                    <Text style={styles.sectionHeaderTitle}>Yêu cầu riêng cho dịch vụ</Text>
+                    <Text style={styles.stepSubtitleNote}>Chúng tôi sẽ hướng dẫn bạn chọn từng thông tin trên một màn hình riêng.</Text>
+                    <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={()=>{setQuestionIndex(0);setQuestionWizardOpen(true);}}><LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}><Text style={styles.ctaPrimaryText}>{serviceAnswersIssue(serviceDetail?.requirements || [],answers)?'Bắt đầu chọn thông tin →':'Xem lại / Chỉnh sửa thông tin →'}</Text></LinearGradient></Pressable>
+                    {!serviceAnswersIssue(serviceDetail?.requirements || [],answers) && <ServiceAnswersSummary fields={serviceDetail?.requirements || []} values={answers} />}
+                  </View>}
                   {staffLoading&&<Text style={styles.stepSubtitleNote}>Đang kiểm tra lại toàn bộ thời lượng…</Text>}
                   {/* Duration selection */}
                   <Text style={styles.sectionHeaderTitle}>Gói dịch vụ & Thời lượng</Text>
@@ -1634,6 +1668,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                   </View>
 
                   {/* Integrated Voucher Section */}
+                  <ServiceAnswersSummary fields={serviceDetail?.requirements || []} values={answers} />
                   {renderVoucherSectionInSummary()}
 
                   {/* Price Breakdown with realtime discount */}
@@ -1890,101 +1925,12 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   // =========================================================================
   if (selectedMode === 'MODE_B') {
     // ---------------- STEP 0: GÓI DIỆN TÍCH & SỐ LƯỢNG NHÂN VIÊN (Mode B) ----------------
-    if (currentStep === 0) {
-      return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
-          <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {renderHeader('Gói diện tích & Số lượng', 0, 8)}
-            {renderAnimatedStep(
-              <View style={styles.stepContainer}>
-                <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
-                  {/* Selected service banner */}
-                  <View style={styles.selectedServiceHeaderCard}>
-                    <Image source={remoteImageSource(service.image)} style={styles.selectedServiceHeaderImg} />
-                    <View style={styles.selectedServiceHeaderMeta}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.selectedServiceHeaderName}>{service.name}</Text>
-                        <Badge label="Dịch vụ đã chọn" variant="success" size="sm" />
-                      </View>
-                      <Text style={styles.selectedServiceHeaderPrice}>
-                        Giá từ {formatVND(service.basePrice)} / {service.unit}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.sectionHeaderTitle}>Chọn gói diện tích</Text>
-                  <ServiceQuestions fields={catalog.details.find(d=>String(d.service.id)===service.id)?.requirements || []} values={answers} change={setAnswers} />
-                  {packages.map((pkg) => {
-                    const isSelected = pkg.id === selectedPackageId;
-                    return (
-                      <Pressable
-                        key={pkg.id}
-                        style={[styles.packageCard, isSelected && styles.packageCardSelected]}
-                        onPress={() => setSelectedPackageId(pkg.id)}>
-                        <View style={styles.packageCardLeft}>
-                          <Text style={styles.packageName}>{pkg.name}</Text>
-                          <Text style={styles.packageDuration}>
-                            Thời lượng: {pkg.durationHours} giờ ({pkg.maxArea || 'Tiêu chuẩn'})
-                          </Text>
-                        </View>
-                        <View style={styles.packageCardRight}>
-                          <Text style={styles.packagePrice}>{formatVND(pkg.price)}</Text>
-                          <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                            {isSelected && <View style={styles.radioInnerDot} />}
-                          </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-
-                  {/* Staff count stepper */}
-                  <Text style={[styles.sectionHeaderTitle, { marginTop: Spacing.four }]}>Số lượng nhân viên</Text>
-                  <View style={styles.stepperCard}>
-                    <View style={styles.stepperHeaderBadge}>
-                      <IconSymbol name="users" size={18} color={BrandColors.primary} />
-                      <Text style={styles.stepperLabel}>Số người thực hiện</Text>
-                    </View>
-                    <View style={styles.stepperControlRow}>
-                      <Pressable
-                        style={[styles.stepperBtn, requiredStaffCount <= 1 && styles.stepperBtnDisabled]}
-                        onPress={() => setRequiredStaffCount(Math.max(1, requiredStaffCount - 1))}
-                        hitSlop={8}>
-                        <IconSymbol name="minus" size={18} color={BrandColors.primary} />
-                      </Pressable>
-                      <Text style={styles.stepperValue}>{requiredStaffCount} người</Text>
-                      <Pressable
-                        style={styles.stepperBtn}
-                        onPress={() => setRequiredStaffCount(requiredStaffCount + 1)}
-                        hitSlop={8}>
-                        <IconSymbol name="plus" size={18} color={BrandColors.primary} />
-                      </Pressable>
-                    </View>
-                  </View>
-
-                  <View style={styles.recommendationBox}>
-                    <Text style={styles.recommendationText}>
-                      💡 1 nhân viên phù hợp tối ưu với căn hộ dưới 55m². Thêm nhân viên giúp hoàn thành ca nhanh gấp đôi.
-                    </Text>
-                  </View>
-                </ScrollView>
-
-                {/* USER CONSTRAINT: Step 2 is Add-on, right after package & staff count */}
-                <View style={styles.bottomBar}>
-                  <Pressable
-                    style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(1)}>
-                    <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
-                      <Text style={styles.ctaPrimaryText}>Tiếp tục (Chọn Add-on)</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-          </SafeAreaView>
-        </LinearGradient>
-      );
+    if (currentStep === 0 && serviceDetail) {
+      return <ServiceSetupWizard detail={serviceDetail} steps={setupSteps} index={serviceSetupIndex} totalSteps={setupSteps.length+5}
+        answers={answers} packageId={selectedPackageId} quantity={unitQuantity} staffCount={requiredStaffCount}
+        setAnswers={setAnswers} setQuantity={setUnitQuantity} setStaffCount={setRequiredStaffCount}
+        setPackage={id=>{setSelectedPackageId(id);const pack=packages.find(item=>item.id===id);setRequiredStaffCount(count=>Math.max(count,pack?.defaultStaffCount || 1));}}
+        setIndex={setServiceSetupIndex} back={handleBack} complete={()=>triggerStepTransition(1)} nextSection="Dịch vụ bổ sung" />;
     }
 
     // ---------------- STEP 1: DỊCH VỤ BỔ SUNG (ADD-ON) (Mode B) ----------------
@@ -2246,7 +2192,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                     <View style={styles.summaryStaffMeta}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.summaryStaffName}>{service.name}</Text>
-                        <Badge label="Hệ thống điều phối" variant="primary" size="sm" />
+                        <Badge label="Chờ nhân viên nhận" variant="primary" size="sm" />
                       </View>
                       <Text style={styles.summaryStaffSub}>
                         {selectedPackage.name} • {requiredStaffCount} nhân viên
@@ -2270,21 +2216,16 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                   </View>
 
                   {/* Integrated Voucher Section */}
+                  <ServiceAnswersSummary fields={serviceDetail?.requirements || []} values={answers} />
                   {renderVoucherSectionInSummary()}
 
                   {/* Price Breakdown */}
                   <View style={styles.priceBreakdownCard}>
                     <Text style={styles.priceBreakdownTitle}>Chi tiết thanh toán</Text>
                     <View style={styles.priceRow}>
-                      <Text style={styles.priceKey}>Gói {selectedPackage.name}</Text>
-                      <Text style={styles.priceVal}>{formatVND(selectedPackage.price)}</Text>
+                      <Text style={styles.priceKey}>Gói {selectedPackage.name} × {quantity} • {requiredStaffCount} nhân viên</Text>
+                      <Text style={styles.priceVal}>{quoteReady ? formatVND(basePrice) : 'Chờ báo giá'}</Text>
                     </View>
-                    {requiredStaffCount > 1 && (
-                      <View style={styles.priceRow}>
-                        <Text style={styles.priceKey}>Thêm nhân viên (+{requiredStaffCount - 1} người)</Text>
-                        <Text style={styles.priceVal}>+{formatVND((requiredStaffCount - 1) * 150000)}</Text>
-                      </View>
-                    )}
                     {addOnsTotal > 0 && (
                       <View style={styles.priceRow}>
                         <Text style={styles.priceKey}>Dịch vụ bổ sung ({selectedAddOnIds.length})</Text>
@@ -2433,10 +2374,10 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(6)}>
+                    disabled={saving || !quoteReady || quoteLoading} onPress={() => void submitBooking()}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>
-                        Xác nhận & Tìm nhân viên ({quote ? formatVND(totalAmount) : 'Chờ báo giá'})
+                        {saving ? 'Đang lưu lịch...' : 'Xác nhận & Đăng việc ('+(quoteReady ? formatVND(totalAmount) : 'Chờ báo giá')+')'}
                       </Text>
                     </LinearGradient>
                   </Pressable>
@@ -2450,7 +2391,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
     // ---------------- STEP 6: RADAR TÌM KIẾM NHÂN VIÊN (Mode B) ----------------
     if (currentStep === 6) {
-      if (isModeBStaffAccepted && modeBMatchedStaff) {
+      if (isModeBStaffAccepted) {
         return (
           <LinearGradient
             colors={BrandColors.softBgGradient}
@@ -2474,18 +2415,16 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                       <Text style={styles.matchedStaffVerifiedText}>Đã xác minh</Text>
                     </View>
                   </View>
-                  <View style={styles.matchedStaffProfile}>
-                    <Image source={remoteImageSource(modeBMatchedStaff.avatar)} style={styles.matchedStaffAvatar} />
-                    <View style={styles.matchedStaffInfo}>
-                      <Text style={styles.matchedStaffName}>{modeBMatchedStaff.fullName}</Text>
-                      <Text style={styles.matchedStaffMeta}>
-                        {modeBMatchedStaff.rating.toFixed(1)}★ • {modeBMatchedStaff.reviewCount} lượt đánh giá
-                      </Text>
-                      <Text style={styles.matchedStaffMeta}>
-                        Hoàn thành {modeBMatchedStaff.completionRate}% đơn hàng
-                      </Text>
-                    </View>
-                  </View>
+                  {modeBAcceptedStaff.map(assignment => {
+                    const staff=assignment.staffSnapshot || {};
+                    return <View key={assignment.staffId} style={styles.matchedStaffProfile}>
+                      <Image source={remoteImageSource(String(staff.avatar || ''))} style={styles.matchedStaffAvatar} />
+                      <View style={styles.matchedStaffInfo}>
+                        <Text style={styles.matchedStaffName}>{String(staff.fullName || 'Nhân viên #'+assignment.staffId)}</Text>
+                        {typeof staff.reviewCount === 'number' && <Text style={styles.matchedStaffMeta}>{staff.reviewCount} lượt đánh giá</Text>}
+                      </View>
+                    </View>;
+                  })}
                 </View>
 
                 <View style={styles.matchBookingCard}>
@@ -2555,7 +2494,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                 </LinearGradient>
               </View>
 
-              <Text style={styles.radarTitle}>ĐANG TÌM KIẾM NHÂN VIÊN</Text>
+              <Text style={styles.radarTitle}>{createdBooking && ['CANCELLED','NO_STAFF_FOUND','REJECTED','REFUNDED'].includes(createdBooking.status) ? 'LỊCH ĐÃ KẾT THÚC' : 'ĐANG CHỜ NHÂN VIÊN NHẬN LỊCH'}</Text>
               <Text style={styles.radarStatusText}>{radarStatusText}</Text>
 
               <View style={styles.radarInfoBox}>
@@ -2579,13 +2518,15 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                 </Text>
               </View>
 
-              {__DEV__ && (
-                <Pressable
-                  style={styles.matchPreviewButton}
-                  onPress={() => setIsModeBStaffAccepted(true)}>
-                  <Text style={styles.matchPreviewButtonText}>Xem trước khi nhân viên nhận đơn</Text>
+              {createdBooking && <>
+                <Text style={styles.radarNoteText}>Đã lưu lịch {createdBooking.bookingCode} • Đã nhận {modeBAcceptedStaff.length}/{createdBooking.requiredStaffCount} nhân viên</Text>
+                <Pressable style={styles.matchPreviewButton} onPress={() => router.replace(('/booking/'+createdBooking.id) as never)}>
+                  <Text style={styles.matchPreviewButtonText}>Xem lịch đã đặt</Text>
                 </Pressable>
-              )}
+                <Pressable style={styles.matchPreviewButton} onPress={() => router.replace('/(tabs)')}>
+                  <Text style={styles.matchPreviewButtonText}>Về trang chủ — lịch vẫn chờ nhân viên nhận</Text>
+                </Pressable>
+              </>}
             </View>
           </SafeAreaView>
         </LinearGradient>

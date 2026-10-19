@@ -32,7 +32,7 @@ export function StaffMatchingList({ matching, filter = DEFAULT_MATCH_FILTER, lim
   if (status === 'ERROR' || !data) return <EmptyState icon="warning" title="Chưa tải được việc phù hợp" description={matching.error} actionText="Thử lại" onAction={retry} />;
   const items = selectMatchingItems(data, filter);
   const noInvitations = filter.mode === 'A' && !data.items.some(item => item.opportunity.mode === 'A');
-  const kind = matchingEmptyKind(data, !!filter.query || filter.district !== 'Tất cả');
+  const kind = matchingEmptyKind(data, !!filter.query || filter.district !== 'Tất cả' || !!filter.serviceId || !!filter.date);
   const empty = {
     INACTIVE: ['Tài khoản chưa được nhận việc', 'Liên hệ người phụ trách hồ sơ để kiểm tra trạng thái.', 'Xem hồ sơ'],
     OFFLINE: ['Bạn đang tạm nghỉ', 'Bật nhận việc để xem ca phù hợp. Ca đã nhận vẫn có trong tab Sắp tới.', 'Bật nhận việc'],

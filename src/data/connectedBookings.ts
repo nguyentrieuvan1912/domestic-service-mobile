@@ -2,7 +2,7 @@ import { operationRequest, operationSession, subscribeSession } from '@/api/oper
 import type { Booking } from '@/types/booking';
 import type { Service } from '@/types/service';
 import type { Staff, CustomerAddress } from '@/types/user';
-export interface ConnectedBooking extends Booking { serverNow?: string; staffResponseDeadline?: string; staffWaitState?: 'WAITING' | 'EXPIRED' | 'CLOSED'; staffWaitRound?: number; staff?: Record<string,unknown>; service: { image?: string; name?: string; serviceName?: string; packageName?: string; answers?: Record<string, unknown> }; address: CustomerAddress; assignments: { staffId: string; status: string; executionStatus: string; staffSnapshot?: Record<string,unknown> }[]; startsAt: string; endsAt: string; paymentStatus: string; paymentMethod: string }
+export interface ConnectedBooking extends Booking { serverNow?: string; staffResponseDeadline?: string; staffWaitState?: 'WAITING' | 'EXPIRED' | 'CLOSED'; staffWaitRound?: number; staff?: Record<string,unknown>; service: { image?: string; name?: string; serviceName?: string; packageName?: string; answers?: Record<string, unknown>; answerLabels?: Record<string,string>; configuration?: Record<string,unknown>; configurationLabels?: Record<string,string>; quantity?: number }; address: CustomerAddress; assignments: { staffId: string; status: string; executionStatus: string; staffSnapshot?: Record<string,unknown> }[]; startsAt: string; endsAt: string; paymentStatus: string; paymentMethod: string }
 let items: ConnectedBooking[] = [], owner = '', readEpoch = 0;
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach(listener => { try { listener(); } catch { /* A login change can unmount a subscriber. */ } }); }

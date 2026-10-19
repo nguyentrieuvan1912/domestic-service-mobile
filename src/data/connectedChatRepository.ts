@@ -1,4 +1,5 @@
 import { operationRequest, operationSession, subscribeSession } from '@/api/operations';
+import { reuseSnapshot } from '@/utils/stable-snapshot';
 import type { User } from '@/types/user';
 import type { ChatMessage, Conversation } from '@/types/chat';
 import type { ChatActor } from './chatPolicy';
@@ -33,7 +34,9 @@ export const ChatRepository = {
     const task = (async () => { try {
       const data = await operationRequest<Record<string, unknown>[]>('booking', '/conversations');
       if (active.token !== operationSession()?.token || epoch !== readEpoch) return;
-      conversations = data.map(item => ({ ...item, id: String(item.id), bookingId: String(item.bookingId), customerId: String(item.customerId), staffId: String(item.staffId) } as LiveConversation)); error = ''; notify();
+      const next=reuseSnapshot(conversations,data.map(item => ({ ...item, id: String(item.id), bookingId: String(item.bookingId), customerId: String(item.customerId), staffId: String(item.staffId) } as LiveConversation)));
+      const changed=next !== conversations || !!error;
+      conversations=next; error = ''; if(changed) notify();
     } catch (cause) { if (active.token === operationSession()?.token) { error = cause instanceof Error ? cause.message : 'Chưa tải được hội thoại.'; notify(); } throw cause; } })();
     loading = task; try { await task; } finally { if (loading === task) loading = null; }
   },

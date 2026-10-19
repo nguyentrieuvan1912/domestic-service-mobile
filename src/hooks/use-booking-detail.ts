@@ -1,6 +1,7 @@
 import { staffRating } from '@/utils/staff-profile';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { AppState } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { CustomerBookings, ConnectedBooking } from '@/data/connectedBookings';
 import { operationRequest } from '@/api/operations';
@@ -16,19 +17,25 @@ export function useBookingDetail(id: string | undefined) {
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ owner?: string; booking?: ConnectedBooking; staff?: Staff; invoice?: StoredInvoice; error: string; loading: boolean }>({ error: '', loading: true });
   useFocusEffect(useCallback(() => {
-    let active = true;
+    let active = true, inFlight=false;
     if (!owner || !id || !/^\d+$/.test(id)) { setState({ owner, error: 'Vui lòng đăng nhập và mở một đơn hàng hợp lệ.', loading: false }); return; }
     const load = async () => {
+      if(inFlight || !active || AppState.currentState !== 'active') return;
+      inFlight=true;
       try {
         const booking = await CustomerBookings.detail(id);
-        const [directory, invoices] = await Promise.all([operationRequest<Record<string, unknown>[]>('identity', '/staff-directory'), operationRequest<StoredInvoice[]>('finance', '/invoices')]);
+        // Accepted bookings already carry the persisted staff snapshot.
+        const needsDirectory=!!booking.staffId && !booking.staff?.fullName;
+        const [directory, invoices] = await Promise.all([needsDirectory ? operationRequest<Record<string, unknown>[]>('identity', '/staff-directory') : Promise.resolve([]), operationRequest<StoredInvoice[]>('finance', '/invoices')]);
         if (!active) return;
         const selected = booking.staff && booking.staff.fullName ? booking.staff : directory.find(s => String(s.id) === booking.staffId);
         setState({ owner, booking, staff: selected ? staffView(selected) : undefined, invoice: invoices.find(i => String(i.bookingId) === id), error: '', loading: false });
       } catch (error) { if (active) setState({ owner, error: error instanceof Error ? error.message : 'Chưa tải được đơn hàng.', loading: false }); }
+      finally { inFlight=false; }
     };
     void load(); const timer = setInterval(() => void load(), 5000);
-    return () => { active = false; clearInterval(timer); };
+    const foreground=AppState.addEventListener('change',state=>{if(state==='active')void load();});
+    return () => { active = false; clearInterval(timer); foreground.remove(); };
   }, [id, owner, attempt]));
   return { ...(state.owner === owner ? state : { error: '', loading: !!owner }), retry: () => setAttempt(x => x + 1) };
 }

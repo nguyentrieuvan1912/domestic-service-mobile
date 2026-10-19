@@ -40,7 +40,7 @@ function StaffDashboardContent() {
   const { unreadCount } = useNotifications();
   const matching = useStaffMatching();
   const [matchFilter, setMatchFilter] = useState(DEFAULT_MATCH_FILTER);
-  const [matchMode, setMatchMode] = useState<'A' | 'B'>('A');
+  const [matchMode, setMatchMode] = useState<'A' | 'B'>('B');
   const counts = matchingModeCounts(matching.data);
   const matchCount = counts[matchMode];
   const staffId = currentStaff?.id || '';
@@ -237,7 +237,7 @@ function StaffDashboardContent() {
             <MatchingModePicker value={matchMode} onChange={setMatchMode} invitations={counts.A} open={counts.B} />
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Việc phù hợp</Text>
+                <Text style={styles.sectionTitle}>Tìm việc phù hợp</Text>
                 <Text style={styles.sectionSubtitle}>
                   Theo năng lực, khu vực và lịch đã lưu
                 </Text>

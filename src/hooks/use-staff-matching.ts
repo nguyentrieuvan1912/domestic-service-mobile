@@ -11,19 +11,18 @@ export function useStaffMatching() {
   const actor = useMemo(() => getCapabilityActor(currentUser, currentStaff), [currentUser, currentStaff]);
   const key = actor ? `${actor.userId}:${actor.staffId}` : '';
   const [attempt, setAttempt] = useState(0);
-  const [clock, setClock] = useState(Date.now);
-  const subscribe = useCallback((listener: () => void) => StaffRepository.subscribe(() => { setClock(Date.now()); listener(); }), []);
-  const revision = useSyncExternalStore(subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
+  const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
   const [state, setState] = useState<{ key: string; status: 'LOADING' | 'READY' | 'ERROR'; error?: string }>({ key: '', status: 'LOADING' });
   const query = useMemo(() => ({ actor, key, attempt }), [actor, key, attempt]);
   useFocusEffect(useCallback(() => {
     if (!query.actor) return;
     const controller = new AbortController();
-    const refresh = () => { if (!controller.signal.aborted && AppState.currentState !== 'background') void StaffMatchingRepository.refresh(query.actor!, controller.signal).catch(() => {}); };
+    let ready=false;
+    const refresh = () => { if (ready && !controller.signal.aborted && AppState.currentState === 'active') void StaffMatchingRepository.refresh(query.actor!, controller.signal).catch(() => {}); };
     const timer = setInterval(refresh, 5000);
     const foreground = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
     void StaffMatchingRepository.load(query.actor, controller.signal).then(() => {
-      if (!controller.signal.aborted) { setClock(Date.now()); setState({ key: query.key, status: 'READY' }); }
+      if (!controller.signal.aborted) { ready=true; setState({ key: query.key, status: 'READY' }); }
     }).catch((error: unknown) => {
       if (!controller.signal.aborted) setState({ key: query.key, status: 'ERROR', error: error instanceof Error ? error.message : 'Chưa tải được việc phù hợp.' });
     });
@@ -31,7 +30,7 @@ export function useStaffMatching() {
   }, [query]));
   const scoped = state.key === key ? state : { key, status: 'LOADING' as const };
   const data = useMemo(() => actor && scoped.status === 'READY'
-    ? { ...StaffMatchingRepository.read(actor, clock), revision } : undefined, [actor, scoped.status, clock, revision]);
+    ? { ...StaffMatchingRepository.read(actor), revision } : undefined, [actor, scoped.status, revision]);
   const retry = () => { setState({ key, status: 'LOADING' }); setAttempt(value => value + 1); };
   return { actor, ...scoped, data, retry };
 }

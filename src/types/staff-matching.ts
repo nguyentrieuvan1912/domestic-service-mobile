@@ -28,4 +28,4 @@ export interface MatchingOpportunity {
 export interface MatchItem { opportunity: MatchingOpportunity; eligibility: MatchEligibility }
 export interface MatchingSnapshot { context: MatchContext; items: MatchItem[]; checkedAt: string; revision: number }
 export type MatchingSort = 'START_TIME' | 'INCOME';
-export interface MatchingFilter { query: string; district: string; sort: MatchingSort; mode?: 'A' | 'B' }
+export interface MatchingFilter { query: string; district: string; sort: MatchingSort; mode?: 'A' | 'B'; serviceId?: string; date?: string }

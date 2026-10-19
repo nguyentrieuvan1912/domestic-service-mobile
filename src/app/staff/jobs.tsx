@@ -18,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
 import { selectMatchingItems } from '@/data/staffMatchingRules';
-import { STAFF_AREA_OPTIONS } from '@/data/staffAreas';
+import { localDate } from '@/data/staffAvailabilityRules';
 import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
 import { EmptyState } from '@/components/common/EmptyState';
 import { MatchingModePicker, matchingModeCounts } from '@/components/staff/MatchingModePicker';
@@ -35,9 +35,9 @@ function StaffJobsContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; source?: string }>();
   const { currentStaff } = useAuth();
-  const staffId = currentStaff?.id || 'staff-001';
+  const staffId = currentStaff!.id;
   const matching = useStaffMatching();
-  const [matchMode, setMatchMode] = useState<'A' | 'B'>(params.source === 'B' ? 'B' : 'A');
+  const [matchMode, setMatchMode] = useState<'A' | 'B'>(params.source === 'A' ? 'A' : 'B');
   const counts = matchingModeCounts(matching.data);
   const [sort, setSort] = useState(DEFAULT_MATCH_FILTER.sort);
   const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
@@ -48,6 +48,8 @@ function StaffJobsContent() {
   const [searchQuery, setSearchQuery] = useState('');
   useEffect(() => { if (params.tab === 'open') setActiveTab('open'); if (params.source === 'A' || params.source === 'B') setMatchMode(params.source); }, [params.tab, params.source]);
   const [selectedDistrict, setSelectedDistrict] = useState('Tất cả');
+  const [selectedService, setSelectedService] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
 
   const [jobs, setJobs] = useState<StaffJobItem[]>([]);
 
@@ -67,7 +69,10 @@ function StaffJobsContent() {
 
   const currentList = activeTab === 'upcoming' ? upcomingList : completedList;
 
-  const districts = ['Tất cả', ...STAFF_AREA_OPTIONS.map(area => area.name)];
+  const opportunities = (matching.data?.items || []).filter(item => item.opportunity.mode === matchMode).map(item => item.opportunity);
+  const districts = ['Tất cả', ...new Set([...opportunities.map(item => item.district), ...currentList.map(item => item.district)].filter(Boolean))];
+  const services = [...new Map(opportunities.map(item => [item.serviceId, item.serviceName])).entries()];
+  const dates = [...new Set(opportunities.map(item => localDate(item.startsAt)))].sort();
 
   const filteredList = currentList.filter((item) => {
     const matchSearch =
@@ -189,14 +194,23 @@ function StaffJobsContent() {
           </ScrollView>
         </View>
 
-        {activeTab === 'open' && <View style={{ padding: Spacing.two }}><MatchingSortPicker value={sort} onChange={setSort} /></View>}
+        {activeTab === 'open' && <View style={{ padding: Spacing.two, gap: 8 }}>
+          <Text style={{ color: BrandColors.gray500 }}>Việc đã lọc theo năng lực được duyệt, khu vực và lịch làm đã đăng ký của bạn.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {[['', 'Mọi dịch vụ'], ...services].map(([id, name]) => <Pressable key={id} style={[styles.chip, selectedService === id && styles.chipActive]} onPress={() => setSelectedService(id)}><Text style={styles.chipText}>{name}</Text></Pressable>)}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {['', ...dates].map(date => <Pressable key={date} style={[styles.chip, selectedDate === date && styles.chipActive]} onPress={() => setSelectedDate(date)}><Text style={styles.chipText}>{date ? date.split('-').reverse().join('/') : 'Mọi ngày'}</Text></Pressable>)}
+          </ScrollView>
+          <MatchingSortPicker value={sort} onChange={setSort} />
+        </View>}
         {/* List of Shifts */}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         >
-          {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort, mode: matchMode }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
+          {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort, mode: matchMode, serviceId: selectedService, date: selectedDate }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); setSelectedService(''); setSelectedDate(''); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol name="calendar" size={44} color={BrandColors.gray300} />
               <Text style={styles.emptyTitle}>Không có ca làm việc nào</Text>

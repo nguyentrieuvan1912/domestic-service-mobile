@@ -1,4 +1,5 @@
 import { identityRequest } from '@/api/identity';
+import { reuseSnapshot } from '@/utils/stable-snapshot';
 import type { AppNotification } from '@/types/notification';
 import { getNotificationTarget } from './notificationAdapter';
 import type { NotificationActor } from './notificationAdapter';
@@ -38,7 +39,10 @@ export const NotificationRepository = {
     const active = authenticate(actor);
     const raw = await identityRequest<(Omit<AppNotification, 'id' | 'userId' | 'referenceId'> & { id: number; userId: number; referenceId: number | null })[]>('/notifications', undefined, active.token, 'GET', signal);
     const data: AppNotification[] = raw.map(item => ({ ...item, id: String(item.id), userId: String(item.userId), referenceId: item.referenceId == null ? undefined : String(item.referenceId) }));
-    if (!signal?.aborted && active === session) { items = Object.freeze(data.map(item => Object.freeze(item))); changed(); }
+    if (!signal?.aborted && active === session) {
+      const next=reuseSnapshot(items,Object.freeze(data.map(item => Object.freeze(item))));
+      if(next !== items){items=next;changed();}
+    }
     return data;
   },
   async markRead(actor: NotificationActor, id?: string, signal?: AbortSignal) {

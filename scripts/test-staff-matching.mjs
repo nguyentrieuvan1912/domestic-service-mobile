@@ -189,3 +189,8 @@ assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'A'}).map(ite
 assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'B'}).map(item=>item.opportunity.id),['b']);
 assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'A',query:'không có'}),[]);
 console.log('Matching modes: own invitations counted even while ineligible; foreign invitations excluded; open jobs require eligibility; search remains scoped.');
+splitSnapshot.items.find(item=>item.opportunity.id==='b').opportunity.serviceId='7';
+assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'B',serviceId:'7',date:'2026-10-16'}).map(item=>item.opportunity.id),['b']);
+assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'B',serviceId:'8'}),[]);
+assert.deepEqual(selectMatchingItems(splitSnapshot,{...filter,mode:'B',date:'2026-10-17'}),[]);
+console.log('Job search: exact service and local work-date filters passed.');
