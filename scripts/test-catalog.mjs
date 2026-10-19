@@ -20,7 +20,7 @@ const controller = new AbortController();
 const payload = { service: { id: 2, name: 'Vệ sinh nhà theo giờ' } };
 global.fetch = async (url, options) => {
   assert.equal(url, 'http://10.0.2.2:8080/api/v1/catalog/services/2');
-  assert.equal(options.signal, controller.signal);
+  assert.equal(options.signal.aborted, false);
   return { ok: true, json: async () => payload };
 };
 assert.deepEqual(await catalogGet('/services/2', controller.signal), payload);

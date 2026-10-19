@@ -1,5 +1,6 @@
 import { STAFF_AREA_OPTIONS, areaNamesForIds } from './staffAreas';
 import { reuseSnapshot } from '@/utils/stable-snapshot';
+import { saveAvailabilityWithReadback } from '@/utils/availability-save';
 import { displayTime, localDate } from './staffAvailabilityRules';
 import { ChatRepository } from './connectedChatRepository';
 import { loadHcmAdministrativeUnits } from '@/api/administrative-units';
@@ -162,7 +163,15 @@ export const StaffRepository = {
   },
   async toggleChecklistItem(staff: string, id: string, checkId: string) { assertStaff(staff); try { const assignment = assignmentView(await operationRequest<Record<string, unknown>>('booking', '/staff/assignments/' + id + '/checklist', 'PATCH', { id: checkId, done: !assignments.find(a=>a.id===id)?.checklist?.find(c=>c.id===checkId)?.done })); assignments = assignments.map(a => a.id === id ? assignment : a); notify(); return { success: true, assignment }; } catch { return { success: false }; } },
   async setOnline(staff: string, isOnline: boolean) { const active = assertStaff(staff); const profile = await operationRequest<typeof active.profile>('identity', '/staff/status', 'PATCH', { isOnline }); if (active.token === operationSession()?.token) { active.profile = profile; notify(); await refreshAfterWrite(); } },
-  async saveSchedule(staff: string, draft: AvailabilityDraft, version: number) { const active = assertStaff(staff); const saved = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...draft, areaIds: draft.areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id), revision: version }); if (active.token !== operationSession()?.token) throw new Error('Phiên đăng nhập đã thay đổi.'); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule; },
+  async saveSchedule(staff: string, draft: AvailabilityDraft, version: number) {
+    const active = assertStaff(staff);
+    const payload = { ...draft, areaIds: draft.areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id) };
+    const sameSession = () => { if (active.token !== operationSession()?.token) throw new Error('Phiên đăng nhập đã thay đổi.'); };
+    const saved = await saveAvailabilityWithReadback(payload, version,
+      () => operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...payload, revision: version }),
+      async () => { sameSession(); const actual = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability'); sameSession(); return actual; });
+    sameSession(); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule;
+  },
   async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank || bank.includes(item.bankCode) && bank.includes(item.accountNumber.slice(-4))); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
   async addBank(staff: string, bankCode: string, accountNumber: string, accountHolder: string) { assertStaff(staff); await operationRequest('finance', '/staff/me/bank-accounts', 'POST', { bankCode, accountNumber, accountHolder }); await refreshAfterWrite(); },
   async reportIssue(staff: string, id: string, reason: string) { assertStaff(staff); return operationRequest('booking', '/bookings/' + id + '/incidents', 'POST', { reason }); },

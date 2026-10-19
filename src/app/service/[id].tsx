@@ -235,7 +235,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
             <View style={styles.reqBlock}>
               <Text style={styles.fieldLabel}>Khu vực cung cấp dịch vụ</Text>
               <Text style={styles.reqText}>
-                📍 {service.supportedAreas?.join(' • ') || 'Nội thành TP. Hồ Chí Minh & Hà Nội'}
+                📍 TP. Hồ Chí Minh
               </Text>
 
               <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Yêu cầu đối với khách hàng</Text>

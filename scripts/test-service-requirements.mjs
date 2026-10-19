@@ -42,3 +42,13 @@ assert.match(serviceSetupIssue(steps[4],detail,{...selection,quantity:1.5}),/s�
 assert.match(serviceSetupIssue(steps[5],detail,{...selection,staffCount:1}),/nhân viên/);
 assert.equal(serviceSetupIssue(steps[5],detail,selection),'');
 console.log('Guided service setup: ordered single-question screens, current-step gating, optional skip, boolean false, package ownership, quantity duration and required staffing passed.');
+
+const {minimumStaffForArea}=require('../src/utils/service-setup.ts');
+const areaDetail={...detail,packages:[{id:10,defaultStaffCount:2,durationMinutes:120,maxArea:80}]};
+assert.equal(minimumStaffForArea(areaDetail,'10',{areaM2:80},1),2);
+assert.equal(minimumStaffForArea(areaDetail,'10',{areaM2:81},1),4);
+assert.equal(minimumStaffForArea(areaDetail,'10',{areaM2:160},2),2);
+assert.match(serviceSetupIssue({kind:'STAFF',key:'staff',title:''},areaDetail,{...selection,answers:{areaM2:160},staffCount:3}),/ít nhất 4/);
+assert.equal(minimumStaffForArea({...areaDetail,packages:[{...areaDetail.packages[0],maxArea:0.29}]},'10',{areaM2:29},100),2,'Decimal capacity at an exact boundary must not add an unnecessary team');
+assert.equal(minimumStaffForArea(areaDetail,'10',{areaM2:'bad'},1),2);
+console.log('Area staffing: whole-team coverage, quantity scaling, manual under-staff rejection and decimal boundary passed.');

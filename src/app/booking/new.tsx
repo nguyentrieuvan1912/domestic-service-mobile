@@ -37,6 +37,8 @@ import { BookingTimingPopup } from '@/components/booking/BookingTimingPopup';
 import { bookingTimingNotice, type BookingTimingNotice } from '@/utils/booking-timing-notice';
 import { buildBookingExtras, getExtraTotals, toggleBookingExtra } from '@/utils/booking-extras';
 import { useBookingCatalog } from '@/hooks/use-booking-catalog';
+import { useBookingResume } from '@/hooks/use-booking-resume';
+import { retryBookingRead } from '@/utils/booking-read';
 import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
 import { RequireAddressView } from '@/components/booking/RequireAddressView';
 import { operationRequest } from '@/api/operations';
@@ -45,6 +47,10 @@ import { staffView } from '@/hooks/use-booking-detail';
 import { serviceAnswersIssue } from '@/utils/service-requirements';
 import { serviceSetupSteps } from '@/utils/service-setup';
 import { ServiceSetupWizard } from '@/components/booking/ServiceSetupWizard';
+import { ServiceRecommendation } from '@/components/booking/ServiceRecommendation';
+import { usePackageRecommendation } from '@/hooks/use-package-recommendation';
+import { minimumStaffForArea } from '@/utils/service-setup';
+import type { PackageSuggestion } from '@/api/catalog-types';
 import { ServiceQuantity, ServiceAnswersSummary } from '@/components/booking/ServiceQuestions';
 import type { Staff, CustomerAddress } from '@/types/user';
 import { BookingMode } from '@/types/booking';
@@ -219,9 +225,9 @@ export default function NewBookingScreen() {
     );
   }
 
-  return <ConnectedNewBooking key={retryKey} catalog={catalog} addresses={addressResource.addresses} retryBooking={retrySource} />;
+  return <ConnectedNewBooking key={retryKey} catalog={catalog} addresses={addressResource.addresses} retryBooking={retrySource} addressRefreshError={addressResource.refreshError} retryAddresses={addressResource.retry} />;
 }
-function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: ReturnType<typeof useBookingCatalog>; addresses: CustomerAddress[]; retryBooking?: ConnectedBooking }) {
+function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshError, retryAddresses }: { catalog: ReturnType<typeof useBookingCatalog>; addresses: CustomerAddress[]; retryBooking?: ConnectedBooking; addressRefreshError: string; retryAddresses: () => void }) {
   const router = useRouter();
   const { currentCustomer } = useAuth();
   const retry = useMemo(() => retryBooking ? bookingRetryDraft(retryBooking) : undefined, [retryBooking]);
@@ -291,6 +297,8 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   const [pickedStaff,setPickedStaff]=useState<Staff>();
   const [serviceFilters,setServiceFilters]=useState<string[]>(retry ? [retry.serviceId] : []);
   const [bookingClock,setBookingClock]=useState(Date.now);
+  const bookingActivity=useBookingResume();
+  useEffect(()=>setBookingClock(bookingActivity.now),[bookingActivity.now]);
   useFocusEffect(useCallback(()=>{setBookingClock(Date.now());const timer=setInterval(()=>{if(AppState.currentState==='active')setBookingClock(Date.now());},30000);return()=>clearInterval(timer);},[]));
 
   // Address
@@ -350,8 +358,8 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
     }
     setSelectedExtraKeys(next); return true;
   };
-  const selectFavouritePackage = (hours: number) => {
-    const pack = packages.find(p => p.durationHours === hours);
+  const selectFavouritePackage = (hours: number, packageId?: string) => {
+    const pack = packages.find(p => packageId ? p.id===packageId : p.durationHours === hours);
     if(!pack) return;
     if(favouriteDurationIssue(pack.durationMinutes * quantity, extraMinutesFor(selectedExtraKeys), selectedExtraKeys.length)) {
       setFavouritePending({ packageId: pack.id, keys: selectedExtraKeys }); return;
@@ -403,7 +411,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   const [timingNotice, setTimingNotice] = useState<BookingTimingNotice | null>(null);
   const [quoteError, setQuoteError] = useState(''), [submitError, setSubmitError] = useState(''), [saving,setSaving] = useState(false);
   const requestRef = useRef<{body:string;key:string} | null>(null);
-  const actualPackage = selectedMode === 'MODE_A' ? packages.find(p => p.durationHours === selectedDurationHours) || selectedPackage : selectedPackage;
+  const actualPackage = selectedMode === 'MODE_A' ? (selectedPackage?.durationHours===selectedDurationHours?selectedPackage:packages.find(p => p.durationHours === selectedDurationHours)) || selectedPackage : selectedPackage;
   let configuration:Record<string,unknown>=retry?.configuration || {};if(!retry)try{const parsed=JSON.parse(params.customConfig || '{}');if(parsed && typeof parsed==='object' && !Array.isArray(parsed))configuration=parsed;}catch{}
   const configuredServiceId=retry?.serviceId || catalog.resolveId(params.serviceId);
   const serviceDetail=catalog.details.find(d=>String(d.service.id)===service.id);
@@ -417,7 +425,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
   const baseBookingMinutes=(actualPackage?.durationMinutes||60)*quantity;
   const computedBookingMinutes=roundedBookingMinutes(baseBookingMinutes, extraMinutesFor(selectedExtraKeys));
-  const quoteReady=!!quote && quoteResolvedKey===quoteKey;
+  const refreshWindow=Math.floor(bookingClock/120000);
+  const quoteRequestKey=quoteKey+':'+bookingActivity.revision+':'+pricingAttempt+':'+refreshWindow;
+  const quoteReady=!!quote && quoteResolvedKey===quoteRequestKey && bookingActivity.active;
   const timePickerMinutes=selectedMode==='MODE_A'&&currentStep===1?discoveryMinutes:quoteReady?quote!.durationMinutes:computedBookingMinutes;
   const selectionTimingNotice=selectedMode==='MODE_A'&&currentStep===5?bookingTimingNotice({startsAt,baseMinutes:baseBookingMinutes,totalMinutes:quoteReady?quote!.durationMinutes:computedBookingMinutes,minimumMinutes:Math.min(...packages.map(p=>p.durationMinutes*quantity)),availableUntil:selectedStaff?.availableUntil,availableUntilReason:selectedStaff?.availableUntilReason,staffName:selectedStaff?.fullName}):null;
   const favouriteIssue=selectedMode==='MODE_A'?favouriteDurationIssue(baseBookingMinutes,extraMinutesFor(selectedExtraKeys),selectedExtraKeys.length):'';
@@ -427,47 +437,68 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   const pendingShorter=pendingPackage?shorterFavouritePackage(packages,pendingPackage.durationMinutes*quantity,pendingExtraMinutes,favouritePending?.keys.length || 0,quantity,Math.min(240,availableMinutes)):undefined;
   const keepFavouritePackage=()=>{if(pendingPackage){const preserve=actualPackage?.id===pendingPackage.id&&!favouriteIssue;setSelectedDurationHours(pendingPackage.durationHours);setSelectedPackageId(pendingPackage.id);if(!preserve)setSelectedExtraKeys([]);}setFavouritePending(null);setSubmitError('');};
   const lowerFavouritePackage=()=>{if(!pendingShorter||!favouritePending)return;setSelectedDurationHours(pendingShorter.durationHours);setSelectedPackageId(pendingShorter.id);setSelectedExtraKeys(favouritePending.keys);setFavouritePending(null);setSubmitError('');};
+  const recommendation=usePackageRecommendation(serviceDetail,answers,selectedMode==='MODE_A'?1:20,
+    selectedMode==='MODE_A'?Math.floor(Math.max(0,Math.min(240,availableMinutes)-extraMinutesFor(selectedExtraKeys))):720,bookingActivity.active&&!createdBooking);
+  const applyRecommendedOption=useCallback((option:PackageSuggestion)=>{
+    const pack=serviceDetail?.packages.find(item=>item.id===option.packageId);
+    if(!pack||selectedMode==='MODE_A'&&option.requiredStaffCount!==1)return;
+    setSelectedPackageId(String(pack.id));setSelectedDurationHours(pack.durationMinutes/60);
+    setUnitQuantity(option.quantity);setRequiredStaffCount(option.requiredStaffCount);setSubmitError('');
+  },[serviceDetail,selectedMode]);
+  const appliedMeasurement=useRef('');
+  useEffect(()=>{
+    const option=recommendation.data?.options[0];
+    if(option&&bookingActivity.active&&appliedMeasurement.current!==recommendation.measurementKey){
+      appliedMeasurement.current=recommendation.measurementKey;applyRecommendedOption(option);
+    }
+  },[recommendation.data,recommendation.measurementKey,bookingActivity.active,applyRecommendedOption]);
+  useEffect(()=>{
+    if(selectedMode!=='MODE_B'||!serviceDetail)return;
+    const minimum=minimumStaffForArea(serviceDetail,selectedPackageId,answers,quantity);
+    if(minimum<=20)setRequiredStaffCount(current=>Math.max(current,minimum));
+  },[serviceDetail,selectedMode,selectedPackageId,answers.areaM2,quantity]);
   const selectionWarning=favouriteIssue || selectionTimingNotice?.message || submitError || quoteError || staffError || (quoteReady&&!staffLoading&&!availableStaffs.find(item=>item.id===selectedStaffId)?.eligibleServices?.some(item=>item.id===service.id)?'Nhân viên không rảnh đủ thời lượng hoặc không làm được dịch vụ này. Chọn lại dịch vụ/thời lượng hoặc quay lại chọn nhân viên.':'');
 
   const basePricingKey=JSON.stringify({...quoteBody,promotionCode:''});
   useEffect(()=>{setPromotionFailures({});setPromoFeedback('');},[basePricingKey]);
   const isFocused=useIsFocused();
   const questionnaireIssue=useMemo(()=>serviceAnswersIssue(serviceDetail?.requirements || [],answers),[serviceDetail,answers]);
-  const quoteEnabled=isFocused && !questionnaireIssue && !createdBooking && selectedMode!==null && (selectedMode==='MODE_B'||currentStep>=5);
+  const quoteEnabled=bookingActivity.active && !questionnaireIssue && !createdBooking && selectedMode!==null && (selectedMode==='MODE_B'||currentStep>=5);
   useEffect(() => {
     if(!quoteEnabled){if(!createdBooking){setQuote(null);setQuoteResolvedKey('');setQuoteLoading(false);setQuoteError('');}return;}
     const controller=new AbortController(),generation=++pricingGeneration.current;quoteAbort.current=controller;let active=true;
     setQuoteLoading(true);setQuoteError('');
     const timer=setTimeout(()=>{
-      void operationRequest<typeof quote>('catalog','/quote-preview','POST',JSON.parse(quoteKey),controller.signal).then(result=>{
+      void retryBookingRead(()=>operationRequest<typeof quote>('catalog','/quote-preview','POST',JSON.parse(quoteKey),controller.signal),controller.signal).then(result=>{
         if(!active||generation!==pricingGeneration.current)return;
-        setQuote(result);setQuoteResolvedKey(quoteKey);setQuoteError('');if(selectedPromoCode)setPromoFeedback('');
+        setQuote(result);setQuoteResolvedKey(quoteRequestKey);setQuoteError('');if(selectedPromoCode)setPromoFeedback('');
         if(selectedPromoCode)setPromotionFailures(previous=>{const next={...previous};delete next[selectedPromoCode];return next;});
       }).catch(error=>{
         if(!active||controller.signal.aborted||generation!==pricingGeneration.current)return;
         const message=error instanceof Error?error.message:'Chưa tính được giá đơn.';
-        if(selectedPromoCode){setPromotionFailures(previous=>({...previous,[selectedPromoCode]:message}));setPromoFeedback(message);setSelectedPromoCode('');}
+        if(selectedPromoCode&&!message.includes('Kết nối')&&!message.includes('kết nối')){setPromotionFailures(previous=>({...previous,[selectedPromoCode]:message}));setPromoFeedback(message);setSelectedPromoCode('');}
         else{setQuote(null);setQuoteResolvedKey('');setQuoteError(message);}
       }).finally(()=>{if(active&&generation===pricingGeneration.current)setQuoteLoading(false);});
     },350);
     return()=>{active=false;clearTimeout(timer);controller.abort();};
-  },[quoteKey,quoteEnabled,pricingAttempt]);
+  },[quoteRequestKey,quoteEnabled]);
   const staffSearchMinutes=selectedMode==='MODE_A'&&currentStep<5?discoveryMinutes:quoteReady?quote!.durationMinutes:computedBookingMinutes;
   const searchTimeValid=!customerSlotIssue(startsAt,staffSearchMinutes,bookingClock);
+  const selectionTimeIssue=customerSlotIssue(startsAt,timePickerMinutes,bookingClock);
   useEffect(() => {
-    if(selectedMode!=='MODE_A'||currentStep<3||createdBooking)return;
+    if(!bookingActivity.active||selectedMode!=='MODE_A'||currentStep<3||createdBooking)return;
     const controller=new AbortController();let active=true;const issue=customerSlotIssue(startsAt,staffSearchMinutes);
     setStaffError('');setAvailableStaffs([]);
     if(issue){setStaffError(issue);setStaffLoading(false);return;}
     setStaffLoading(true);
     const query=new URLSearchParams({addressId:selectedAddressId,startsAt,durationMinutes:String(staffSearchMinutes)});
     if(serviceFilters.length===1 && !retry)query.set('serviceId',serviceFilters[0]);
-    void operationRequest<Record<string,unknown>[]>('booking','/customer/staff?'+query,'GET',undefined,controller.signal)
+    void retryBookingRead(()=>operationRequest<Record<string,unknown>[]>('booking','/customer/staff?'+query,'GET',undefined,controller.signal),controller.signal)
       .then(rows=>{if(active)setAvailableStaffs(rows.map(staffView));})
       .catch(error=>{if(active)setStaffError(error.message);})
       .finally(()=>{if(active)setStaffLoading(false);});
     return()=>{active=false;controller.abort();};
-  },[selectedMode,selectedAddressId,startsAt,staffSearchMinutes,staffAttempt,currentStep<3,!!createdBooking,searchTimeValid,serviceFilters]);
+  },[selectedMode,selectedAddressId,startsAt,staffSearchMinutes,staffAttempt,currentStep<3,!!createdBooking,searchTimeValid,serviceFilters,bookingActivity.active,bookingActivity.revision,refreshWindow]);
   useEffect(() => { if(!isFocused || !createdBooking || !['PENDING','MATCHING','STAFF_ASSIGNED'].includes(createdBooking.status)) return; let active=true,inFlight=false; const poll=async()=>{if(inFlight || AppState.currentState!=='active')return;inFlight=true;try{const next=await CustomerBookings.detail(createdBooking.id);if(!active)return;setCreatedBooking(next);if(['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(next.status)){if(selectedMode==='MODE_A')setCurrentStep(9);}else if(['CANCELLED','NO_STAFF_FOUND','REJECTED'].includes(next.status))setRadarStatusText('Đơn đã kết thúc: '+next.status);}catch(e){if(active)setSubmitError(e instanceof Error?e.message:'Chưa tải được trạng thái đơn.');}finally{inFlight=false;}}; const timer=setInterval(()=>void poll(),4000); const foreground=AppState.addEventListener('change',state=>{if(state==='active')void poll();}); return()=>{active=false;clearInterval(timer);foreground.remove();}; },[createdBooking?.id,createdBooking?.status,selectedMode,isFocused]);
   const validateBookingTiming = () => {
     if(selectedMode==='MODE_A' && currentStep>=5 && favouriteIssue){setFavouritePending({packageId:actualPackage?.id || '',keys:selectedExtraKeys});return false;}
@@ -497,14 +528,14 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
     setSaving(true);setSubmitError('');
     try { const timeIssue=customerSlotIssue(startsAt,quote?.durationMinutes||actualPackage?.durationMinutes||60);if(timeIssue)throw new Error(timeIssue);
       if(selectedMode==='MODE_A'&&(staffLoading||staffError||!availableStaffs.find(item=>item.id===selectedStaffId)?.eligibleServices?.some(item=>item.id===service.id)))throw new Error(staffError||'Vui lòng kiểm tra lại nhân viên phù hợp trước khi đặt đơn.');
-      if(!quote)throw new Error(quoteError || 'Đang chờ báo giá từ backend.');
+      if(!quoteReady||quoteLoading)throw new Error(quoteError || 'Đang kiểm tra lại giá và lịch. Vui lòng chờ một chút.');
       if(selectedMode==='MODE_A' && !selectedStaff) throw new Error('Vui lòng chọn nhân viên phù hợp.');
       const body={...JSON.parse(quoteKey),mode:selectedMode,addressId:selectedAddressId,startsAt,staffId:selectedMode==='MODE_A'?selectedStaff?.id:undefined,paymentMethod:paymentMethod==='CASH'?'CASH':'BANK_TRANSFER_QR',notes:customerNote};
       const serialized=JSON.stringify(body);if(requestRef.current?.body!==serialized)requestRef.current={body:serialized,key:'mobile-'+Date.now()+'-'+Math.random().toString(36).slice(2)};
-      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); await CustomerBookings.load().catch(()=>{});if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
+      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); void CustomerBookings.load().catch(()=>{});if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
     } catch(e) {setSubmitError(e instanceof Error?e.message:'Chưa tạo được đơn.');} finally{setSaving(false);}
   };
-  const CLEANING_DURATIONS = packages.filter(p=>p.durationMinutes*quantity<=240&&(p.defaultStaffCount||1)===1).map(p=>({hours:p.durationHours,title:p.name,area:p.maxArea || '',unitType:p.recommendedFor || '',desc:p.description,isPopular:false,price:p.price}));
+  const CLEANING_DURATIONS = packages.filter(p=>p.durationMinutes*quantity<=240&&(p.defaultStaffCount||1)===1).map(p=>({packageId:p.id,hours:p.durationHours,title:p.name,area:p.maxArea || '',unitType:p.recommendedFor || '',desc:p.description,isPopular:false,price:p.price}));
 
   useEffect(() => {
     if(!isFocused) return;
@@ -708,6 +739,13 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
         </View>
 
         {!(selectedMode==='MODE_A'&&currentStep===5) && !!(submitError || ((selectedMode==='MODE_A'?currentStep>=5:currentStep>=4)&&quoteError)) && <Text style={{color:'#B91C1C',padding:12}}>{submitError || quoteError}</Text>}
+        {!createdBooking && quoteLoading && currentStep>=(selectedMode==='MODE_A'?5:4) && <Text accessibilityLiveRegion="polite" style={{padding:12,color:BrandColors.gray700}}>Đang kiểm tra lại giá và thời lượng. Thông tin đã chọn vẫn được giữ.</Text>}
+        {!createdBooking && !!addressRefreshError && <View style={{padding:12,gap:6}}><Text style={{color:'#9A3412'}}>Chưa cập nhật được địa chỉ. Thông tin bạn đang nhập vẫn được giữ.</Text><Pressable accessibilityRole="button" onPress={retryAddresses}><Text style={{color:BrandColors.primary,fontWeight:'700'}}>Tải lại địa chỉ</Text></Pressable></View>}
+        {!createdBooking && !!quoteError && <Pressable accessibilityRole="button" onPress={()=>setPricingAttempt(value=>value+1)} style={{padding:12}}><Text style={{color:BrandColors.primary,fontWeight:'700'}}>Kiểm tra lại giá · Giữ thông tin đã chọn</Text></Pressable>}
+        {!createdBooking && !!selectionTimeIssue && currentStep>=(selectedMode==='MODE_A'?2:3) && <View accessibilityRole="alert" style={{padding:12,backgroundColor:'#FFF7ED',gap:6}}>
+          <Text style={{color:'#9A3412'}}>Cần chọn lại giờ: {selectionTimeIssue} Thông tin dịch vụ của bạn vẫn được giữ.</Text>
+          <Pressable accessibilityRole="button" onPress={()=>{setSubmitError('');setTimingNotice(null);setCurrentStep(selectedMode==='MODE_A'?1:3);}}><Text style={{color:BrandColors.primary,fontWeight:'700'}}>Đổi ngày / giờ</Text></Pressable>
+        </View>}
         {/* Dynamic Progress Bar */}
         <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: progressPercent as any }]} />
@@ -739,6 +777,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
   // =========================================================================
   if(questionWizardOpen && serviceDetail && questionSteps.length>0) {
     return <ServiceSetupWizard detail={serviceDetail} steps={questionSteps} index={questionIndex}
+      recommendation={recommendation} applyRecommendation={applyRecommendedOption}
       answers={answers} packageId={selectedPackageId} quantity={unitQuantity} staffCount={1}
       setAnswers={setAnswers} setQuantity={setUnitQuantity} setStaffCount={setRequiredStaffCount} setPackage={setSelectedPackageId}
       setIndex={setQuestionIndex} back={handleBack} complete={()=>setQuestionWizardOpen(false)} nextSection="Gói dịch vụ và công việc thêm" />;
@@ -1527,6 +1566,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                   </View>}
                   {staffLoading&&<Text style={styles.stepSubtitleNote}>Đang kiểm tra lại toàn bộ thời lượng…</Text>}
                   {/* Duration selection */}
+                  <ServiceRecommendation resource={recommendation} packageId={actualPackage?.id || ''} quantity={quantity} staffCount={1} apply={applyRecommendedOption}/>
                   <Text style={styles.sectionHeaderTitle}>Gói dịch vụ & Thời lượng</Text>
                   <Text style={styles.stepSubtitleNote}>
                     Chọn gói và thời lượng phù hợp với nhu cầu của bạn
@@ -1534,12 +1574,12 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
 
                   <View style={styles.durationCardsContainer}>
                     {CLEANING_DURATIONS.map((dur) => {
-                      const isSelected = selectedDurationHours === dur.hours;
+                      const isSelected = actualPackage?.id === dur.packageId;
                       return (
                         <Pressable
-                          key={dur.hours}
+                          key={dur.packageId}
                           style={[styles.durationCard, isSelected && styles.durationCardSelected]}
-                          onPress={() => selectFavouritePackage(dur.hours)}>
+                          onPress={() => selectFavouritePackage(dur.hours,dur.packageId)}>
                           <View style={styles.durationCardHeader}>
                             <View style={styles.durationTitleGroup}>
                               <Text
@@ -1827,7 +1867,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    disabled={saving || !quote} onPress={() => void submitBooking()}>
+                    disabled={saving || !quoteReady || quoteLoading} onPress={() => void submitBooking()}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Xác nhận & Đặt ca ({quote ? formatVND(totalAmount) : 'Chờ báo giá'})</Text>
                     </LinearGradient>
@@ -1927,6 +1967,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking }: { catalog: Re
     // ---------------- STEP 0: GÓI DIỆN TÍCH & SỐ LƯỢNG NHÂN VIÊN (Mode B) ----------------
     if (currentStep === 0 && serviceDetail) {
       return <ServiceSetupWizard detail={serviceDetail} steps={setupSteps} index={serviceSetupIndex} totalSteps={setupSteps.length+5}
+        recommendation={recommendation} applyRecommendation={applyRecommendedOption}
         answers={answers} packageId={selectedPackageId} quantity={unitQuantity} staffCount={requiredStaffCount}
         setAnswers={setAnswers} setQuantity={setUnitQuantity} setStaffCount={setRequiredStaffCount}
         setPackage={id=>{setSelectedPackageId(id);const pack=packages.find(item=>item.id===id);setRequiredStaffCount(count=>Math.max(count,pack?.defaultStaffCount || 1));}}

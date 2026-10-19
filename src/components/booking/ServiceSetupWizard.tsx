@@ -4,7 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CatalogDetail } from '@/api/catalog-types';
 import { BrandColors } from '@/constants/theme';
 import { ServiceQuantity } from './ServiceQuestions';
-import { serviceSetupIssue, type ServiceSetupStep } from '@/utils/service-setup';
+import { minimumStaffForArea, serviceSetupIssue, type ServiceSetupStep } from '@/utils/service-setup';
+import { ServiceRecommendation } from './ServiceRecommendation';
+import type { usePackageRecommendation } from '@/hooks/use-package-recommendation';
+import type { PackageSuggestion } from '@/api/catalog-types';
 
 interface Props {
   detail: CatalogDetail; steps: ServiceSetupStep[]; index: number; totalSteps?: number;
@@ -13,6 +16,7 @@ interface Props {
   setPackage: (id: string) => void; setQuantity: (quantity: number) => void; setStaffCount: (count: number) => void;
   setIndex: (index: number) => void; back: () => void; complete: () => void;
   nextSection?: string;
+  recommendation?: ReturnType<typeof usePackageRecommendation>; applyRecommendation?: (option: PackageSuggestion) => void;
 }
 
 export function ServiceSetupWizard(props: Props) {
@@ -21,6 +25,7 @@ export function ServiceSetupWizard(props: Props) {
   const [error,setError]=useState<{key: string;message: string}>();
   const scroll=useRef<ScrollView>(null);
   const pack=detail.packages.find(item=>String(item.id)===packageId);
+  const minimumStaff=minimumStaffForArea(detail,packageId,answers,quantity);
   const last=index===steps.length-1;
   const nextTitle=last ? props.nextSection || 'Dịch vụ bổ sung' : steps[index+1].title;
   const changeAnswer=(value: unknown) => { setError(undefined); props.setAnswers({...answers,[step.kind==='QUESTION'?step.field.fieldKey:'']:value}); };
@@ -40,6 +45,7 @@ export function ServiceSetupWizard(props: Props) {
       <ScrollView key={step.key} ref={scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={styles.eyebrow}>{step.kind==='QUESTION' ? step.field.required ? 'THÔNG TIN CẦN CHỌN' : 'THÔNG TIN THÊM · CÓ THỂ BỎ QUA' : 'LỰA CHỌN CHO LỊCH ĐẶT'}</Text>
         <Text accessibilityRole="header" style={styles.title}>{step.title}</Text>
+        {props.recommendation&&props.applyRecommendation&&(step.kind==='PACKAGE'||step.kind==='STAFF')&&<ServiceRecommendation resource={props.recommendation} packageId={packageId} staffCount={staffCount} quantity={quantity} apply={props.applyRecommendation}/>}
         {step.kind==='QUESTION' && <>
           <Text style={styles.description}>{step.field.fieldType==='MULTI_SELECT' ? 'Bạn có thể chọn nhiều mục. Chọn xong, bấm Tiếp tục ở bên dưới.' : ['SELECT','BOOLEAN'].includes(step.field.fieldType) ? 'Bấm vào một lựa chọn bên dưới, sau đó bấm Tiếp tục.' : step.field.fieldType==='NUMBER' ? 'Nhập con số vào ô bên dưới để chúng tôi chuẩn bị đúng nhu cầu.' : 'Nhập thông tin vào ô bên dưới. Nội dung sẽ được lưu cùng lịch đặt.'}</Text>
           {step.field.validationRules.hint != null && <Text style={styles.hint}>{String(step.field.validationRules.hint)}</Text>}
@@ -62,6 +68,7 @@ export function ServiceSetupWizard(props: Props) {
             {step.field.fieldType==='NUMBER'&&<Text style={styles.description}>Từ {String(step.field.validationRules.min ?? 0)} đến {String(step.field.validationRules.max ?? 'không giới hạn')}{step.field.validationRules.integer?' · Nhập số nguyên':''}</Text>}
           </View>}
         </>}
+        {props.recommendation&&props.applyRecommendation&&step.kind==='QUESTION'&&step.field.fieldKey==='areaM2'&&<ServiceRecommendation resource={props.recommendation} packageId={packageId} staffCount={staffCount} quantity={quantity} apply={props.applyRecommendation}/>}
         {step.kind==='PACKAGE' && <>
           <Text style={styles.description}>Chọn một gói phù hợp. Giá và thời lượng được lấy từ bảng giá của dịch vụ.</Text>
           {detail.packages.map(item=><Pressable key={item.id} accessibilityRole="radio" accessibilityState={{checked:String(item.id)===packageId}} accessibilityLabel={item.name}
@@ -77,9 +84,9 @@ export function ServiceSetupWizard(props: Props) {
           {pack&&<Text style={styles.hint}>{quantity} gói × {pack.basePrice.toLocaleString('vi-VN')}đ · Thời gian gói chính: {pack.durationMinutes*quantity} phút</Text>}
         </View>}
         {step.kind==='STAFF' && <View style={styles.inputCard}>
-          <Text style={styles.description}>Gói đã chọn cần tối thiểu {pack?.defaultStaffCount || 1} nhân viên. Nếu chọn nhiều người, lịch sẽ chờ đủ người nhận.</Text>
+          <Text style={styles.description}>Gói và diện tích đã chọn cần tối thiểu {minimumStaff} nhân viên. Nếu chọn nhiều người, lịch sẽ chờ đủ người nhận.</Text>
           <View style={styles.counter}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Giảm số nhân viên" disabled={staffCount<=(pack?.defaultStaffCount || 1)} onPress={()=>props.setStaffCount(Math.max(pack?.defaultStaffCount || 1,staffCount-1))} style={styles.counterButton}><Text style={styles.counterSign}>−</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Giảm số nhân viên" disabled={staffCount<=minimumStaff} onPress={()=>props.setStaffCount(Math.max(minimumStaff,staffCount-1))} style={styles.counterButton}><Text style={styles.counterSign}>−</Text></Pressable>
             <Text style={styles.counterValue}>{staffCount} người</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Tăng số nhân viên" disabled={staffCount>=20} onPress={()=>props.setStaffCount(Math.min(20,staffCount+1))} style={styles.counterButton}><Text style={styles.counterSign}>+</Text></Pressable>
           </View>

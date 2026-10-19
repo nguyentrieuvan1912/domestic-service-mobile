@@ -8,18 +8,31 @@ export const catalogUnit = (unit: string) => ({ PACKAGE: 'gói', HOUR: 'giờ', 
 
 export async function catalogGet<T>(path: string, signal: AbortSignal): Promise<T> {
   if (!API_BASE_URL) throw new Error('Kết nối dịch vụ chưa được thiết lập. Vui lòng liên hệ hỗ trợ.');
-  let response: Response;
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (signal.aborted) cancel();
+  else signal.addEventListener('abort', cancel, { once: true });
+  const timeout = setTimeout(cancel, 15000);
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1/catalog${path}`, { signal });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/v1/catalog${path}`, { signal: controller.signal });
+    } catch (error) {
+      if (signal.aborted) throw error;
+      // Native fetch can reject with Error (including a Java exception), not only TypeError.
+      throw new Error('Chưa kết nối được hệ thống dịch vụ. Vui lòng thử lại sau.');
+    }
+    if (!response.ok) {
+      if (response.status === 404) throw new Error('Không tìm thấy dịch vụ hoặc dịch vụ đã ngừng hoạt động.');
+      if (response.status === 400) throw new Error('Thông tin tìm kiếm hoặc ID dịch vụ không hợp lệ.');
+      throw new Error('Chưa tải được dịch vụ. Vui lòng thử lại sau.');
+    }
+    return await response.json() as T;
   } catch (error) {
-    if (signal.aborted) throw error;
-    // Native fetch can reject with Error (including a Java exception), not only TypeError.
-    throw new Error('Chưa kết nối được hệ thống dịch vụ. Vui lòng thử lại sau.');
+    if (controller.signal.aborted && !signal.aborted) throw new Error('Tải dịch vụ quá lâu. Vui lòng thử lại.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener('abort', cancel);
   }
-  if (!response.ok) {
-    if (response.status === 404) throw new Error('Không tìm thấy dịch vụ hoặc dịch vụ đã ngừng hoạt động.');
-    if (response.status === 400) throw new Error('Thông tin tìm kiếm hoặc ID dịch vụ không hợp lệ.');
-    throw new Error('Chưa tải được dịch vụ. Vui lòng thử lại sau.');
-  }
-  return response.json() as Promise<T>;
 }
