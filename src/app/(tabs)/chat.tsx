@@ -1,5 +1,5 @@
 import { remoteImageSource } from '@/utils/image-source';
-import React, { useEffect, useReducer } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -13,18 +13,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '@/context/AuthContext';
-import { ChatRepository, getChatActor } from '@/data/connectedChatRepository';
+import { ChatRepository } from '@/data/connectedChatRepository';
 import { CHAT_TIME_ZONE } from '@/data/chatPolicy';
 import { useChatInbox } from '@/hooks/use-chat-inbox';
 
 export default function ChatListScreen() {
+  'use no memo'; // Repository access checks must follow each subscribed snapshot.
   const router = useRouter();
-  const { currentUser } = useAuth();
-  const actor = getChatActor(currentUser);
-  useChatInbox();
-  const conversations = ChatRepository.list().filter((conversation) =>
-    ChatRepository.access(conversation.id, actor).kind === 'READY');
+  const { actor, conversations: inbox } = useChatInbox();
+  const conversations = inbox.filter((conversation) =>
+    ChatRepository.access(conversation.id, actor, inbox).kind === 'READY');
 
   return (
     <LinearGradient

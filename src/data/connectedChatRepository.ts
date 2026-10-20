@@ -8,10 +8,14 @@ import type { ChatAccessResult } from './chatRepository';
 type LiveConversation = Conversation & { bookingStatus: string; conversationStatus: string; bookingCode: string };
 let conversations: LiveConversation[] = [], owner = '', error = '', loading: Promise<void> | null = null;
 let readEpoch = 0;
-let watcher: { token: string; count: number; timer: ReturnType<typeof setInterval> } | undefined;
+let watcher: { token: string; clients: Set<() => boolean>; timer: ReturnType<typeof setInterval> } | undefined;
+const messageEpoch = new Map<string, number>();
+const receiptThrough = new Map<string, number>();
+const receiptsInFlight = new Map<string, Promise<void>>();
+const emptyMessages: ChatMessage[] = [];
 const messages = new Map<string, ChatMessage[]>(), listeners = new Set<() => void>();
 function notify() { listeners.forEach(listener => { try { listener(); } catch { /* Role-scoped subscribers can unmount during logout. */ } }); }
-subscribeSession(() => { const active = operationSession(), id = active?.userId || ''; if (id !== owner) { owner = id; conversations = []; messages.clear(); error = ''; loading = null; notify(); } });
+subscribeSession(() => { const active = operationSession(), id = active?.token || ''; if (id !== owner) { owner = id; conversations = []; messages.clear(); messageEpoch.clear(); receiptThrough.clear(); receiptsInFlight.clear(); readEpoch++; error = ''; loading = null; if (watcher) clearInterval(watcher.timer); watcher = undefined; notify(); } });
 function assertActor(actor: ChatActor | null) { const session = operationSession(); if (!actor || !session || actor.userId !== session.userId || actor.participantId !== session.userId || actor.role !== session.profile.role) throw new Error('Vui lòng đăng nhập đúng tài khoản tham gia hội thoại.'); return session; }
 export function getChatActor(user: User | null): ChatActor | null { return user && ['STAFF', 'CUSTOMER'].includes(user.role) ? { userId: user.id, participantId: user.id, role: user.role as ChatActor['role'], name: user.fullName, avatar: user.avatar } : null; }
 export function createChatDraft(conversationId: string, actor: ChatActor, content: string): ChatMessage { return { id: 'message-' + Date.now() + '-' + Math.random().toString(36).slice(2), conversationId, senderId: actor.userId, senderType: actor.role, senderName: actor.name, senderAvatar: actor.avatar, contentType: 'TEXT', content, isRead: false, sentAt: new Date().toISOString() }; }
@@ -20,13 +24,16 @@ export const ChatRepository = {
   list() { return conversations; },
   watch(actor: ChatActor, visible: () => boolean) {
     const active = assertActor(actor);
-    const refresh = () => { if (visible()) void this.loadList(actor).catch(() => {}); };
     if (watcher?.token !== active.token) {
       if (watcher) clearInterval(watcher.timer);
-      watcher = { token: active.token, count: 0, timer: setInterval(refresh, 4000) };
+      const clients = new Set<() => boolean>();
+      watcher = { token: active.token, clients, timer: setInterval(() => {
+        if ([...clients].some(isVisible => isVisible())) void this.loadList(actor).catch(() => {});
+      }, 4000) };
     }
-    const resource = watcher; resource.count++; refresh();
-    return () => { resource.count--; if (!resource.count) { clearInterval(resource.timer); if (watcher === resource) watcher = undefined; } };
+    const resource = watcher; resource.clients.add(visible);
+    if (visible()) void this.loadList(actor).catch(() => {});
+    return () => { resource.clients.delete(visible); if (!resource.clients.size) { clearInterval(resource.timer); if (watcher === resource) watcher = undefined; } };
   },
   async loadList(actor: ChatActor | null) {
     const active = assertActor(actor); if (loading) return loading;
@@ -40,31 +47,60 @@ export const ChatRepository = {
     } catch (cause) { if (active.token === operationSession()?.token) { error = cause instanceof Error ? cause.message : 'Chưa tải được hội thoại.'; notify(); } throw cause; } })();
     loading = task; try { await task; } finally { if (loading === task) loading = null; }
   },
-  access(id: string | undefined, actor: ChatActor | null): ChatAccessResult {
+  access(id: string | undefined, actor: ChatActor | null, snapshot: readonly Conversation[] = conversations): ChatAccessResult {
     if (!actor) return { kind: 'UNAUTHENTICATED', reason: 'Vui lòng đăng nhập.' };
     try { assertActor(actor); } catch { return { kind: 'FORBIDDEN', reason: 'Tài khoản không khớp hội thoại.' }; }
-    const conversation = conversations.find(c => c.id === id);
+    const conversation = snapshot.find(c => c.id === id) as LiveConversation | undefined;
     if (!conversation) return { kind: 'NOT_FOUND', reason: error || 'Đang tải hoặc hội thoại không thuộc tài khoản này.' };
     return { kind: 'READY', conversation, bookingCode: conversation.bookingCode, phase: conversation.conversationStatus === 'CLOSED' ? 'CLOSED' : getChatBookingPhase(conversation.bookingStatus) };
   },
-  resolveForBooking(id: string | undefined, actor: ChatActor | null, staffId?: string) { const found = conversations.find(c => c.bookingId === id && (!staffId || c.staffId === staffId)); return this.access(found?.id, actor); },
-  getMessages(id: string, actor: ChatActor) { if (this.access(id, actor).kind !== 'READY') throw new Error('Bạn không có quyền đọc hội thoại.'); return messages.get(id) || []; },
+  resolveForBooking(id: string | undefined, actor: ChatActor | null, staffId?: string, snapshot: readonly Conversation[] = conversations) { const found = snapshot.find(c => c.bookingId === id && (!staffId || c.staffId === staffId)); return this.access(found?.id, actor, snapshot); },
+  getMessages(id: string, actor: ChatActor) { if (this.access(id, actor).kind !== 'READY') throw new Error('Bạn không có quyền đọc hội thoại.'); return messages.get(id) || emptyMessages; },
   async load(id: string, actor: ChatActor, signal?: AbortSignal) {
     const active = assertActor(actor); const access = this.access(id, actor); if (access.kind !== 'READY') throw new Error(access.reason);
+    const epoch = (messageEpoch.get(id) || 0) + 1;
+    messageEpoch.set(id, epoch);
     const data = await operationRequest<Record<string, unknown>[]>('booking', '/conversations/' + id + '/messages', 'GET', undefined, signal);
     const list: ChatMessage[] = data.map(item => ({ ...item, id: String(item.id), conversationId: String(item.conversationId), senderId: item.senderId == null ? '' : String(item.senderId), senderName: item.senderType === 'SYSTEM' ? 'Hệ thống' : item.senderType === 'STAFF' ? access.conversation.staffName : access.conversation.customerName, senderAvatar: item.senderType === 'STAFF' ? access.conversation.staffAvatar : access.conversation.customerAvatar } as ChatMessage));
-    if (active.token !== operationSession()?.token || signal?.aborted) return [];
-    messages.set(id, list); notify();
+    if (active.token !== operationSession()?.token || signal?.aborted) return emptyMessages;
+    if (messageEpoch.get(id) !== epoch) return messages.get(id) || emptyMessages;
+    const previous = messages.get(id) || emptyMessages;
+    const byId = new Map(previous.map(item => [item.id, item]));
+    const next = reuseSnapshot(previous, list.map(item => reuseSnapshot(byId.get(item.id), item)!));
+    if (next !== previous) { messages.set(id, next); notify(); }
     const throughMessageId = list.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
-    if (throughMessageId) {
+    if (!receiptsInFlight.has(id) && list.some(item => item.senderType !== actor.role && !item.isRead && Number(item.id) > (receiptThrough.get(id) || 0))) {
+      const receipt = (async () => { try {
       const result = await operationRequest<{ unreadCount: number }>('booking', '/conversations/' + id + '/read', 'PATCH', { throughMessageId }, signal);
       if (active.token === operationSession()?.token && !signal?.aborted) {
+        receiptThrough.set(id, Math.max(receiptThrough.get(id) || 0, throughMessageId));
         readEpoch++;
-        conversations = conversations.map(item => item.id !== id ? item : { ...item, [actor.role === 'CUSTOMER' ? 'unreadCountCustomer' : 'unreadCountStaff']: result.unreadCount });
-        notify();
+        const field = actor.role === 'CUSTOMER' ? 'unreadCountCustomer' : 'unreadCountStaff';
+        const updated = reuseSnapshot(conversations, conversations.map(item => item.id !== id ? item : { ...item, [field]: result.unreadCount }));
+        if (updated !== conversations) { conversations = updated; notify(); }
       }
+      } catch { /* Reading succeeded; retry the receipt on the next focused poll. */ } })();
+      receiptsInFlight.set(id, receipt);
+      void receipt.finally(() => { if (receiptsInFlight.get(id) === receipt) receiptsInFlight.delete(id); });
     }
-    return list;
+    return messages.get(id) || next;
   },
-  async send(id: string, actor: ChatActor, content: string, key: string, signal?: AbortSignal) { assertActor(actor); await operationRequest('booking', '/conversations/' + id + '/messages', 'POST', { content, clientKey: key }, signal); await this.load(id, actor, signal); await this.loadList(actor); },
+  async send(id: string, actor: ChatActor, content: string, key: string, signal?: AbortSignal) {
+    const active = assertActor(actor);
+    if (this.access(id, actor).kind !== 'READY') throw new Error('Bạn không có quyền gửi tin trong hội thoại.');
+    const saved = await operationRequest<{ id: number | string }>('booking', '/conversations/' + id + '/messages', 'POST', { content, clientKey: key }, signal);
+    if (active.token !== operationSession()?.token) throw new Error('Phiên đăng nhập đã thay đổi.');
+    if (!saved?.id) throw new Error('Backend chưa xác nhận lưu tin nhắn.');
+    // The POST commits before returning its database ID. Refresh failure cannot undo that success.
+    messageEpoch.set(id, (messageEpoch.get(id) || 0) + 1);
+    readEpoch++;
+    const previous = messages.get(id) || emptyMessages;
+    if (!previous.some(item => item.id === String(saved.id))) {
+      messages.set(id, [...previous, { ...createChatDraft(id, actor, content), id: String(saved.id), clientKey: key }]);
+      conversations = conversations.map(item => item.id !== id ? item : { ...item, lastMessage: content, lastMessageTime: new Date().toISOString() });
+      notify();
+    }
+    void this.loadList(actor).catch(() => {});
+    return String(saved.id);
+  },
 };

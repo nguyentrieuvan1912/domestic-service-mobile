@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandColors } from '@/constants/theme';
 
-export type StaffTabKey = 'home' | 'jobs' | 'availability' | 'wallet' | 'profile';
+export type StaffTabKey = 'home' | 'jobs' | 'community' | 'wallet' | 'profile';
 
 interface StaffBottomNavProps {
   activeTab: StaffTabKey;
@@ -14,7 +14,7 @@ interface StaffBottomNavProps {
 const TABS: { key: StaffTabKey; label: string; icon: string; route: string }[] = [
   { key: 'home', label: 'Trang chủ', icon: 'home', route: '/staff' },
   { key: 'jobs', label: 'Ca làm việc', icon: 'calendar', route: '/staff/jobs' },
-  { key: 'availability', label: 'Đăng ký lịch', icon: 'clock', route: '/staff/availability' },
+  { key: 'community', label: 'Cộng đồng', icon: 'users', route: '/staff/community' },
   { key: 'wallet', label: 'Thu nhập', icon: 'wallet', route: '/staff/wallet' },
   { key: 'profile', label: 'Tài khoản', icon: 'user', route: '/staff/profile' },
 ];

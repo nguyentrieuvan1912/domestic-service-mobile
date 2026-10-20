@@ -53,17 +53,17 @@ export default function BookingsScreen() {
     }
   });
 
-  const handleCancel = (bookingId: string) => {
+  const handleCancel = (bookingId: string, bookingCode: string) => {
     Alert.alert(
       'Hủy đơn dịch vụ',
-      'Bạn có muốn hủy đơn hàng? Khoản tiền đã thu sẽ được xử lý theo chính sách sau khi đối soát.',
+      `Bạn có muốn hủy đơn ${bookingCode}? Các đơn khác vẫn giữ nguyên. Khoản tiền đã thu sẽ được xử lý theo chính sách sau khi đối soát.`,
       [
         { text: 'Giữ lại đơn', style: 'cancel' },
         {
           text: 'Xác nhận hủy',
           style: 'destructive',
           onPress: async () => {
-            try { await CustomerBookings.cancel(bookingId, 'Khách hàng hủy đơn chủ động qua ứng dụng'); Alert.alert('Đã lưu', 'Trạng thái hủy đã được lưu trên hệ thống.'); setActiveFilter('CANCELLED'); }
+            try { await CustomerBookings.cancel(bookingId, 'Khách hàng hủy đơn chủ động qua ứng dụng'); Alert.alert('Đã hủy đơn', `Đơn ${bookingCode} đã được hủy trên hệ thống.`); }
             catch (cause) { Alert.alert('Chưa hủy được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
           },
         },
@@ -126,7 +126,7 @@ export default function BookingsScreen() {
                 key={b.id}
                 booking={b}
                 onPress={() => router.push(`/booking/${b.id}`)}
-                onCancel={() => handleCancel(b.id)}
+                onCancel={() => handleCancel(b.id, b.bookingCode)}
                 onReview={() =>
                   router.push({
                     pathname: '/booking/review',

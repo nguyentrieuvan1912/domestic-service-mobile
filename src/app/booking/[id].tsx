@@ -48,14 +48,14 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
   const handleCancelBooking = () => {
     Alert.alert(
       'Xác nhận hủy đơn',
-      'Yêu cầu hủy sẽ được kiểm tra theo trạng thái đơn thực tế. Bạn có muốn tiếp tục?',
+      `Bạn có muốn hủy đơn ${booking.bookingCode}? Các đơn khác vẫn giữ nguyên. Yêu cầu sẽ được kiểm tra theo trạng thái thực tế.`,
       [
         { text: 'Giữ lại đơn', style: 'cancel' },
         {
           text: 'Xác nhận hủy',
           style: 'destructive',
           onPress: async () => {
-            try { setBooking(await CustomerBookings.cancel(booking.id, 'Khách hàng hủy đơn chủ động')); Alert.alert('Đã hủy', 'Trạng thái hủy đã được lưu vào hệ thống.'); }
+            try { setBooking(await CustomerBookings.cancel(booking.id, 'Khách hàng hủy đơn chủ động')); Alert.alert('Đã hủy', `Đơn ${booking.bookingCode} đã được hủy trên hệ thống.`); }
             catch (error) { Alert.alert('Chưa hủy được đơn', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
           },
         },

@@ -39,6 +39,7 @@ function AuthStack() {
           <Stack.Screen name="staff/job-detail" options={{ headerShown: false }} />
           <Stack.Screen name="staff/wallet" options={{ headerShown: false }} />
           <Stack.Screen name="staff/availability" options={{ headerShown: false }} />
+          <Stack.Screen name="staff/community" options={{ headerShown: false }} />
           <Stack.Screen name="staff/profile" options={{ headerShown: false }} />
           <Stack.Screen name="staff/account-details" options={{ headerShown: false }} />
           <Stack.Screen name="staff/personal-info" options={{ headerShown: false }} />

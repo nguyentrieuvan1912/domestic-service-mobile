@@ -27,6 +27,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   const staff = (booking as ConnectedBooking & { staff?: { fullName: string; avatar: string } }).staff;
 
   const isCompleted = booking.status === 'COMPLETED';
+  const isClosed = ['CANCELLED', 'REFUNDING', 'REFUNDED', 'NO_STAFF_FOUND', 'ABSENT', 'REJECTED'].includes(booking.status);
+  const hasAcceptedStaff = (booking as ConnectedBooking).assignments?.some(item => ['ACCEPTED', 'COMPLETED'].includes(item.status));
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
@@ -63,15 +65,22 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           {staff ? (
             <View style={styles.staffAssignedRow}>
               <Image source={remoteImageSource(staff.avatar)} style={styles.staffThumb} />
-              <Text style={styles.staffAssignedName}>{staff.fullName}</Text>
+              <Text style={styles.staffAssignedName}>{!hasAcceptedStaff ? 'Nhân viên đã chọn: ' : ''}{staff.fullName}</Text>
             </View>
           ) : (
             <Text style={styles.matchingNote}>
-              {booking.status === 'MATCHING' ? '⚡ Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
+              {isClosed ? 'Đã dừng điều phối' : booking.status === 'MATCHING' ? '⚡ Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
             </Text>
           )}
         </View>
       </View>
+
+      {booking.status === 'CANCELLED' && (booking.cancelledAt || booking.cancellationReason) && (
+        <View style={styles.cancellationInfo}>
+          {!!booking.cancelledAt && <Text style={styles.cancellationText}>Hủy lúc {new Date(booking.cancelledAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</Text>}
+          {!!booking.cancellationReason && <Text style={styles.cancellationText}>{booking.cancellationReason}</Text>}
+        </View>
+      )}
 
       {/* Bottom row: Total amount & Quick action buttons */}
       <View style={styles.bottomRow}>
@@ -125,6 +134,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 };
 
 const styles = StyleSheet.create({
+  cancellationInfo: { paddingBottom: Spacing.two, gap: 3 },
+  cancellationText: { fontSize: 11, lineHeight: 16, color: BrandColors.gray600 },
   card: {
     backgroundColor: '#FFF',
     borderRadius: BorderRadius.xl,

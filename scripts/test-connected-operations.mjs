@@ -15,6 +15,20 @@ global.fetch=async (_url,options)=>{if(options.method==='POST')postCalls++;if(mo
 ops.connectOperationsSession(customer,'customer-session');await bookings.load();assert.equal(bookings.list()[0].id,'90001');assert.equal(bookings.list()[0].customerId,String(customer.id));
 mode='failed';await assert.rejects(bookings.cancel('90001','Reason'),/Persistence unavailable/);assert.equal(bookings.list()[0].status,'MATCHING','Failed write must not update local state or report success');
 mode='cancel';await bookings.cancel('90001','Reason');assert.equal(bookings.list()[0].status,'CANCELLED');
+// Cancelling one booking must preserve another booking accepted by the same staff.
+const acceptedOther={...record,id:90002,status:'CONFIRMED',assignments:[{staffId:employee.id,status:'ACCEPTED',executionStatus:'ACCEPTED'}]};
+let cancelledPath;
+global.fetch=async(url,options)=>{
+ if(options.method==='POST'){cancelledPath=url;return new Response(JSON.stringify({...record,status:'CANCELLED'}));}
+ return new Response(JSON.stringify([record,acceptedOther]));
+};
+await bookings.load();const untouchedBooking=bookings.get('90002');
+await bookings.cancel('90001','Cancel only the selected booking');
+assert(cancelledPath.endsWith('/bookings/90001/cancel'));
+assert.equal(bookings.get('90001').status,'CANCELLED');
+assert.equal(bookings.get('90002'),untouchedBooking,'Cancellation must not replace or change the other booking');
+assert.equal(bookings.get('90002').status,'CONFIRMED');
+assert.equal(bookings.get('90002').assignments[0].status,'ACCEPTED');
 // A pending refresh must never restore an expired invitation after a successful renewal.
 let finishOldRead;
 global.fetch=async (_url,options)=>{
@@ -34,6 +48,7 @@ ops.connectOperationsSession(employee,'staff-session');const count=postCalls;awa
 let revoked=0;ops.onOperationSessionInvalidated(()=>revoked++);mode='unauthorized';await assert.rejects(ops.operationRequest('booking','/staff/me/assignments'),/Session revoked/);assert.equal(ops.operationSession(),null);assert.equal(revoked,1);assert.equal(bookings.list().length,0);
 console.log('Connected operations: persisted-response mutations, failed-write isolation, role scoping, account cache reset, stale-response rejection and revoked-session clearing passed.');
 
+const settleChat=()=>new Promise(resolve=>setImmediate(resolve));
 const {ChatRepository:chat}=require('../src/data/connectedChatRepository.ts');
 const chatActor={userId:String(customer.id),participantId:String(customer.id),role:'CUSTOMER',name:'Customer',avatar:''};
 const conversation={id:80001,bookingId:90001,customerId:customer.id,staffId:employee.id,bookingStatus:'CONFIRMED',conversationStatus:'ACTIVE',unreadCountCustomer:2,unreadCountStaff:0};
@@ -46,7 +61,7 @@ global.fetch=async(url,options)=>{
  throw new Error('Unexpected request '+url);
 };
 await chat.loadList(chatActor);assert.equal(chat.list()[0].unreadCountCustomer,2);assert.equal(chat.resolveForBooking('90001',chatActor,String(employee.id)).kind,'READY');
-staleInbox=true;const oldInbox=chat.loadList(chatActor);await chat.load('80001',chatActor);assert.deepEqual(readBody,{throughMessageId:1001});assert.equal(chat.list()[0].unreadCountCustomer,0);releaseInbox();await oldInbox;assert.equal(chat.list()[0].unreadCountCustomer,0,'A stale inbox poll must not restore unread count after read receipt');
+staleInbox=true;const oldInbox=chat.loadList(chatActor);await chat.load('80001',chatActor);await settleChat();assert.deepEqual(readBody,{throughMessageId:1001});assert.equal(chat.list()[0].unreadCountCustomer,0);releaseInbox();await oldInbox;assert.equal(chat.list()[0].unreadCountCustomer,0,'A stale inbox poll must not restore unread count after read receipt');
 ops.connectOperationsSession(other,'new-chat-owner');assert.equal(chat.list().length,0);await assert.rejects(chat.loadList(chatActor),/đúng tài khoản/);
 console.log('Connected chat: accepted-booking lookup, bounded receipt, unread update, stale-poll rejection and account reset passed.');
 
@@ -90,3 +105,45 @@ jobStatus='COMPLETED';await matching.refresh(staffActor);assert.equal(staff.getS
 const beforeShared=reads;await Promise.all([matching.refresh(staffActor),matching.refresh(staffActor)]);
 assert.equal(reads-beforeShared,2,'Concurrent refreshes share one assignments/matching request pair');
 console.log('Polling performance: 20 identical chat, notification and job polls caused zero extra store updates; real unread/job changes were delivered and concurrent job requests were deduplicated.');
+// Chat transport regression fixtures exercise the production repository, never the app's live data.
+ops.connectOperationsSession(customer,'smooth-chat-session');
+const incoming={id:1001,conversationId:80001,senderId:employee.id,senderType:'STAFF',content:'Hello',isRead:false,sentAt:'2026-10-15T12:00:00Z'};
+let receiptCalls=0, messageReads=0, failReceipt=false;
+global.fetch=async(url,options)=>{
+ if(url.endsWith('/conversations'))return new Response(JSON.stringify([conversation]));
+ if(url.endsWith('/read')){receiptCalls++;return new Response(JSON.stringify(failReceipt?{detail:'Receipt unavailable'}:{changed:1,unreadCount:0}),{status:failReceipt?503:200});}
+ if(url.endsWith('/messages')){messageReads++;return new Response(JSON.stringify([incoming]));}
+ throw new Error('Unexpected request '+url);
+};
+await chat.loadList(chatActor);
+failReceipt=true;await chat.load('80001',chatActor);await settleChat();
+assert.equal(chat.getMessages('80001',chatActor)[0].content,'Hello','A read receipt failure cannot hide loaded history');
+failReceipt=false;await chat.load('80001',chatActor);await settleChat();
+const quietThread=chat.getMessages('80001',chatActor);let threadEvents=0;
+const stopThread=chat.subscribe(()=>threadEvents++);
+for(let i=0;i<20;i++)await chat.load('80001',chatActor);await settleChat();
+assert.equal(chat.getMessages('80001',chatActor),quietThread);
+assert.equal(threadEvents,0,'Identical message polls must not rerender the thread');
+assert.equal(receiptCalls,2,'Only the failed receipt is retried; confirmed receipts are not repeated');
+stopThread();
+
+let releaseOldMessages;
+global.fetch=async(url,options)=>{
+ if(options.method==='POST')return new Response(JSON.stringify({id:1002}));
+ if(url.endsWith('/conversations'))return new Response(JSON.stringify({detail:'Inbox unavailable'}),{status:503});
+ if(url.endsWith('/messages')){await new Promise(resolve=>releaseOldMessages=resolve);return new Response(JSON.stringify([incoming]));}
+ throw new Error('Unexpected request '+url);
+};
+const delayedMessages=chat.load('80001',chatActor);
+assert.equal(await chat.send('80001',chatActor,'Persisted message','same-key'),'1002');
+releaseOldMessages();await delayedMessages;
+assert.equal(chat.getMessages('80001',chatActor).at(-1).id,'1002','An older poll cannot remove a committed send');
+await chat.send('80001',chatActor,'Persisted message','same-key');
+assert.equal(chat.getMessages('80001',chatActor).filter(item=>item.id==='1002').length,1,'The same acknowledged database ID must not be duplicated');
+const beforeFailedSend=chat.getMessages('80001',chatActor);
+global.fetch=async()=>new Response(JSON.stringify({detail:'Write unavailable'}),{status:503});
+await assert.rejects(chat.send('80001',chatActor,'Not persisted','failed-key'),/Write unavailable/);
+assert.equal(chat.getMessages('80001',chatActor),beforeFailedSend,'Failed POST cannot create a sent bubble');
+ops.connectOperationsSession(customer,'same-user-renewed-session');
+assert.equal(chat.list().length,0,'Renewing the same account session resets its old requests and cache');
+console.log('Chat smoothness: unchanged thread stability, receipt retry/dedup, committed-send confirmation despite inbox failure, late-poll protection, idempotent acknowledgement and failed-send isolation passed.');

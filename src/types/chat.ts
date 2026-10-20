@@ -4,6 +4,7 @@ export type MessageContentType = 'TEXT' | 'IMAGE' | 'LOCATION';
 
 export interface ChatMessage {
   id: string;
+  clientKey?: string;
   conversationId: string;
   senderId: string;
   senderName: string;

@@ -118,6 +118,20 @@ function StaffProfileContent() {
             </View>
           </Pressable>
 
+          <Pressable style={styles.scheduleCard} accessibilityRole="button"
+            accessibilityLabel="Đăng ký lịch làm việc và khu vực, bước đầu tiên để tìm và nhận việc"
+            onPress={() => router.push('/staff/availability')}>
+            <View style={styles.scheduleHeading}>
+              <View style={styles.scheduleIcon}><IconSymbol name="calendar" size={25} color="#047857" /></View>
+              <View style={styles.scheduleHeadingCopy}>
+                <Text style={styles.scheduleStep}>BƯỚC 1 • TRƯỚC KHI NHẬN VIỆC</Text>
+                <Text style={styles.scheduleTitle}>Đăng ký lịch làm việc</Text>
+              </View>
+            </View>
+            <Text style={styles.scheduleDescription}>Chọn giờ rảnh và khu vực hoạt động tại TP.HCM. Đăng ký đầy đủ lịch tuần để được xét nhận và tìm công việc phù hợp.</Text>
+            <View style={styles.scheduleAction}><Text style={styles.scheduleActionText}>Đăng ký / cập nhật lịch & khu vực</Text><IconSymbol name="chevronRight" size={18} color="#FFFFFF" /></View>
+          </Pressable>
+
           {/* Account Utilities / Switch Role */}
           <View style={styles.card}>
             <Text style={styles.cardSectionTitle}>Cài đặt & Tiện ích</Text>
@@ -142,16 +156,7 @@ function StaffProfileContent() {
               <Text style={styles.utilityArrow}>›</Text>
             </Pressable>
 
-            <Pressable
-              style={styles.utilityRow}
-              onPress={() => router.push('/staff/availability')}
-            >
-              <View style={styles.utilityIconWrap}>
-                <IconSymbol name="calendar" size={18} color="#047857" />
-              </View>
-              <Text style={styles.utilityTitle}>Đăng ký lịch làm & khu vực</Text>
-              <Text style={styles.utilityArrow}>›</Text>
-            </Pressable>
+
 
             <Pressable
               style={styles.utilityRow}
@@ -195,6 +200,15 @@ function StaffProfileContent() {
 }
 
 const styles = StyleSheet.create({
+  scheduleCard: { backgroundColor: '#ECFDF5', borderWidth: 2, borderColor: '#34D399', borderRadius: 20, padding: 16, gap: 13 },
+  scheduleHeading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  scheduleIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D1FAE5' },
+  scheduleHeadingCopy: { flex: 1, gap: 5 },
+  scheduleStep: { color: '#047857', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
+  scheduleTitle: { color: '#064E3B', fontWeight: '800', fontSize: 20 },
+  scheduleDescription: { color: '#065F46', fontSize: 13, lineHeight: 20 },
+  scheduleAction: { backgroundColor: '#047857', borderRadius: 12, padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  scheduleActionText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
   safeArea: { flex: 1 },
 
