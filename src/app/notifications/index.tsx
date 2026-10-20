@@ -8,7 +8,7 @@ import { NotificationItem } from '@/components/common/NotificationItem';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/hooks/use-notifications';
-import { NotificationRepository } from '@/data/notificationRepository';
+import { NotificationRepository } from '@/data/connectedNotifications';
 import { CUSTOMER_NOTIFICATION_FILTERS, STAFF_NOTIFICATION_FILTERS, getNotificationGroup } from '@/data/notificationAdapter';
 import type { NotificationActor, NotificationGroup } from '@/data/notificationAdapter';
 import type { AppNotification } from '@/types/notification';

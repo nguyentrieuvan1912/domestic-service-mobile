@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -21,7 +22,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   if (variant === 'horizontal') {
     return (
       <Pressable style={styles.horizontalCard} onPress={onPress}>
-        <Image source={{ uri: service.image }} style={styles.horizontalImage} />
+        <Image source={remoteImageSource(service.image)} style={styles.horizontalImage} />
         <View style={styles.horizontalBody}>
           <View style={styles.headerRow}>
             <Text numberOfLines={1} style={styles.horizontalTitle}>
@@ -54,7 +55,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
   return (
     <Pressable style={styles.verticalCard} onPress={onPress}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: service.image }} style={styles.verticalImage} />
+        <Image source={remoteImageSource(service.image)} style={styles.verticalImage} />
         {service.isPopular && (
           <View style={styles.floatingHotBadge}>
             <Text style={styles.hotBadgeText}>Hot</Text>

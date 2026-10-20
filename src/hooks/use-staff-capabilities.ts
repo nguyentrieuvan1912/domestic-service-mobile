@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffCapabilityRepository } from '@/data/staffCapabilityRepository';
+import { StaffCapabilityRepository } from '@/data/connectedStaffRepository';
 import type { StaffCapabilitySnapshot } from '@/types/staff-capability';
 
 type CapabilityLoadState = { key: string; status: 'LOADING' | 'ERROR' | 'READY'; data?: StaffCapabilitySnapshot; error?: string };

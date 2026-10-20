@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { createRequire, Module } from 'node:module';
+import { readFileSync } from 'node:fs';
+const require=createRequire(import.meta.url),ts=require('typescript');
+Module._extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {staffAge,staffAgeLabel,staffBirthLabel,staffRating}=require('../src/utils/staff-profile.ts');
+const born={dateOfBirth:'1998-06-18',birthYear:1998};
+assert.equal(staffAge(born,Date.parse('2026-06-17T10:00:00+07:00')),27);
+assert.equal(staffAge(born,Date.parse('2026-06-18T00:00:00+07:00')),28);
+assert.equal(staffAge({dateOfBirth:''},Date.now()),null);
+assert.equal(staffAgeLabel({dateOfBirth:''}),'Chưa cập nhật tuổi');
+assert.equal(staffAgeLabel({dateOfBirth:'',birthYear:1998}),`${staffAge({dateOfBirth:'',birthYear:1998})} tuổi`);
+assert.equal(staffBirthLabel(born),'18/06/1998');
+assert.equal(staffBirthLabel({dateOfBirth:'',birthYear:1998}),'1998 (chưa có ngày/tháng)');
+console.log('Staff profile: exact birthday, Vietnam date, legacy birth-year precision and missing-age labels passed.');
+
+assert.equal(staffRating(0,0),5,'No reviews defaults to five stars');
+assert.equal(staffRating(4.9,0),5,'No reviews uses the default, not an old cached score');
+assert.equal(staffRating(3,2),3,'Existing review average is preserved without adding a default five-star review');
+assert.equal(staffRating(4.5,8),4.5);
+console.log('Staff rating: five-star default and real reviewed averages passed.');

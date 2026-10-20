@@ -1,4 +1,30 @@
-# Bàn giao Prompt 05 — Lịch rảnh 7 ngày và khu vực
+# Đăng ký lịch tuần — cập nhật 15/10/2026
+
+Màn `/staff/availability` hiện dùng backend thật qua `connectedStaffRepository`.
+Sáng, Chiều, Tối là các lựa chọn độc lập: chọn 1, 2 hoặc cả 3; “Cả ngày” chọn
+08:00–20:00 cho từng ngày. Cần chọn ca làm hoặc “Nghỉ” cho mỗi ngày còn lại,
+không tự suy ra ngày nghỉ từ ngày chưa thao tác. confirmedDates gửi cùng bản lưu.
+StaffScheduleReminder ở root đọc lịch đã lưu từ backend và nhắc các ngày chưa
+đăng ký khi vào/quay lại app; không hiện trên màn đang đăng ký và tự hết khi
+lưu đủ tuần. Backend kiểm tra SCHEDULE_REQUIRED trước các điều kiện nhận việc.
+Hiển thị cả tuần thứ Hai–Chủ nhật, có tuần hiện tại và tuần kế tiếp. Nhấn
+“Đăng ký cả tuần” hoặc “Thay đổi lịch”, chỉnh bản nháp rồi “Xác nhận” để lưu.
+Các ngày không chọn giờ sau khi xác nhận là ngày nghỉ. Không tự đăng ký lại tuần mới.
+Khung 30 phút đã bắt đầu bị khóa; khi sửa một khoảng đang diễn ra, giữ nguyên
+phần đã qua và khung đang bắt đầu, chỉ thay đổi phần tương lai. Backend kiểm tra
+lại theo thời gian server lúc lưu, revision và các ca đã nhận.
+
+GET availability trả 14 ngày cùng `registeredWeekStarts`. PUT gửi `weekStart`
+(thứ Hai), đúng 7 ngày, `areaIds`, `matchNotifications`, `revision`; không xóa tuần khác.
+`areaIds` trên mobile là `hcm-{id}`, adapter gửi tên đầy đủ từ danh mục Identity.
+Chỉ dùng phường/xã/đặc khu mới. Phần quận cũ ngừng dùng cho đăng ký/ghép việc mới;
+snapshot địa chỉ của ca lịch sử vẫn được giữ nguyên.
+
+Kiểm tra: `npm run test:weekly`, `npx tsc --noEmit`; backend Maven verify và
+kiểm thử lưu/đọc lại qua API + PostgreSQL thật. Tài liệu cũ bên dưới chỉ mô tả
+fixture/domain test trước khi nối backend, không phải luồng chạy hiện tại.
+
+# Bàn giao cũ Prompt 05 — Lịch rảnh 7 ngày và khu vực
 
 Ngày kiểm tra: 08/10/2026. Đã đọc AGENTS.md, package.json, source hiện tại, tài liệu Expo SDK 57 và hợp đồng Booking backend. Chỉ sửa Staff, không xây backend hoặc gọi endpoint availability tự đặt.
 

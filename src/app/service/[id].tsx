@@ -1,6 +1,8 @@
+import { remoteImageSource } from '@/utils/image-source';
+import { useAuth } from '@/context/AuthContext';
+import { operationRequest } from '@/api/operations';
 import { CatalogDetail, CatalogPage } from '@/api/catalog-types';
 import { catalogDetailView, catalogTemplate } from '@/api/catalog-view';
-import { mockServicePackages } from '@/data/servicePackages';
 import { useCatalogResource } from '@/hooks/use-catalog-resource';
 import { CatalogState } from '@/components/common/CatalogState';
 import React, { useState } from 'react';
@@ -21,11 +23,9 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
-import {
-  getReviewsByServiceId,
-  getRelatedServices,
-  getBundleForService,
-} from '@/data';
+import { usePublicBookingResource } from '@/hooks/use-public-booking-resource';
+import type { ServiceBundle, RelatedServiceItem } from '@/data/serviceBundles';
+import { catalogSummaryView } from '@/api/catalog-view';
 
 const { width } = Dimensions.get('window');
 
@@ -64,43 +64,24 @@ function CatalogDetailLoader({ id }: { id: string }) {
 function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
   const router = useRouter();
   const { service, packages, addOns } = catalogDetailView(detail);
-  const presentationId = catalogTemplate(detail.service)?.id || '';
-  // These existing Person 2 screens remain prototypes, not connected reviews/AI/Booking APIs.
-  const reviews = getReviewsByServiceId(presentationId);
-  const relatedServices = getRelatedServices(presentationId);
-  const serviceBundle = getBundleForService(presentationId);
+  const reviewResource = usePublicBookingResource<{id:number;rating:number;comment:string;createdAt:string}[]>('/services/'+service.id+'/reviews');
+  const reviews = (reviewResource.data || []).map(r=>({...r,customerName:'Khách hàng',customerAvatar:''}));
+  service.reviewCount=reviews.length;service.rating=reviews.length?reviews.reduce((n,r)=>n+r.rating,0)/reviews.length:0;
+  const relatedResource = useCatalogResource<CatalogPage>('/services?size=10');
+  const relatedServices: RelatedServiceItem[] = (relatedResource.data?.items || []).filter(s=>String(s.id)!==service.id).slice(0,3).map(raw=>{const service=catalogSummaryView(raw);return {service,reason:'Dịch vụ đang hoạt động',discountOffer:'',discountedPrice:service.basePrice};});
+  const serviceBundle = React.useMemo<ServiceBundle | undefined>(()=>undefined,[]);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('CONFIG');
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
     packages.find((p) => p.isPopular)?.id || packages[0]?.id || ''
   );
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const { currentCustomer }=useAuth();
+  const [isFavorite,setIsFavorite]=useState(false),[favoriteBusy,setFavoriteBusy]=useState(false);
+  React.useEffect(()=>{let active=true;setIsFavorite(false);if(currentCustomer)void operationRequest<number[]>('identity','/customer/favorites').then(ids=>{if(active)setIsFavorite(ids.includes(Number(service.id)));}).catch(()=>{});return()=>{active=false;};},[currentCustomer?.id,service.id]);
+  const toggleFavorite=async()=>{if(favoriteBusy)return;setFavoriteBusy(true);try{const result=await operationRequest<{favorite:boolean}>('identity','/customer/favorites/'+service.id,'PUT',{favorite:!isFavorite});setIsFavorite(result.favorite);}catch(e){Alert.alert('Chưa lưu được dịch vụ',e instanceof Error?e.message:'Vui lòng thử lại.');}finally{setFavoriteBusy(false);}};
 
-  // Dynamic Service-Specific Configuration States
-  // 1. Máy lạnh
-  const [acType, setAcType] = useState<'WALL' | 'CASSETTE' | 'CEILING'>('WALL');
-  const [acQuantity, setAcQuantity] = useState(1);
-  const [acPosition, setAcPosition] = useState<'NORMAL' | 'HIGH_LADDER'>('NORMAL');
-  const [acNeedGas, setAcNeedGas] = useState(false);
-
-  // 2. Chăm sóc trẻ em
-  const [childAgeGroup, setChildAgeGroup] = useState<'INFANT' | 'TODDLER' | 'KID'>('TODDLER');
-  const [childSpecialNotes, setChildSpecialNotes] = useState('');
-  const [emergencyPhone, setEmergencyPhone] = useState('0909123456');
-
-  // 3. Chăm sóc người cao tuổi
-  const [elderlyAge, setElderlyAge] = useState('78');
-  const [elderlyMobility, setElderlyMobility] = useState<'INDEPENDENT' | 'NEED_SUPPORT' | 'BEDRIDDEN'>('NEED_SUPPORT');
-  const [elderlyMedicalNotes, setElderlyMedicalNotes] = useState('');
-
-  // 4. Chăm sóc thú cưng
-  const [petType, setPetType] = useState<'DOG' | 'CAT'>('DOG');
-  const [petWeight, setPetWeight] = useState<'SMALL' | 'MEDIUM' | 'LARGE'>('SMALL');
-
-  // 5. Nấu ăn
-  const [dietStyle, setDietStyle] = useState<'NORTH' | 'CENTRAL' | 'SOUTH' | 'VEGAN'>('SOUTH');
-  const [memberCount, setMemberCount] = useState(4);
+  const quantity = 1;
 
   const selectedPackage = packages.find((p) => p.id === selectedPackageId) || packages[0];
 
@@ -114,10 +95,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
   const calculateTotalPrice = () => {
     let total = selectedPackage ? selectedPackage.price : service.basePrice;
-    if (service.dynamicFieldType === 'AC_CLEANING' && acQuantity > 1) {
-      total = (selectedPackage?.price ?? service.basePrice) * acQuantity;
-    }
-    if (acNeedGas) total += 80000;
+    if (detail.service.priceUnit === 'ITEM') total *= quantity;
 
     selectedAddOnIds.forEach((addId) => {
       const add = addOns.find((a) => a.id === addId);
@@ -128,32 +106,16 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
   };
 
   const handleBookNow = () => {
-    // Pass configured dynamic fields to Booking Flow
-    const customConfig = {
-      acType,
-      acQuantity,
-      acPosition,
-      acNeedGas,
-      childAgeGroup,
-      childSpecialNotes,
-      emergencyPhone,
-      elderlyAge,
-      elderlyMobility,
-      elderlyMedicalNotes,
-      petType,
-      petWeight,
-      dietStyle,
-      memberCount,
-    };
-
     router.push({
       pathname: '/booking/new',
       params: {
-        // Booking still uses the original prototype lookup IDs until Person 2 integrates its API.
-        serviceId: presentationId || service.id,
-        packageId: mockServicePackages.find(item => item.serviceId === presentationId && item.name === selectedPackage?.name)?.id || selectedPackage?.id || '',
+        serviceId: service.id,
+        packageId: selectedPackage?.id || '',
         mode: 'MODE_B',
-        customConfig: JSON.stringify(customConfig),
+        quantity: String(quantity),
+        customConfig: '{}',
+        answers: JSON.stringify({}),
+        addOnIds: JSON.stringify(selectedAddOnIds),
       },
     });
   };
@@ -163,7 +125,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* HERO IMAGE */}
         <View style={styles.heroContainer}>
-          <Image source={{ uri: service.image }} style={styles.heroImage} />
+          <Image source={remoteImageSource(service.image)} style={styles.heroImage} />
           <SafeAreaView style={styles.heroOverlay} edges={['top']}>
             <Pressable
               style={styles.heroNavButton}
@@ -174,7 +136,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
             <Pressable
               style={styles.heroNavButton}
-              onPress={() => setIsFavorite(!isFavorite)}
+              disabled={favoriteBusy} onPress={()=>void toggleFavorite()}
               hitSlop={8}>
               <IconSymbol
                 name={isFavorite ? 'heart' : 'heartOutline'}
@@ -259,242 +221,21 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
         {/* TAB 1: DYNAMIC CONFIGURATION FOR SERVICE */}
         {activeTab === 'CONFIG' && (
           <View style={styles.tabContentSection}>
-            <Text style={styles.sectionHeading}>Tùy chỉnh thông số dịch vụ</Text>
+            <Text style={styles.sectionHeading}>Đặt dịch vụ theo từng bước</Text>
             <Text style={styles.sectionSubtitle}>
-              Thông tin cụ thể giúp nền tảng chuẩn bị thiết bị và điều phối nhân viên phù hợp nhất.
+              Bấm Bắt đầu đặt dịch vụ. Ứng dụng sẽ lần lượt hướng dẫn bạn chọn nhu cầu, gói dịch vụ, địa chỉ và thời gian.
             </Text>
 
-            {/* A. Dynamic Form: Máy Lạnh */}
-            {(service.dynamicFieldType === 'AC_CLEANING' || service.dynamicFieldType === 'AC_MAINTENANCE') && (
-              <View style={styles.configBlock}>
-                <Text style={styles.fieldLabel}>Loại máy lạnh</Text>
-                <View style={styles.optionsRow}>
-                  {[
-                    { id: 'WALL', label: 'Treo tường' },
-                    { id: 'CASSETTE', label: 'Âm trần' },
-                    { id: 'CEILING', label: 'Áp trần' },
-                  ].map((item) => (
-                    <Pressable
-                      key={item.id}
-                      style={[styles.optionPill, acType === item.id && styles.optionPillActive]}
-                      onPress={() => setAcType(item.id as any)}>
-                      <Text style={[styles.optionPillText, acType === item.id && styles.optionPillTextActive]}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.fieldLabel}>Số lượng máy cần vệ sinh</Text>
-                <View style={styles.counterRow}>
-                  <Pressable
-                    style={styles.counterBtn}
-                    onPress={() => setAcQuantity(Math.max(1, acQuantity - 1))}>
-                    <Text style={styles.counterBtnText}>-</Text>
-                  </Pressable>
-                  <Text style={styles.counterValue}>{acQuantity} bộ máy</Text>
-                  <Pressable
-                    style={styles.counterBtn}
-                    onPress={() => setAcQuantity(acQuantity + 1)}>
-                    <Text style={styles.counterBtnText}>+</Text>
-                  </Pressable>
-                </View>
-
-                <Text style={styles.fieldLabel}>Vị trí dàn nóng ngoài trời</Text>
-                <View style={styles.optionsRow}>
-                  <Pressable
-                    style={[styles.optionPill, acPosition === 'NORMAL' && styles.optionPillActive]}
-                    onPress={() => setAcPosition('NORMAL')}>
-                    <Text style={[styles.optionPillText, acPosition === 'NORMAL' && styles.optionPillTextActive]}>
-                      Ban công / Dưới 3 mét
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.optionPill, acPosition === 'HIGH_LADDER' && styles.optionPillActive]}
-                    onPress={() => setAcPosition('HIGH_LADDER')}>
-                    <Text style={[styles.optionPillText, acPosition === 'HIGH_LADDER' && styles.optionPillTextActive]}>
-                      Trên cao / Cần thang dây
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <Pressable
-                  style={[styles.checkOption, acNeedGas && styles.checkOptionActive]}
-                  onPress={() => setAcNeedGas(!acNeedGas)}>
-                  <Text style={styles.checkIcon}>{acNeedGas ? '☑' : '☐'}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.checkTitle}>Kiểm tra & Nạp bổ sung gas R32/R410A (+80.000đ)</Text>
-                    <Text style={styles.checkDesc}>Đo áp suất gas bằng đồng hồ chuyên dụng trước mặt khách</Text>
-                  </View>
-                </Pressable>
-              </View>
-            )}
-
-            {/* B. Dynamic Form: Chăm Sóc Trẻ Em */}
-            {service.dynamicFieldType === 'CHILD_CARE' && (
-              <View style={styles.configBlock}>
-                <Text style={styles.fieldLabel}>Độ tuổi của bé</Text>
-                <View style={styles.optionsRow}>
-                  {[
-                    { id: 'INFANT', label: 'Dưới 1 tuổi' },
-                    { id: 'TODDLER', label: '1 - 3 tuổi' },
-                    { id: 'KID', label: 'Trên 3 tuổi' },
-                  ].map((item) => (
-                    <Pressable
-                      key={item.id}
-                      style={[styles.optionPill, childAgeGroup === item.id && styles.optionPillActive]}
-                      onPress={() => setChildAgeGroup(item.id as any)}>
-                      <Text style={[styles.optionPillText, childAgeGroup === item.id && styles.optionPillTextActive]}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.fieldLabel}>Số điện thoại liên hệ khẩn cấp</Text>
-                <TextInput
-                  style={styles.inputBox}
-                  value={emergencyPhone}
-                  onChangeText={setEmergencyPhone}
-                  keyboardType="phone-pad"
-                  placeholder="Nhập số điện thoại ba/mẹ..."
-                />
-
-                <Text style={styles.fieldLabel}>Lưu ý đặc biệt (Dị ứng, giờ giấc ăn ngủ)</Text>
-                <TextInput
-                  style={[styles.inputBox, { height: 70 }]}
-                  value={childSpecialNotes}
-                  onChangeText={setChildSpecialNotes}
-                  multiline
-                  placeholder="Ví dụ: Bé dị ứng tôm cua, cần ru ngủ lúc 13h..."
-                />
-              </View>
-            )}
-
-            {/* C. Dynamic Form: Chăm Sóc Người Cao Tuổi */}
-            {service.dynamicFieldType === 'ELDERLY_CARE' && (
-              <View style={styles.configBlock}>
-                <Text style={styles.fieldLabel}>Độ tuổi của người thân</Text>
-                <TextInput
-                  style={styles.inputBox}
-                  value={elderlyAge}
-                  onChangeText={setElderlyAge}
-                  keyboardType="numeric"
-                  placeholder="Ví dụ: 75 tuổi"
-                />
-
-                <Text style={styles.fieldLabel}>Mức độ hỗ trợ sinh hoạt</Text>
-                <View style={styles.optionsCol}>
-                  {[
-                    { id: 'INDEPENDENT', label: 'Tự đi lại được, cần nhắc thuốc và trò chuyện' },
-                    { id: 'NEED_SUPPORT', label: 'Yếu sức, cần dìu đỡ khi đi lại và vệ sinh' },
-                    { id: 'BEDRIDDEN', label: 'Nằm tại giường, cần hỗ trợ xoay trở và ăn uống' },
-                  ].map((item) => (
-                    <Pressable
-                      key={item.id}
-                      style={[styles.radioItem, elderlyMobility === item.id && styles.radioItemActive]}
-                      onPress={() => setElderlyMobility(item.id as any)}>
-                      <Text style={styles.radioDot}>{elderlyMobility === item.id ? '🔘' : '⚪'}</Text>
-                      <Text style={styles.radioText}>{item.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.fieldLabel}>Bệnh lý nền cần lưu ý</Text>
-                <TextInput
-                  style={[styles.inputBox, { height: 60 }]}
-                  value={elderlyMedicalNotes}
-                  onChangeText={setElderlyMedicalNotes}
-                  placeholder="Ví dụ: Cao huyết áp, tiểu đường..."
-                />
-              </View>
-            )}
-
-            {/* D. Dynamic Form: Thú Cưng */}
-            {service.dynamicFieldType === 'PET_CARE' && (
-              <View style={styles.configBlock}>
-                <Text style={styles.fieldLabel}>Loại thú cưng</Text>
-                <View style={styles.optionsRow}>
-                  <Pressable
-                    style={[styles.optionPill, petType === 'DOG' && styles.optionPillActive]}
-                    onPress={() => setPetType('DOG')}>
-                    <Text style={[styles.optionPillText, petType === 'DOG' && styles.optionPillTextActive]}>
-                      🐶 Chó cưng
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.optionPill, petType === 'CAT' && styles.optionPillActive]}
-                    onPress={() => setPetType('CAT')}>
-                    <Text style={[styles.optionPillText, petType === 'CAT' && styles.optionPillTextActive]}>
-                      🐱 Mèo cưng
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <Text style={styles.fieldLabel}>Cân nặng thú cưng</Text>
-                <View style={styles.optionsRow}>
-                  {[
-                    { id: 'SMALL', label: 'Nhỏ (< 5kg)' },
-                    { id: 'MEDIUM', label: 'Vừa (5 - 15kg)' },
-                    { id: 'LARGE', label: 'Lớn (> 15kg)' },
-                  ].map((item) => (
-                    <Pressable
-                      key={item.id}
-                      style={[styles.optionPill, petWeight === item.id && styles.optionPillActive]}
-                      onPress={() => setPetWeight(item.id as any)}>
-                      <Text style={[styles.optionPillText, petWeight === item.id && styles.optionPillTextActive]}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* E. Dynamic Form: Nấu Ăn */}
-            {service.dynamicFieldType === 'COOKING' && (
-              <View style={styles.configBlock}>
-                <Text style={styles.fieldLabel}>Khẩu vị gia đình mong muốn</Text>
-                <View style={styles.optionsRow}>
-                  {[
-                    { id: 'NORTH', label: 'Miền Bắc' },
-                    { id: 'CENTRAL', label: 'Miền Trung' },
-                    { id: 'SOUTH', label: 'Miền Nam' },
-                    { id: 'VEGAN', label: 'Món chay' },
-                  ].map((item) => (
-                    <Pressable
-                      key={item.id}
-                      style={[styles.optionPill, dietStyle === item.id && styles.optionPillActive]}
-                      onPress={() => setDietStyle(item.id as any)}>
-                      <Text style={[styles.optionPillText, dietStyle === item.id && styles.optionPillTextActive]}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.fieldLabel}>Số người trong bữa ăn</Text>
-                <View style={styles.counterRow}>
-                  <Pressable
-                    style={styles.counterBtn}
-                    onPress={() => setMemberCount(Math.max(1, memberCount - 1))}>
-                    <Text style={styles.counterBtnText}>-</Text>
-                  </Pressable>
-                  <Text style={styles.counterValue}>{memberCount} người</Text>
-                  <Pressable
-                    style={styles.counterBtn}
-                    onPress={() => setMemberCount(memberCount + 1)}>
-                    <Text style={styles.counterBtnText}>+</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
+            <Pressable accessibilityRole="button" style={[styles.bookNowBtn,{padding:16,alignSelf:'stretch',marginBottom:16}]} onPress={handleBookNow}>
+              <Text style={styles.bookNowText}>Bắt đầu đặt dịch vụ →</Text>
+            </Pressable>
+            {detail.requirements.length>0 && <Text style={styles.reqText}>Bạn sẽ được hướng dẫn chọn: {detail.requirements.map(field=>field.label).join(' • ')}.</Text>}
 
             {/* Default general requirements */}
             <View style={styles.reqBlock}>
               <Text style={styles.fieldLabel}>Khu vực cung cấp dịch vụ</Text>
               <Text style={styles.reqText}>
-                📍 {service.supportedAreas?.join(' • ') || 'Nội thành TP. Hồ Chí Minh & Hà Nội'}
+                📍 TP. Hồ Chí Minh
               </Text>
 
               <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Yêu cầu đối với khách hàng</Text>
@@ -561,7 +302,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                       key={add.id}
                       style={[styles.addonItem, isChecked && styles.addonItemSelected]}
                       onPress={() => toggleAddOn(add.id)}>
-                      <Image source={{ uri: add.image }} style={styles.addonThumb} />
+                      <Image source={remoteImageSource(add.image)} style={styles.addonThumb} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.addonName}>{add.name}</Text>
                         <Text numberOfLines={2} style={styles.addonDesc}>{add.description}</Text>
@@ -619,7 +360,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
                 {relatedServices.map((item) => (
                   <View key={item.service.id} style={styles.relatedCard}>
-                    <Image source={{ uri: item.service.image }} style={styles.relatedThumb} />
+                    <Image source={remoteImageSource(item.service.image)} style={styles.relatedThumb} />
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={styles.relatedName}>{item.service.name}</Text>
@@ -688,13 +429,14 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
               <Text style={styles.totalReviewsText}>Dựa trên {service.reviewCount} đánh giá xác thực</Text>
             </View>
 
+            {reviewResource.error && <Pressable onPress={reviewResource.retry}><Text>{reviewResource.error} • Thử lại</Text></Pressable>}
             {reviews.length === 0 ? (
               <Text style={styles.emptyReviewText}>Chưa có nhận xét nào cho dịch vụ này.</Text>
             ) : (
               reviews.map((rev) => (
                 <View key={rev.id} style={styles.reviewCard}>
                   <View style={styles.revHeader}>
-                    <Image source={{ uri: rev.customerAvatar }} style={styles.revAvatar} />
+                    <Image source={remoteImageSource(rev.customerAvatar)} style={styles.revAvatar} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.revName}>{rev.customerName}</Text>
                       <Text style={styles.revDate}>{rev.createdAt.split('T')[0]}</Text>
@@ -721,7 +463,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
         </View>
 
         <Pressable style={styles.bookNowBtn} onPress={handleBookNow}>
-          <Text style={styles.bookNowText}>Đặt dịch vụ ngay →</Text>
+          <Text style={styles.bookNowText}>Bắt đầu đặt dịch vụ →</Text>
         </Pressable>
       </SafeAreaView>
     </View>

@@ -1,171 +1,121 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffAvailabilityRepository, availabilityDraft } from '@/data/staffAvailabilityRepository';
-import { StaffRepository } from '@/data/staffRepository';
-import { STAFF_AREA_OPTIONS } from '@/data/staffAreas';
-import { bookingBuffer, bookingWorkMinutes, displayDate, displayTime, intervalFor, localDate, normalizeDraft, scheduleDates, SCHEDULE_TIME_OPTIONS } from '@/data/staffAvailabilityRules';
-import type { AvailabilityActor, AvailabilityDraft, AvailabilitySnapshot } from '@/types/staff-availability';
-import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { StaffAvailabilityRepository, availabilityDraft } from '@/data/connectedStaffRepository';
+import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
+import { administrativeSearchKey } from '@/api/administrative-units';
+import { addCalendarDays, displayDate, displayTime, localDate } from '@/data/staffAvailabilityRules';
+import { selectedSlots, setDaySlots, slotLocked, weekDates, weekStart, WEEK_SLOTS, WORK_SHIFTS, toggleShift } from '@/data/weeklyAvailability';
+import type { AvailabilityActor, AvailabilityDay, AvailabilityDraft, AvailabilitySnapshot } from '@/types/staff-availability';
+import { BrandColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { EmptyState } from '@/components/common/EmptyState';
 import { StaffBottomNav } from './StaffBottomNav';
 
 export function StaffAvailabilityScreen() {
-  const router = useRouter();
-  const { currentUser, currentStaff } = useAuth();
+  const router = useRouter(), { currentUser, currentStaff } = useAuth();
   const actor = useMemo(() => getCapabilityActor(currentUser, currentStaff), [currentUser, currentStaff]);
-  if (!actor) return <SafeAreaView style={styles.root}>
-    <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" style={styles.header} onPress={() => router.canGoBack() ? router.back() : router.replace('/auth/login')}><IconSymbol name="back" size={24} color={BrandColors.gray800} /><Text style={styles.link}>Quay lại</Text></Pressable>
-    <EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" description="Bạn chỉ có thể đăng ký lịch cho hồ sơ của mình." actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} />
-  </SafeAreaView>;
+  if (!actor) return <SafeAreaView style={s.root}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
   return <AvailabilityEditor key={actor.userId} actor={actor} />;
 }
+const presets = WORK_SHIFTS;
+const clone = (value: AvailabilitySnapshot, start: string): AvailabilityDraft => ({ ...availabilityDraft(value), weekStart: start, confirmedDates: value.saved.registeredWeekStarts?.includes(start) ? weekDates(start) : [], days: weekDates(start).map(date => value.saved.days.find(day => day.date === date) ?? { date, intervals: [] }) });
+const presetSlots = (start: string, end: string) => WEEK_SLOTS.filter(time => time >= start && time < end);
 function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
-  const router = useRouter();
-  const navigation = useNavigation();
-  const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
-  const [loaded, setLoaded] = useState<AvailabilitySnapshot>();
-  const [draft, setDraft] = useState<AvailabilityDraft>();
-  const [attempt, setAttempt] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [selectedDate, setSelectedDate] = useState(() => scheduleDates()[0]);
-  const [editor, setEditor] = useState<{ index?: number; start: string; end: string }>();
-  const [editorError, setEditorError] = useState('');
-  const [copyDates, setCopyDates] = useState<string[] | null>(null);
-  const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
-  const [allowLeave, setAllowLeave] = useState(false);
-  const saveController = useRef<AbortController | null>(null);
-  const dirty = !!draft && !!loaded && JSON.stringify(draft) !== JSON.stringify(availabilityDraft(loaded));
-  const snapshot = useMemo(() => ({ ...StaffRepository.getScheduleSnapshot(actor.staffId), storeRevision: revision }), [actor.staffId, revision]);
-  const dates = draft?.days.map(day => day.date) ?? scheduleDates();
-  const day = draft?.days.find(item => item.date === selectedDate);
-  const bookings = snapshot.bookings.filter(booking => localDate(booking.startsAt) === selectedDate && booking.status !== 'CANCELLED');
+  const router = useRouter(), navigation = useNavigation(), administrative = useAdministrativeUnits();
+  const [loaded, setLoaded] = useState<AvailabilitySnapshot>(), [draft, setDraft] = useState<AvailabilityDraft>();
+  const [week, setWeek] = useState(() => weekStart()), [now, setNow] = useState(Date.now());
+  const [editingFrom, setEditingFrom] = useState<number | null>(null), [modalDate, setModalDate] = useState('');
+  const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false), [attempt, setAttempt] = useState(0);
+  const [error, setError] = useState(''), [notice, setNotice] = useState(''), [search, setSearch] = useState('');
+  const [leave, setLeave] = useState<(() => void) | null>(null), [allowLeave, setAllowLeave] = useState(false);
+  const editing = editingFrom !== null;
+  const dirty = !!draft && !!loaded && JSON.stringify(draft) !== JSON.stringify(clone(loaded, week));
+  const registered = loaded?.saved.registeredWeekStarts?.includes(week) ?? false;
+  const dates = weekDates(week), lockedNow = Math.max(now, editingFrom ?? now);
+  const modalDay = draft?.days.find(day => day.date === modalDate);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(timer); }, []);
   useEffect(() => {
-    const controller = new AbortController();
+    const controller = new AbortController(); setLoading(true);
     void StaffAvailabilityRepository.load(actor, controller.signal).then(result => {
       if (controller.signal.aborted) return;
-      setLoaded(result); setDraft(availabilityDraft(result)); setSelectedDate(result.saved.days[0].date); setLoading(false); setError('');
-    }).catch((reason: unknown) => { if (!controller.signal.aborted) { setLoading(false); setError(reason instanceof Error ? reason.message : 'Chưa tải được lịch.'); } });
+      setLoaded(result); setDraft(clone(result, week)); setEditingFrom(null); setError(''); setLoading(false);
+    }).catch(cause => { if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : 'Chưa tải được lịch.'); setLoading(false); } });
     return () => controller.abort();
   }, [actor, attempt]);
-  useEffect(() => () => saveController.current?.abort(), []);
-  usePreventRemove((dirty || saving) && !allowLeave, ({ data }) => { setLeaveAction(() => () => navigation.dispatch(data.action)); });
-  useEffect(() => {
-    if (!allowLeave || !leaveAction) return;
-    // Dispatch after the navigator has committed the updated removal guard.
-    const timer = setTimeout(() => { setLeaveAction(null); setAllowLeave(false); leaveAction(); }, 0);
-    return () => clearTimeout(timer);
-  }, [allowLeave, leaveAction]);
+  usePreventRemove((dirty || saving) && !allowLeave, ({ data }) => setLeave(() => () => navigation.dispatch(data.action)));
   useEffect(() => {
     if (Platform.OS !== 'web' || !dirty) return;
-    const preventClose = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
-    window.addEventListener('beforeunload', preventClose);
-    return () => window.removeEventListener('beforeunload', preventClose);
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', guard); return () => window.removeEventListener('beforeunload', guard);
   }, [dirty]);
-  const freshValidation = (next: AvailabilityDraft) => {
-    if (snapshot.unknownBookingCodes.length) return { error: 'Cần xác minh giờ ca đã nhận trước khi thay đổi lịch.' };
-    return normalizeDraft(next, snapshot.bookings);
+  useEffect(() => { if (allowLeave && leave) { const timer = setTimeout(leave, 0); return () => clearTimeout(timer); } }, [allowLeave, leave]);
+  const updateDay = (day: AvailabilityDay, slots: readonly string[]) => {
+    if (!editing || saving) return;
+    setDraft(value => value ? { ...value, confirmedDates: [...new Set([...(value.confirmedDates ?? []), day.date])], days: value.days.map(item => item.date === day.date ? setDaySlots(item, slots, Date.now()) : item) } : value); setError(''); setNotice('');
   };
-  const changeDraft = (next: AvailabilityDraft): boolean => {
-    const result = freshValidation(next);
-    if (!result.draft) { setError(result.error ?? 'Lịch chưa hợp lệ.'); return false; }
-    setDraft(result.draft); setError(''); setNotice(''); return true;
-  };
-  const reload = () => { setLoading(true); setAttempt(value => value + 1); setNotice(''); };
-  const requestReload = () => dirty ? setLeaveAction(() => reload) : reload();
-  const save = async (): Promise<boolean> => {
-    if (!draft || !loaded || saving) return false;
-    const checked = freshValidation(draft);
-    if (!checked.draft) { setError(checked.error ?? 'Lịch chưa hợp lệ.'); return false; }
-    const controller = new AbortController(); saveController.current = controller;
+  const save = async () => {
+    if (!draft || !loaded || saving) return;
+    const missing=draft.days.filter(day=>day.date>=localDate()&&!draft.confirmedDates?.includes(day.date));
+    if(missing.length){setError('Chưa chọn ca làm hoặc Nghỉ: '+missing.map(day=>displayDate(day.date)).join(', '));return;}
+    const validIds = administrative.units.map(unit => `hcm-${unit.id}`), areas = draft.areaIds.filter(id => validIds.includes(id));
+    if (!areas.length) { setError('Chọn ít nhất một phường/xã nhận việc.'); return; }
+    if (week !== weekStart() && week !== addCalendarDays(weekStart(), 7)) { setError('Tuần đã kết thúc. Hãy tải lại lịch.'); return; }
     setSaving(true); setError(''); setNotice('');
     try {
-      const result = await StaffAvailabilityRepository.save(actor, checked.draft, loaded.saved.revision, controller.signal);
-      if (controller.signal.aborted) return false;
-      setLoaded(result); setDraft(availabilityDraft(result)); setNotice('Đã lưu lịch rảnh và khu vực nhận việc.'); return true;
-    } catch (reason: unknown) {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Chưa lưu được lịch. Bản nháp vẫn được giữ.');
-      return false;
-    } finally { if (!controller.signal.aborted) setSaving(false); }
+      const result = await StaffAvailabilityRepository.save(actor, { ...draft, areaIds: areas }, loaded.saved.revision);
+      setLoaded(result); setDraft(clone(result, week)); setSearch(''); setEditingFrom(null); setModalDate(''); setNotice('Đã xác nhận và cập nhật lịch cả tuần.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa lưu được lịch. Bản nháp vẫn được giữ.'); }
+    finally { setSaving(false); }
   };
-  const applyInterval = () => {
-    if (!draft || !day || !editor) return;
-    const intervals = [...day.intervals];
-    const interval = intervalFor(selectedDate, editor.start, editor.end);
-    if (editor.index === undefined) intervals.push(interval); else intervals[editor.index] = interval;
-    const next = { ...draft, days: draft.days.map(item => item.date === selectedDate ? { ...day, intervals } : item) };
-    const checked = freshValidation(next);
-    if (!checked.draft) { setEditorError(checked.error ?? 'Khoảng rảnh chưa hợp lệ.'); return; }
-    changeDraft(checked.draft); setEditor(undefined);
+  const switchWeek = (start: string) => {
+    if (!loaded || editing || saving) return;
+    setWeek(start); setDraft(clone(loaded, start)); setNotice(''); setError('');
   };
-  const applyCopy = () => {
-    if (!draft || !day || !copyDates?.length) return;
-    const next = { ...draft, days: draft.days.map(item => copyDates.includes(item.date) ? { ...item, intervals: day.intervals.map(interval => intervalFor(item.date, displayTime(interval.startsAt), displayTime(interval.endsAt))) } : item) };
-    if (changeDraft(next)) { setCopyDates(null); setNotice('Đã sao chép vào bản nháp. Bấm lưu để áp dụng.'); }
-  };
-  return <View style={styles.root}>
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/staff')} style={styles.icon}><IconSymbol name="back" size={24} color={BrandColors.gray800} /></Pressable><Text style={styles.title}>Đăng ký lịch rảnh</Text><View style={styles.icon} /></View>
-      {loading ? <View style={styles.loading}><ActivityIndicator color={BrandColors.primary} /><Text>Đang tải lịch…</Text></View> : !draft || !loaded ? <EmptyState title="Chưa tải được lịch" description={error} icon="warning" actionText="Thử lại" onAction={reload} /> : <>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.body}>Hôm nay và 6 ngày tiếp theo • Giờ Việt Nam</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-            {dates.map(date => <Pressable accessibilityRole="button" accessibilityState={{ selected: date === selectedDate }} key={date} style={[styles.chip, date === selectedDate && styles.selectedChip]} onPress={() => { setSelectedDate(date); setError(''); }}><Text style={date === selectedDate ? styles.light : styles.label}>{date === localDate() ? 'Hôm nay\n' : ''}{displayDate(date)}</Text></Pressable>)}
-          </ScrollView>
-          <View style={styles.card}><Text style={styles.heading}>Khoảng rảnh • {displayDate(selectedDate)}</Text><Text style={styles.body}>08:00–20:00, mỗi bước 30 phút. Các khoảng chạm nhau được hợp nhất; ca phải nằm trọn trong khoảng rảnh.</Text>
-            {!day?.intervals.length && <Text style={styles.body}>Chưa đăng ký khoảng rảnh cho ngày này.</Text>}
-            {day?.intervals.map((interval, index) => <View key={interval.startsAt} style={styles.interval}>
-              <Text style={[styles.heading, styles.grow]}>{displayTime(interval.startsAt)}–{displayTime(interval.endsAt)}</Text>
-              <Pressable disabled={saving} accessibilityRole="button" accessibilityLabel={`Sửa khoảng ${displayTime(interval.startsAt)}`} onPress={() => { setEditorError(''); setEditor({ index, start: displayTime(interval.startsAt), end: displayTime(interval.endsAt) }); }} style={styles.smallButton}><Text style={styles.link}>Sửa</Text></Pressable>
-              <Pressable disabled={saving} accessibilityRole="button" accessibilityLabel={`Xóa khoảng ${displayTime(interval.startsAt)}`} onPress={() => changeDraft({ ...draft, days: draft.days.map(item => item.date === selectedDate ? { ...item, intervals: item.intervals.filter((_, position) => position !== index) } : item) })} style={styles.smallButton}><Text style={styles.link}>Xóa</Text></Pressable>
-            </View>)}
-            <Pressable disabled={saving} accessibilityRole="button" style={styles.secondary} onPress={() => { setEditorError(''); setEditor({ start: '08:00', end: '12:00' }); }}><Text style={styles.link}>+ Thêm khoảng rảnh</Text></Pressable>
-            <Pressable disabled={saving || !day?.intervals.length} accessibilityRole="button" style={[styles.secondary, !day?.intervals.length && styles.disabled]} onPress={() => setCopyDates([])}><Text style={styles.link}>Sao chép sang ngày khác</Text></Pressable>
-            {!day?.intervals.length && <Text style={styles.sub}>Thêm khoảng rảnh trước khi sao chép.</Text>}
-          </View>
-          <View style={styles.card}><Text style={styles.heading}>Ca đã nhận và vùng đệm</Text><Text style={styles.body}>Đệm tối thiểu 60 phút giữa hai ca, không tính vào giờ công. Giữ lịch rảnh và khu vực bao trọn ca đã nhận.</Text>
-            {!bookings.length && <Text style={styles.body}>Chưa có ca đã nhận trong ngày này.</Text>}
-            {bookings.map(booking => { const buffer = bookingBuffer(booking); return <View key={booking.id} style={styles.booking}><Text style={styles.heading}>{booking.bookingCode} • {displayTime(booking.startsAt)}–{displayTime(booking.endsAt)}</Text><Text style={styles.body}>{booking.district} • {(bookingWorkMinutes(booking) / 60).toLocaleString('vi-VN')} giờ công</Text><Text style={styles.sub}>Vùng đệm: {displayTime(buffer.startsAt)}–{displayTime(booking.startsAt)} và {displayTime(booking.endsAt)}–{displayTime(buffer.endsAt)}. Không nhận ca khác trong vùng này.</Text></View>; })}
-            {!!snapshot.unknownBookingCodes.length && <Text style={styles.error}>Chưa có giờ hợp lệ: {snapshot.unknownBookingCodes.join(', ')}. Cần xác minh trước khi lưu hoặc nhận thêm.</Text>}
-          </View>
-          <View style={styles.card}><Text style={styles.heading}>Khu vực nhận việc • {draft.areaIds.length} đã chọn</Text><Text style={styles.body}>Chọn ít nhất một khu vực. Khu vực có ca đã nhận cần được giữ lại.</Text><View style={styles.wrap}>
-            {STAFF_AREA_OPTIONS.map(area => { const selected = draft.areaIds.includes(area.id); return <Pressable disabled={saving} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} key={area.id} style={[styles.chip, selected && styles.selectedChip]} onPress={() => changeDraft({ ...draft, areaIds: selected ? draft.areaIds.filter(id => id !== area.id) : [...draft.areaIds, area.id] })}><Text style={selected ? styles.light : styles.label}>{selected ? '✓ ' : '+ '}{area.name}</Text></Pressable>; })}
-          </View><Text style={styles.sub}>Chưa có vị trí làm mốc để chọn bán kính. Việc phù hợp được kiểm tra theo khu vực đã lưu.</Text></View>
-          <View style={styles.card}><View style={styles.row}><View style={styles.grow}><Text style={styles.heading}>Nhận thông báo việc phù hợp</Text><Text style={styles.body}>Bạn vẫn cần xác nhận khi nhận ca. Tùy chọn này không tự nhận việc.</Text></View><Switch disabled={saving} value={draft.matchNotifications} onValueChange={value => { changeDraft({ ...draft, matchNotifications: value }); }} trackColor={{ true: BrandColors.primary, false: BrandColors.gray300 }} /></View></View>
-          {!!notice && <Text accessibilityLiveRegion="polite" style={styles.success}>{notice}</Text>}
-          <Pressable disabled={saving} accessibilityRole="button" onPress={requestReload} style={styles.secondary}><Text style={styles.link}>Tải lại lịch đã lưu</Text></Pressable>
-        </ScrollView>
-        <View style={styles.footer}>{!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}<Text accessibilityLiveRegion="polite" style={styles.sub}>{saving ? 'Đang lưu…' : dirty ? 'Có thay đổi chưa lưu' : notice || 'Lịch đã lưu • không có thay đổi mới'}</Text><Pressable accessibilityRole="button" disabled={!dirty || saving} style={[styles.primary, (!dirty || saving) && styles.disabled]} onPress={() => { void save(); }}><Text style={styles.light}>{saving ? 'Đang lưu lịch…' : 'Lưu lịch rảnh và khu vực'}</Text></Pressable></View>
-      </>}
-    </SafeAreaView>
-    <StaffBottomNav activeTab="availability" />
-    <Modal visible={!!editor} transparent animationType="slide" onRequestClose={() => setEditor(undefined)}><View style={styles.scrim}><SafeAreaView style={styles.modal} edges={['bottom']}><Text style={styles.title}>{editor?.index === undefined ? 'Thêm' : 'Sửa'} khoảng rảnh</Text><Text style={styles.body}>{displayDate(selectedDate)} • Chọn giờ theo bước 30 phút</Text><View style={[styles.row, styles.picker]}>
-      {(['start', 'end'] as const).map(field => <View key={field} style={styles.grow}><Text style={styles.heading}>{field === 'start' ? 'Bắt đầu' : 'Kết thúc'}: {editor?.[field]}</Text><ScrollView>{SCHEDULE_TIME_OPTIONS.map(time => <Pressable accessibilityRole="button" accessibilityState={{ selected: editor?.[field] === time }} key={time} style={[styles.time, editor?.[field] === time && styles.selectedChip]} onPress={() => { setEditorError(''); setEditor(value => value ? { ...value, [field]: time } : value); }}><Text style={editor?.[field] === time ? styles.light : styles.label}>{time}</Text></Pressable>)}</ScrollView></View>)}
-    </View>{!!editorError && <Text accessibilityRole="alert" style={styles.error}>{editorError}</Text>}<Pressable style={styles.primary} accessibilityRole="button" onPress={applyInterval}><Text style={styles.light}>Áp dụng vào bản nháp</Text></Pressable><Pressable style={styles.secondary} accessibilityRole="button" onPress={() => setEditor(undefined)}><Text style={styles.link}>Hủy</Text></Pressable></SafeAreaView></View></Modal>
-    <Modal visible={copyDates !== null} transparent animationType="slide" onRequestClose={() => setCopyDates(null)}><View style={styles.scrim}><SafeAreaView style={styles.modal} edges={['bottom']}><Text style={styles.title}>Sao chép lịch {displayDate(selectedDate)}</Text><Text style={styles.body}>Thay các khoảng rảnh ở ngày đã chọn. Thao tác chỉ cập nhật bản nháp.</Text><View style={styles.wrap}>{dates.filter(date => date !== selectedDate).map(date => <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: copyDates?.includes(date) }} key={date} style={[styles.chip, copyDates?.includes(date) && styles.selectedChip]} onPress={() => setCopyDates(value => value?.includes(date) ? value.filter(item => item !== date) : [...(value ?? []), date])}><Text style={copyDates?.includes(date) ? styles.light : styles.label}>{displayDate(date)}</Text></Pressable>)}</View>{!!error && <Text style={styles.error}>{error}</Text>}<Pressable disabled={!copyDates?.length} accessibilityRole="button" style={[styles.primary, !copyDates?.length && styles.disabled]} onPress={applyCopy}><Text style={styles.light}>Sao chép vào bản nháp</Text></Pressable>{!copyDates?.length && <Text style={styles.sub}>Chọn ít nhất một ngày để sao chép.</Text>}<Pressable accessibilityRole="button" style={styles.secondary} onPress={() => setCopyDates(null)}><Text style={styles.link}>Hủy</Text></Pressable></SafeAreaView></View></Modal>
-    <Modal visible={!!leaveAction && !allowLeave} transparent animationType="fade" onRequestClose={() => { if (!saving) setLeaveAction(null); }}><View style={styles.scrim}><SafeAreaView style={styles.modal} edges={['bottom']}><Text style={styles.title}>Lịch có thay đổi chưa lưu</Text><Text style={styles.body}>Lưu trước khi rời màn hình hoặc bỏ bản nháp. Lịch đã lưu vẫn được dùng để kiểm tra việc phù hợp.</Text>{!!error && <Text style={styles.error}>{error}</Text>}<Pressable disabled={saving} style={styles.primary} accessibilityRole="button" onPress={() => { void save().then(success => { if (success) setAllowLeave(true); }); }}><Text style={styles.light}>{saving ? 'Đang lưu…' : 'Lưu rồi rời màn hình'}</Text></Pressable><Pressable disabled={saving} style={styles.secondary} accessibilityRole="button" onPress={() => { if (loaded) setDraft(availabilityDraft(loaded)); setAllowLeave(true); }}><Text style={styles.link}>Bỏ thay đổi</Text></Pressable><Pressable disabled={saving} style={styles.secondary} accessibilityRole="button" onPress={() => setLeaveAction(null)}><Text style={styles.link}>Tiếp tục chỉnh sửa</Text></Pressable></SafeAreaView></View></Modal>
+  return <View style={s.root}><SafeAreaView edges={['top']} style={s.screen}>
+    <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/staff')}><IconSymbol name="back" size={24} color={BrandColors.gray800} /></Pressable><Text style={s.title}>Đăng ký lịch tuần</Text><View style={{ width: 24 }} /></View>
+    {loading ? <View style={s.center}><ActivityIndicator color={BrandColors.primary} /><Text>Đang tải lịch đã lưu…</Text></View> : !draft || !loaded ? <EmptyState icon="warning" title="Chưa tải được lịch" description={error} actionText="Thử lại" onAction={() => setAttempt(value => value + 1)} /> : <>
+      <ScrollView contentContainerStyle={s.content}>
+        <View style={s.row}>{[weekStart(now), addCalendarDays(weekStart(now), 7)].map((start, i) => <Pressable key={start} disabled={editing || saving} accessibilityRole="button" accessibilityState={{ selected: week === start }} style={[s.week, week === start && s.selected]} onPress={() => switchWeek(start)}><Text style={week === start ? s.white : s.link}>{i === 0 ? 'Tuần này' : 'Tuần kế tiếp'}</Text></Pressable>)}</View>
+        <View style={s.card}><Text style={s.title}>{displayDate(dates[0])} – {displayDate(dates[6])}</Text><Text style={s.body}>Thứ Hai đến Chủ nhật • Giờ Việt Nam</Text><Text style={s.status}>{registered ? '✓ Đã đăng ký cả tuần' : 'Chưa xác nhận lịch tuần này'}</Text><Text style={s.body}>{editing ? `Đang sửa từ ${new Date(editingFrom!).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}. Khung giờ đã bắt đầu được khóa.` : 'Xem đủ 7 ngày bên dưới. Bấm thay đổi lịch để chỉnh các khung giờ chưa bắt đầu.'}</Text>
+          {editing && <><Text style={s.heading}>Chọn ca cho cả tuần (có thể chọn nhiều ca)</Text><View style={s.wrap}>{[...presets, { title: 'Cả ngày', start: '08:00', end: '20:00' }, { title: 'Nghỉ', start: '08:00', end: '08:00' }].map(preset => <Pressable key={preset.title} disabled={saving} style={s.chip} onPress={() => { setDraft(value => value ? { ...value, confirmedDates: weekDates(week), days: value.days.map(day => preset.title === 'Cả ngày' || preset.title === 'Nghỉ' ? setDaySlots(day, presetSlots(preset.start, preset.end), Date.now()) : toggleShift(day, preset.start, preset.end, Date.now())) } : value); setError(''); }}><Text style={s.link}>{preset.title}</Text></Pressable>)}</View><Text style={s.sub}>Áp dụng cho các giờ còn lại; giữ nguyên thời gian đã qua.</Text></>}
+        </View>
+        {draft.days.map(day => {
+          const expired = !WEEK_SLOTS.some(time => !slotLocked(day.date, time, lockedNow));
+          const bookings = loaded.bookings.filter(item => localDate(item.startsAt) === day.date && !['CANCELLED', 'REFUNDED'].includes(item.status));
+          return <View key={day.date} style={[s.card, expired && s.past]}><View style={s.row}><Text style={[s.heading, s.grow]}>{displayDate(day.date)}{day.date === localDate(now) ? ' • Hôm nay' : ''}</Text><Text style={s.sub}>{expired ? '🔒 Đã qua' : !draft.confirmedDates?.includes(day.date) ? 'Chưa đăng ký' : day.intervals.length ? 'Có lịch làm' : 'Nghỉ'}</Text></View>
+            <View style={s.wrap}>{day.intervals.length ? day.intervals.map(period => <View key={period.startsAt} style={s.period}><Text style={s.status}>{displayTime(period.startsAt)}–{displayTime(period.endsAt)}</Text></View>) : <Text style={s.body}>{draft.confirmedDates?.includes(day.date) ? 'Đã xác nhận nghỉ trong ngày này.' : 'Chưa có khung giờ làm việc.'}</Text>}</View>
+            {editing && (!expired || day.date === localDate(now)) && <><View style={s.wrap}>{presets.map(preset => { const slots=presetSlots(preset.start,preset.end).filter(time=>!slotLocked(day.date,time,lockedNow)), checked=slots.length>0&&slots.every(time=>selectedSlots(day).includes(time)); return <Pressable key={preset.title} disabled={saving || !slots.length} accessibilityRole="checkbox" accessibilityState={{checked,disabled:saving||!slots.length}} style={[s.chip,checked&&s.selected,!slots.length&&s.disabled]} onPress={() => updateDay(day,selectedSlots(toggleShift(day,preset.start,preset.end,Date.now())))}><Text style={checked?s.white:s.link}>{checked?'✓ ':''}{preset.title} {preset.start}–{preset.end}</Text></Pressable>; })}<Pressable disabled={saving} style={[s.chip, WEEK_SLOTS.filter(time=>!slotLocked(day.date,time,lockedNow)).every(time=>selectedSlots(day).includes(time))&&s.selected]} onPress={()=>updateDay(day,WEEK_SLOTS)}><Text style={WEEK_SLOTS.filter(time=>!slotLocked(day.date,time,lockedNow)).every(time=>selectedSlots(day).includes(time))?s.white:s.link}>Cả ngày 08:00–20:00</Text></Pressable></View><View style={s.row}><Pressable disabled={saving} style={[s.chip, s.grow]} onPress={() => setModalDate(day.date)}><Text style={s.link}>Chọn giờ chi tiết</Text></Pressable><Pressable disabled={saving} style={s.chip} onPress={() => updateDay(day, [])}><Text style={s.link}>Nghỉ</Text></Pressable></View></>}
+            {bookings.map(booking => <Text key={booking.id} style={s.sub}>Ca {booking.bookingCode} • {displayTime(booking.startsAt)}–{displayTime(booking.endsAt)}{booking.district ? ` • ${booking.district}` : ''}</Text>)}
+          </View>;
+        })}
+        <View style={s.card}><Text style={s.heading}>Phường/xã nhận việc • {draft.areaIds.length} đã chọn</Text><Text style={s.body}>Danh mục đơn vị hành chính mới của TP. Hồ Chí Minh.</Text>
+          {administrative.loading && <ActivityIndicator color={BrandColors.primary} />}{!!administrative.error && <Pressable onPress={administrative.retry}><Text style={s.error}>{administrative.error} Bấm để tải lại.</Text></Pressable>}
+          <TextInput editable={editing && !saving} accessibilityLabel="Tìm phường/xã" placeholder="Tìm phường/xã có hoặc không dấu" value={search} onChangeText={setSearch} style={s.input} />
+          <View style={s.wrap}>{administrative.units.filter(unit => draft.areaIds.includes(`hcm-${unit.id}`)).map(unit => <View style={s.period} key={unit.id}><Text style={s.status}>✓ {unit.name}</Text></View>)}</View>
+          {editing && <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }}><View style={s.wrap}>{administrative.units.filter(unit => administrativeSearchKey(unit.name).includes(administrativeSearchKey(search))).map(unit => { const id = `hcm-${unit.id}`, selected = draft.areaIds.includes(id); return <Pressable key={id} disabled={saving} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} style={[s.chip, selected && s.selected]} onPress={() => { setDraft(value => value ? { ...value, areaIds: selected ? value.areaIds.filter(item => item !== id) : [...value.areaIds, id] } : value); setError(''); }}><Text style={selected ? s.white : s.link}>{selected ? '✓ ' : '+ '}{unit.name}</Text></Pressable>; })}</View></ScrollView>}
+          {!draft.areaIds.length && <Text style={s.sub}>Chưa chọn phường/xã. Chọn khu vực trước khi xác nhận lịch.</Text>}
+        </View>
+        <View style={[s.card, s.row]}><View style={s.grow}><Text style={s.heading}>Thông báo việc phù hợp</Text><Text style={s.sub}>Theo lịch và phường/xã đã xác nhận.</Text></View><Switch disabled={!editing || saving} value={draft.matchNotifications} onValueChange={value => setDraft(current => current ? { ...current, matchNotifications: value } : current)} /></View>
+        <Pressable disabled={saving} style={s.chip} onPress={() => dirty ? setError('Hãy xác nhận hoặc hủy thay đổi trước khi tải lại.') : setAttempt(value => value + 1)}><Text style={s.link}>Tải lại lịch đã lưu</Text></Pressable>
+      </ScrollView>
+      <View style={s.footer}>{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!!notice && <Text accessibilityLiveRegion="polite" style={s.status}>{notice}</Text>}{editing ? <><Text style={s.sub}>Bản nháp chưa áp dụng. Xác nhận để lưu cả tuần.</Text><View style={s.row}><Pressable disabled={saving} style={s.chip} onPress={() => { setDraft(clone(loaded, week)); setEditingFrom(null); setError(''); }}><Text style={s.link}>Hủy thay đổi</Text></Pressable><Pressable disabled={saving || administrative.loading || !!administrative.error} style={[s.primary, s.grow, saving && s.disabled]} onPress={() => { void save(); }}><Text style={s.white}>{saving ? 'Đang lưu…' : 'Xác nhận'}</Text></Pressable></View></> : <Pressable style={s.primary} onPress={() => { const timestamp = Date.now(); setNow(timestamp); setEditingFrom(timestamp); setNotice(''); setError(''); }}><Text style={s.white}>{registered ? 'Thay đổi lịch' : 'Đăng ký cả tuần'}</Text></Pressable>}</View>
+    </>}
+  </SafeAreaView><StaffBottomNav activeTab="profile" />
+    <Modal visible={!!modalDay} transparent animationType="slide" onRequestClose={() => setModalDate('')}><View style={s.scrim}><SafeAreaView edges={['bottom']} style={s.modal}><Text style={s.title}>{modalDay ? displayDate(modalDay.date) : ''} • Chọn khung 30 phút</Text><Text style={s.sub}>Khung giờ đã bắt đầu bị khóa. Bấm Xác nhận ở màn hình tuần để lưu.</Text><ScrollView><View style={s.wrap}>{modalDay && WEEK_SLOTS.map(time => { const selected = selectedSlots(modalDay).includes(time), locked = slotLocked(modalDay.date, time, lockedNow); return <Pressable key={time} disabled={locked || saving} accessibilityRole="checkbox" accessibilityState={{ checked: selected, disabled: locked }} style={[s.slot, selected && s.selected, locked && s.disabled]} onPress={() => { const before = selectedSlots(modalDay); updateDay(modalDay, selected ? before.filter(item => item !== time) : [...before, time]); }}><Text style={selected ? s.white : s.link}>{locked ? '🔒 ' : ''}{time}</Text></Pressable>; })}</View></ScrollView><Pressable style={s.primary} onPress={() => setModalDate('')}><Text style={s.white}>Xong</Text></Pressable></SafeAreaView></View></Modal>
+    <Modal visible={!!leave && !allowLeave} transparent onRequestClose={() => setLeave(null)}><View style={s.scrim}><SafeAreaView edges={['bottom']} style={s.modal}><Text style={s.title}>Lịch chưa được xác nhận</Text><Text style={s.body}>Tiếp tục chỉnh sửa hoặc bỏ bản nháp để rời màn hình.</Text><Pressable disabled={saving} style={s.primary} onPress={() => setLeave(null)}><Text style={s.white}>Tiếp tục chỉnh sửa</Text></Pressable><Pressable disabled={saving} style={s.chip} onPress={() => setAllowLeave(true)}><Text style={s.link}>Bỏ thay đổi và rời màn hình</Text></Pressable></SafeAreaView></View></Modal>
   </View>;
 }
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BrandColors.gray50 }, screen: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.three, backgroundColor: BrandColors.white },
-  icon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }, title: { color: BrandColors.gray900, fontSize: 18, fontWeight: '700', flexShrink: 1 },
-  content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.four }, card: { backgroundColor: BrandColors.white, padding: Spacing.three, borderRadius: BorderRadius.lg, gap: Spacing.two },
-  heading: { color: BrandColors.gray900, fontSize: 15, fontWeight: '700', lineHeight: 22 }, body: { color: BrandColors.gray700, fontSize: 14, lineHeight: 21 }, sub: { color: BrandColors.gray500, fontSize: 12, lineHeight: 19 },
-  label: { color: BrandColors.gray700, fontSize: 14, fontWeight: '600', textAlign: 'center' }, light: { color: BrandColors.white, fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two }, grow: { flex: 1 },
-  chip: { padding: Spacing.two, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: BrandColors.gray200, backgroundColor: BrandColors.white }, selectedChip: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary },
-  interval: { flexDirection: 'row', alignItems: 'center', backgroundColor: BrandColors.primaryLight, borderRadius: BorderRadius.md, padding: Spacing.two }, smallButton: { padding: Spacing.two }, link: { color: BrandColors.primaryDark, textAlign: 'center', fontWeight: '700', fontSize: 14 },
-  secondary: { padding: Spacing.two, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: BrandColors.gray300 }, primary: { padding: Spacing.three, backgroundColor: BrandColors.primary, borderRadius: BorderRadius.md }, disabled: { opacity: 0.45 },
-  booking: { padding: Spacing.two, borderRadius: BorderRadius.md, backgroundColor: BrandColors.gray100, gap: Spacing.one }, error: { color: BrandColors.danger, lineHeight: 21, fontSize: 14 }, success: { color: BrandColors.primaryDark, lineHeight: 21, fontSize: 14 },
-  loading: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: Spacing.two }, footer: { backgroundColor: BrandColors.white, padding: Spacing.three, gap: Spacing.two },
-  scrim: { flex: 1, backgroundColor: '#0007', justifyContent: 'flex-end' }, modal: { backgroundColor: BrandColors.white, padding: Spacing.three, gap: Spacing.two, borderTopLeftRadius: BorderRadius.lg, borderTopRightRadius: BorderRadius.lg, maxHeight: '90%' }, picker: { height: 290, flexShrink: 1, alignItems: 'stretch' }, time: { padding: Spacing.two, borderRadius: BorderRadius.md, marginVertical: Spacing.one },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: BrandColors.gray50 }, screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff' },
+  title: { fontSize: 18, fontWeight: '700', color: BrandColors.gray900 }, heading: { fontSize: 15, fontWeight: '700', color: BrandColors.gray900 }, body: { fontSize: 14, lineHeight: 21, color: BrandColors.gray700 }, sub: { fontSize: 12, lineHeight: 19, color: BrandColors.gray500 },
+  content: { padding: 12, gap: 12 }, card: { backgroundColor: '#fff', borderRadius: 16, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 8, alignItems: 'center' }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, grow: { flex: 1 },
+  chip: { padding: 10, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 10, backgroundColor: '#fff' }, week: { flex: 1, padding: 12, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 12, backgroundColor: '#fff' }, selected: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary },
+  period: { backgroundColor: BrandColors.primaryLight, borderRadius: 8, padding: 8 }, status: { color: BrandColors.primaryDark, fontWeight: '600', fontSize: 13 }, link: { color: BrandColors.primaryDark, fontWeight: '600', textAlign: 'center', fontSize: 13 }, white: { color: '#fff', fontWeight: '700', textAlign: 'center', fontSize: 14 },
+  primary: { backgroundColor: BrandColors.primary, padding: 14, borderRadius: 12 }, footer: { backgroundColor: '#fff', padding: 12, gap: 8 }, input: { padding: 10, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 10 }, error: { color: BrandColors.danger, lineHeight: 20 }, past: { backgroundColor: BrandColors.gray100 }, disabled: { opacity: 0.45 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }, scrim: { flex: 1, backgroundColor: '#0007', justifyContent: 'flex-end' }, modal: { backgroundColor: '#fff', padding: 16, gap: 12, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' }, slot: { width: '30%', padding: 12, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 10 },
 });

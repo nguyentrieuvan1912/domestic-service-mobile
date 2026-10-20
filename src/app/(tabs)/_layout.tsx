@@ -6,10 +6,12 @@ import { BrandColors } from '@/constants/theme';
 import { TabImageIcon } from '@/components/common/TabImageIcon';
 import { CenterAIMascotTabButton } from '@/components/common/CenterAIMascotTabButton';
 import { useAuth } from '@/context/AuthContext';
+import { useChatInbox } from '@/hooks/use-chat-inbox';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { currentRole } = useAuth();
+  const { unreadCount } = useChatInbox();
   const isStaff = currentRole === 'STAFF';
 
   // Compact, lowered padding for mobile screens
@@ -97,6 +99,8 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Tin nhắn',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarAccessibilityLabel: `Tin nhắn, ${unreadCount} tin chưa đọc`,
           tabBarIcon: ({ focused }) => (
             <TabImageIcon name="chat" focused={focused} size={22} />
           ),

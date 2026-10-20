@@ -50,6 +50,7 @@ export function getNotificationGroup(notification: AppNotification): Notificatio
   return 'SYSTEM';
 }
 export function getNotificationPresentation(notification: AppNotification): { label: string; icon: string; background: string } {
+  if (notification.type === 'CHAT_MESSAGE') return { label: 'Tin nhắn', icon: 'chat', background: '#DCFCE7' };
   switch (getNotificationGroup(notification)) {
     case 'WORK': return { label: 'Lời mời / Việc', icon: 'users', background: '#DCFCE7' };
     case 'SCHEDULE': return { label: 'Lịch ca', icon: 'calendar', background: '#E0F2FE' };

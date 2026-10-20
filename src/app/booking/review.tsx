@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState } from 'react';
 import {
   View,
@@ -14,7 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { RatingView } from '@/components/common/RatingView';
-import { getBookingById, getStaffById, getServiceById, mockBookings } from '@/data';
+import { bookingServiceView, ConnectedBooking } from '@/data/connectedBookings';
+import { useBookingDetail } from '@/hooks/use-booking-detail';
+import { operationRequest } from '@/api/operations';
+import type { Staff } from '@/types/user';
 
 const CRITERIA_LIST = [
   'Đúng giờ hẹn',
@@ -26,22 +30,15 @@ const CRITERIA_LIST = [
 ];
 
 export default function ReviewStaffScreen() {
-  const router = useRouter();
-  const { bookingId } = useLocalSearchParams<{ bookingId?: string }>();
-
-  const booking = getBookingById(bookingId || 'bk-001') || mockBookings[0];
-  const service = getServiceById(booking.serviceId);
-  const staff = booking.staffId ? getStaffById(booking.staffId) : getStaffById('staff-001');
-
-  // Prevent reviewing non-completed booking
-  if (booking.status !== 'COMPLETED') {
-    Alert.alert(
-      'Chưa thể đánh giá',
-      'Đánh giá chỉ áp dụng cho đơn hàng đã hoàn tất nghiệm thu dịch vụ.',
-      [{ text: 'Quay lại', onPress: () => router.back() }]
-    );
-  }
-
+  const router = useRouter(); const { bookingId } = useLocalSearchParams<{ bookingId?: string }>();
+  const data = useBookingDetail(bookingId);
+  if (!data.booking || data.booking.status !== 'COMPLETED') return <SafeAreaView style={styles.container}><Pressable onPress={() => router.back()}><Text>← Quay lại</Text></Pressable><Text>{data.loading ? 'Đang tải đơn...' : data.error || 'Chỉ đánh giá được đơn đã hoàn tất.'}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable></SafeAreaView>;
+  return <ReviewContent booking={data.booking} staff={data.staff} />;
+}
+function ReviewContent({ booking, staff }: { booking: ConnectedBooking; staff?: Staff }) {
+  const router = useRouter(); const service = bookingServiceView(booking);
+  const [selectedStaffId,setSelectedStaffId]=useState(booking.staffId || booking.assignments.find(a=>a.executionStatus==='COMPLETED')?.staffId || '');
+  const [saving, setSaving] = useState(false);
   const [rating, setRating] = useState(5);
   const [selectedCriteria, setSelectedCriteria] = useState<string[]>([
     'Đúng giờ hẹn',
@@ -57,22 +54,21 @@ export default function ReviewStaffScreen() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!comment.trim()) {
       Alert.alert('Gợi ý', 'Vui lòng chia sẻ thêm vài dòng cảm nhận để giúp nhân viên hoàn thiện hơn nhé!');
       return;
     }
 
-    Alert.alert(
-      'Cảm ơn đánh giá của bạn!',
-      `Đánh giá ${rating} sao và phản hồi quý báu của bạn đã được ghi nhận vào hồ sơ nhân viên ${staff?.fullName || ''}.`,
-      [
-        {
-          text: 'Hoàn tất',
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    if (saving) return;
+    setSaving(true);
+    try {
+      const target = booking.assignments.find(a => a.staffId === selectedStaffId && a.executionStatus === 'COMPLETED');
+      if (!target) throw new Error('Chưa có nhân viên hoàn tất trong đơn hàng.');
+      await operationRequest('booking', '/bookings/' + booking.id + '/reviews', 'POST', { staffId: target.staffId, rating, comment: comment.trim(), tags: selectedCriteria });
+      Alert.alert('Cảm ơn đánh giá của bạn!', 'Đánh giá đã được lưu vào hệ thống.', [{ text: 'Hoàn tất', onPress: () => router.back() }]);
+    } catch (error) { Alert.alert('Chưa gửi được đánh giá', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -92,13 +88,14 @@ export default function ReviewStaffScreen() {
 
         {/* Staff & Service Header Card */}
         <View style={styles.staffCard}>
-          <Image source={{ uri: staff?.avatar }} style={styles.staffAvatar} />
-          <Text style={styles.staffName}>{staff?.fullName || 'Nhân viên CleanMaster'}</Text>
+          <Image source={remoteImageSource(staff?.avatar)} style={styles.staffAvatar} />
+          <Text style={styles.staffName}>{String(booking.assignments.find(a=>a.staffId===selectedStaffId)?.staffSnapshot?.fullName || staff?.fullName || 'Nhân viên #'+selectedStaffId)}</Text>
           <Text style={styles.serviceName}>
             {service?.name} • Mã đơn: {booking.bookingCode}
           </Text>
         </View>
 
+        {booking.assignments.filter(a=>a.executionStatus==='COMPLETED').length>1 && <View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{booking.assignments.filter(a=>a.executionStatus==='COMPLETED').map(a=><Pressable key={a.staffId} onPress={()=>setSelectedStaffId(a.staffId)} style={{padding:10,borderWidth:1,borderRadius:10,borderColor:selectedStaffId===a.staffId?'#059669':'#CBD5E1'}}><Text>{String(a.staffSnapshot?.fullName || 'Nhân viên #'+a.staffId)}</Text></Pressable>)}</View>}
         {/* Interactive Star Rating */}
         <View style={styles.ratingCard}>
           <Text style={styles.ratingTitle}>Bạn hài lòng với chất lượng phục vụ chứ?</Text>
@@ -149,7 +146,7 @@ export default function ReviewStaffScreen() {
         </View>
 
         {/* Submit button */}
-        <Pressable style={styles.submitBtn} onPress={handleSubmit}>
+        <Pressable style={styles.submitBtn} disabled={saving} onPress={handleSubmit}>
           <Text style={styles.submitBtnText}>Gửi đánh giá dịch vụ</Text>
         </Pressable>
 

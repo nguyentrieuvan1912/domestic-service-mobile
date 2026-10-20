@@ -46,7 +46,8 @@ export const mockStaffAreas: StaffArea[] = [
   { id: 'sa-026', staffId: 'staff-012', district: 'Bình Thạnh', city: 'TP. Hồ Chí Minh', isPrimary: false },
 ];
 
-// Shared local area catalog until Booking publishes an area DTO. IDs are UI fixture IDs.
+// Legacy area IDs remain for historical schedules and domain tests.
+// New ward choices are registered from Identity's administrative directory by administrative-units.ts.
 const operationalAreaNames = [
   'Bình Thạnh', 'Quận 1', 'Quận 2', 'Quận 3', 'Quận 7', 'Phú Nhuận', 'Gò Vấp',
   'Tân Bình', 'TP. Thủ Đức', 'Tân Phú', 'Quận 10', 'Nhà Bè',

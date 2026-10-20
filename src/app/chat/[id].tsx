@@ -1,31 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { remoteImageSource } from '@/utils/image-source';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, Pressable, Image,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  View, Text, StyleSheet, FlatList, TextInput, Pressable, Image,
+  KeyboardAvoidingView, Platform, ActivityIndicator, AppState,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useChatInbox } from '@/hooks/use-chat-inbox';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
-import { ChatRepository, createChatDraft, getChatActor } from '@/data/chatRepository';
-import { StaffRepository } from '@/data/staffRepository';
+import { ChatRepository, createChatDraft, getChatActor } from '@/data/connectedChatRepository';
 import { canSendChat, CHAT_PHASE_LABELS, CHAT_TIME_ZONE, isOwnChatMessage } from '@/data/chatPolicy';
 import type { ChatActor, ChatBookingPhase } from '@/data/chatPolicy';
 import type { ChatMessage, Conversation } from '@/types/chat';
 
 export default function ChatDetailScreen() {
+  'use no memo'; // This boundary reads repository access state outside React.
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const router = useRouter();
   const { currentUser, currentRole } = useAuth();
+  const { conversations } = useChatInbox();
   const actor = useMemo(() => getChatActor(currentUser), [currentUser]);
-  const [, refresh] = useReducer((value: number) => value + 1, 0);
-  useEffect(() => {
-    const unsubscribeBooking = StaffRepository.subscribe(refresh);
-    const unsubscribeChat = ChatRepository.subscribe(refresh);
-    return () => { unsubscribeBooking(); unsubscribeChat(); };
-  }, []);
-  const access = ChatRepository.access(typeof id === 'string' ? id : undefined, actor);
+  // Access depends on the subscribed snapshot; the React Compiler cannot observe a mutable repository.
+  const access = useMemo(() => ChatRepository.access(typeof id === 'string' ? id : undefined, actor, conversations), [id, actor, conversations]);
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace(currentRole === 'STAFF' ? '/staff/jobs' : '/(tabs)/chat');
@@ -63,15 +61,18 @@ interface ChatContentProps {
 interface PendingMessage { message: ChatMessage; status: 'SENDING' | 'FAILED'; error?: string }
 
 function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatContentProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => ChatRepository.getMessages(conversation.id, actor));
   const [loadState, setLoadState] = useState<'LOADING' | 'READY' | 'ERROR'>('LOADING');
   const [loadError, setLoadError] = useState('');
   const [inputText, setInputText] = useState('');
   const [pending, setPending] = useState<PendingMessage | null>(null);
   const [sendNotice, setSendNotice] = useState('');
-  const listRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const nearBottom = useRef(true);
+  const hasLoaded = useRef(false);
   const requests = useRef(new Set<AbortController>());
   const sending = useRef(false);
+  const reading = useRef(false);
   const isLocked = !canSendChat(phase);
   const lockReason = phase === 'AWAITING_ACCEPTANCE'
     ? 'Tạm khóa gửi tin trong thời gian chờ nghiệm thu theo chính sách của ca.'
@@ -81,31 +82,35 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
   const conversationId = conversation.id;
 
   const load = useCallback(() => {
+    if (reading.current || AppState.currentState !== 'active') return;
+    reading.current = true;
     const controller = new AbortController();
     requests.current.add(controller);
     void ChatRepository.load(conversationId, actor, controller.signal).then((next) => {
-      if (!controller.signal.aborted) { setMessages(next); setLoadState('READY'); }
+      if (!controller.signal.aborted) { setMessages(next); hasLoaded.current = true; setLoadError(''); setLoadState('READY'); }
     }).catch((error: unknown) => {
       if (!controller.signal.aborted) {
         setLoadError(error instanceof Error ? error.message : 'Chưa tải được tin nhắn.');
-        setLoadState('ERROR');
+        if (!hasLoaded.current) setLoadState('ERROR');
       }
-    }).finally(() => { requests.current.delete(controller); });
+    }).finally(() => { reading.current = false; requests.current.delete(controller); });
   }, [actor, conversationId]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     const activeRequests = requests.current;
     void load();
+    const poll = setInterval(load, 2000);
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') load(); });
     const unsubscribe = ChatRepository.subscribe(() => {
       try { setMessages(ChatRepository.getMessages(conversationId, actor)); }
       catch { /* Parent immediately replaces content when booking access is revoked. */ }
     });
     return () => {
-      unsubscribe();
+      clearInterval(poll); foreground.remove(); unsubscribe();
       activeRequests.forEach((controller) => controller.abort());
       activeRequests.clear();
     };
-  }, [actor, conversationId, load]);
+  }, [actor, conversationId, load]));
 
   const send = async (retry?: ChatMessage) => {
     if (sending.current || isLocked || loadState !== 'READY') return;
@@ -113,6 +118,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
     if (!content || (!retry && pending)) return;
     const message = retry ?? createChatDraft(conversationId, actor, content);
     sending.current = true;
+    nearBottom.current = true;
     setPending({ message, status: 'SENDING' });
     setInputText('');
     setSendNotice('');
@@ -120,18 +126,16 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
     requests.current.add(controller);
     try {
       await ChatRepository.send(conversationId, actor, content, message.id, controller.signal);
-      if (!controller.signal.aborted) {
-        setMessages(ChatRepository.getMessages(conversationId, actor));
-        setPending(null);
-        setSendNotice('Đã gửi');
-      }
+      setMessages(ChatRepository.getMessages(conversationId, actor));
+      setPending(null);
+      setSendNotice('Đã gửi');
     } catch (error) {
-      if (!controller.signal.aborted) setPending({ message, status: 'FAILED',
+      setPending({ message, status: 'FAILED',
         error: error instanceof Error ? error.message : 'Chưa gửi được tin nhắn.' });
     } finally { requests.current.delete(controller); sending.current = false; }
   };
 
-  const displayed = pending && !messages.some((message) => message.id === pending.message.id)
+  const displayed = pending && !messages.some((message) => message.id === pending.message.id || message.clientKey === pending.message.id)
     ? [...messages, pending.message] : messages;
   const sendEnabled = loadState === 'READY' && !isLocked && !pending && !!inputText.trim();
 
@@ -141,7 +145,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
         <Pressable style={styles.backBtn} onPress={goBack} accessibilityLabel="Quay lại">
           <IconSymbol name="back" size={22} color={BrandColors.gray700} />
         </Pressable>
-        <Image source={{ uri: otherAvatar }} style={styles.headerAvatar} />
+        <Image source={remoteImageSource(otherAvatar)} style={styles.headerAvatar} />
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>{otherName}</Text>
           <Text style={styles.headerSubtitle}>{bookingCode} • {CHAT_PHASE_LABELS[phase]}</Text>
@@ -161,34 +165,23 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
         </Text>
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView ref={listRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-          contentContainerStyle={styles.messageScroll}>
-          {loadState === 'LOADING' ? <View style={styles.stateBox}><ActivityIndicator color={BrandColors.primary} /><Text style={styles.stateText}>Đang tải tin nhắn…</Text></View> :
-            loadState === 'ERROR' ? <View style={styles.stateBox}><Text style={styles.stateText}>{loadError}</Text><Pressable style={styles.retryBtn} onPress={() => { setLoadState('LOADING'); void load(); }}><Text style={styles.retryText}>Thử lại</Text></Pressable></View> :
-            displayed.length === 0 ? <View style={styles.stateBox}><IconSymbol name="chat" size={32} color={BrandColors.gray400} /><Text style={styles.stateTitle}>Chưa có tin nhắn</Text><Text style={styles.stateText}>{isLocked ? 'Ca này đã kết thúc.' : 'Bắt đầu trao đổi về ca với ' + otherName + '.'}</Text></View> :
-            displayed.map((message) => {
-              if (message.senderType === 'SYSTEM') return <View key={message.id} style={styles.systemMsgBox}><Text style={styles.systemMsgText}>{message.content}</Text></View>;
-              const isMe = isOwnChatMessage(message, actor);
-              const delivery = pending?.message.id === message.id ? pending : null;
-              return (
-                <View key={message.id} style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
-                  {!isMe && <Image source={{ uri: message.senderAvatar }} style={styles.msgAvatar} />}
-                  <View style={[styles.bubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
-                    <Text style={[styles.bubbleText, isMe ? styles.bubbleTextRight : styles.bubbleTextLeft]}>{message.content}</Text>
-                    <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft]}>
-                      {new Date(message.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: CHAT_TIME_ZONE })}
-                      {isMe ? delivery?.status === 'SENDING' ? ' • Đang gửi…' : delivery?.status === 'FAILED' ? ' • Chưa gửi' : ' • Đã gửi' : ''}
-                    </Text>
-                    {delivery?.status === 'FAILED' && <Pressable disabled={isLocked} accessibilityState={{ disabled: isLocked }}
-                      accessibilityLabel="Thử gửi lại tin nhắn" onPress={() => void send(message)}>
-                      <Text style={styles.messageRetry}>{isLocked ? 'Ca đã khóa gửi tin' : 'Thử gửi lại'}</Text>
-                    </Pressable>}
-                  </View>
-                </View>
-              );
-            })}
-        </ScrollView>
+        <FlatList ref={listRef} data={displayed} keyExtractor={message => message.id}
+          showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+          initialNumToRender={20} maxToRenderPerBatch={12} windowSize={7}
+          onScroll={({ nativeEvent: { contentOffset, layoutMeasurement, contentSize } }) => {
+            nearBottom.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 100;
+          }} scrollEventThrottle={100}
+          onContentSizeChange={() => { if (nearBottom.current) listRef.current?.scrollToEnd({ animated: hasLoaded.current }); }}
+          contentContainerStyle={styles.messageScroll}
+          ListEmptyComponent={loadState === 'LOADING' ? <View style={styles.stateBox}><ActivityIndicator color={BrandColors.primary} /><Text style={styles.stateText}>Đang tải tin nhắn…</Text></View> :
+            loadState === 'ERROR' ? <View style={styles.stateBox}><Text style={styles.stateText}>{loadError}</Text><Pressable style={styles.retryBtn} onPress={() => { setLoadState('LOADING'); void load(); }}><Text style={styles.retryText}>Thử lại</Text></Pressable></View> : <View style={styles.stateBox}><IconSymbol name="chat" size={32} color={BrandColors.gray400} /><Text style={styles.stateTitle}>Chưa có tin nhắn</Text><Text style={styles.stateText}>{isLocked ? 'Ca này đã kết thúc.' : 'Bắt đầu trao đổi về ca với ' + otherName + '.'}</Text></View>}
+          renderItem={({ item: message }) => {
+            return <MessageBubble message={message} actor={actor} isLocked={isLocked}
+              delivery={pending?.message.id === message.id ? pending : null}
+              onRetry={pending?.message.id === message.id && pending.status === 'FAILED' ? () => void send(message) : undefined} />;
+          }}
+        />
+        {!!loadError && loadState === 'READY' && <Pressable onPress={load}><Text style={styles.deliveryNotice}>Chưa đồng bộ được tin mới. Chạm để thử lại.</Text></Pressable>}
         {pending?.error && <Text style={styles.deliveryNotice} accessibilityLiveRegion="polite">{pending.error}</Text>}
         {!!sendNotice && <Text style={styles.deliveryNotice} accessibilityLiveRegion="polite">{sendNotice}</Text>}
         {isLocked ? <View style={styles.lockedBar}><Text style={styles.lockedText}>{lockReason}</Text></View> :
@@ -206,6 +199,29 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
     </SafeAreaView>
   );
 }
+
+const MessageBubble = React.memo(function MessageBubble({ message, actor, delivery, isLocked, onRetry }: {
+  message: ChatMessage; actor: ChatActor; delivery: PendingMessage | null; isLocked: boolean; onRetry?: () => void;
+}) {
+              if (message.senderType === 'SYSTEM') return <View style={styles.systemMsgBox}><Text style={styles.systemMsgText}>{message.content}</Text></View>;
+              const isMe = isOwnChatMessage(message, actor);
+              return (
+                <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
+                  {!isMe && <Image source={remoteImageSource(message.senderAvatar)} style={styles.msgAvatar} />}
+                  <View style={[styles.bubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+                    <Text style={[styles.bubbleText, isMe ? styles.bubbleTextRight : styles.bubbleTextLeft]}>{message.content}</Text>
+                    <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft]}>
+                      {new Date(message.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: CHAT_TIME_ZONE })}
+                      {isMe ? delivery?.status === 'SENDING' ? ' • Đang gửi…' : delivery?.status === 'FAILED' ? ' • Chưa gửi' : ' • Đã gửi' : ''}
+                    </Text>
+                    {delivery?.status === 'FAILED' && <Pressable disabled={isLocked} accessibilityState={{ disabled: isLocked }}
+                      accessibilityLabel="Thử gửi lại tin nhắn" onPress={onRetry}>
+                      <Text style={styles.messageRetry}>{isLocked ? 'Ca đã khóa gửi tin' : 'Thử gửi lại'}</Text>
+                    </Pressable>}
+                  </View>
+                </View>
+              );
+});
 
 const styles = StyleSheet.create({
   stateBox: { alignItems: 'center', padding: Spacing.four, gap: Spacing.two },

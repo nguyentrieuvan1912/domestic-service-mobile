@@ -21,6 +21,7 @@ export const BookingStatusBadge: React.FC<BookingStatusBadgeProps> = ({
       case 'CONFIRMED':
         return { label: 'Đã xác nhận', bg: '#E0F2FE', text: '#0284C7', dot: '#38BDF8' };
       case 'STAFF_ASSIGNED':
+        return { label: 'Chờ nhân viên nhận', bg: '#FEF3C7', text: '#B45309', dot: '#F59E0B' };
       case 'ASSIGNED':
       case 'ACCEPTED':
         return { label: 'Đã có thợ nhận', bg: '#CCFBF1', text: '#0D9488', dot: '#14B8A6' };

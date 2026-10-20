@@ -1,4 +1,4 @@
-export type BookingMode = 'MODE_A' | 'MODE_B'; // MODE_A: Customer selects staff, MODE_B: System matches
+export type BookingMode = 'MODE_A' | 'MODE_B'; // MODE_A: Customer invites staff; MODE_B: Eligible staff claim posted work.
 
 export type BookingStatus =
   | 'PENDING'

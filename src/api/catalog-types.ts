@@ -16,3 +16,5 @@ export interface CatalogDetail {
   workflow: string[]; benefits: string[]
 }
 export interface CatalogPage { items: CatalogService[]; total: number; page: number; size: number; totalPages: number }
+export interface PackageSuggestion { packageId: number; packageName: string; requiredStaffCount: number; quantity: number; baseAmount: number; durationMinutes: number; coveredAreaM2: number }
+export interface PackageRecommendation { status: 'RECOMMENDED' | 'NO_MATCH' | 'UNSUPPORTED'; areaM2: number; options: PackageSuggestion[]; unconfiguredPackageIds: number[]; message: string }

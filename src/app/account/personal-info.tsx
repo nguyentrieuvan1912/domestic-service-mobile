@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -12,15 +13,18 @@ export default function PersonalInfoScreen() {
   const { currentCustomer, updateCustomerProfile } = useAuth();
   const [fullName, setFullName] = useState(currentCustomer?.fullName || '');
   const [phone, setPhone] = useState(currentCustomer?.phone || '');
-  const [email, setEmail] = useState(currentCustomer?.email || '');
+  const email = currentCustomer?.email || '';
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     if (!fullName.trim() || !phone.trim() || !email.trim()) {
       Alert.alert('Thiếu thông tin', 'Vui lòng nhập họ tên, số điện thoại và email.');
       return;
     }
 
-    updateCustomerProfile({
+    setSaving(true);
+    try { await updateCustomerProfile({
       fullName: fullName.trim(),
       phone: phone.trim(),
       email: email.trim(),
@@ -29,6 +33,8 @@ export default function PersonalInfoScreen() {
     Alert.alert('Đã lưu', 'Thông tin cá nhân của bạn đã được cập nhật.', [
       { text: 'Xong', onPress: () => router.back() },
     ]);
+    } catch (error) { Alert.alert('Chưa lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -47,12 +53,7 @@ export default function PersonalInfoScreen() {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.avatarSection}>
-            <Image
-              source={{
-                uri: currentCustomer?.avatar || 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80',
-              }}
-              style={styles.avatar}
-            />
+            {currentCustomer?.avatar ? <Image source={remoteImageSource(currentCustomer.avatar)} style={styles.avatar} /> : <View style={[styles.avatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' }]}><IconSymbol name="user" size={36} color={BrandColors.primary} /></View>}
             <Text style={styles.avatarHint}>Ảnh đại diện</Text>
             <Text style={styles.avatarSubHint}>Tính năng thay ảnh sẽ được bổ sung khi kết nối máy chủ.</Text>
           </View>
@@ -90,8 +91,8 @@ export default function PersonalInfoScreen() {
               <IconSymbol name="✉️" style={styles.fieldEmoji} />
               <TextInput
                 value={email}
-                onChangeText={setEmail}
-                placeholder="Nhập email"
+                editable={false}
+                placeholder="Gmail đã xác thực"
                 placeholderTextColor={BrandColors.gray400}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -106,8 +107,8 @@ export default function PersonalInfoScreen() {
         </ScrollView>
 
         <View style={styles.bottomBar}>
-          <Pressable style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>Lưu thay đổi</Text>
+          <Pressable style={styles.saveButton} disabled={saving} onPress={handleSave}>
+            <Text style={styles.saveButtonText}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</Text>
           </Pressable>
         </View>
       </SafeAreaView>

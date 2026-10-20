@@ -1,3 +1,5 @@
+import { staffBirthLabel } from '@/utils/staff-profile';
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -10,17 +12,22 @@ export default function StaffPersonalInfoScreen() {
   const router = useRouter();
   const { currentStaff, updateStaffProfile } = useAuth();
   const staff = currentStaff;
-  const [phone, setPhone] = useState(staff?.phone || '0912 001 001');
-  const [email, setEmail] = useState(staff?.email || 'hoa.nguyen.staff@cleanmaster.vn');
-  const [bio, setBio] = useState(staff?.bio || 'Cẩn thận, chu đáo và trung thực.');
+  const [phone, setPhone] = useState(staff?.phone || '');
+  const email = staff?.email || '';
+  const [saving, setSaving] = useState(false);
+  const [bio, setBio] = useState(staff?.bio || '');
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     if (!phone.trim() || !email.trim()) {
       Alert.alert('Thiếu thông tin', 'Vui lòng nhập số điện thoại và email liên hệ.');
       return;
     }
-    updateStaffProfile({ phone: phone.trim(), email: email.trim(), bio: bio.trim() });
+    setSaving(true);
+    try { await updateStaffProfile({ phone: phone.trim(), email: email.trim(), bio: bio.trim() });
     Alert.alert('Đã cập nhật', 'Thông tin liên hệ của bạn đã được lưu.', [{ text: 'Xong', onPress: () => router.back() }]);
+    } catch (error) { Alert.alert('Chưa lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -33,9 +40,9 @@ export default function StaffPersonalInfoScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarSection}>
-          <Image source={{ uri: staff?.avatar || 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80' }} style={styles.avatar} />
-          <Text style={styles.avatarName}>{staff?.fullName || 'Nguyễn Thị Hoa'}</Text>
-          <Text style={styles.avatarHint}>Ảnh đại diện sẽ được cập nhật sau khi có kết nối máy chủ.</Text>
+          <Image source={remoteImageSource(staff?.avatar || '/api/v1/identity/staff-avatar.png')} style={styles.avatar} />
+          <Text style={styles.avatarName}>{staff?.fullName || 'Chưa đăng nhập'}</Text>
+          <Text style={styles.avatarHint}>Ảnh đại diện được đồng bộ từ hồ sơ tài khoản.</Text>
         </View>
 
         <View style={styles.card}>
@@ -46,7 +53,7 @@ export default function StaffPersonalInfoScreen() {
           <View style={styles.inputRow}><IconSymbol name="phone" size={17} color={BrandColors.gray500} /><TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Nhập số điện thoại" /></View>
 
           <Text style={styles.fieldLabel}>Email</Text>
-          <View style={styles.inputRow}><IconSymbol name="✉️" style={styles.inputIcon} /><TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" style={styles.input} placeholder="Nhập email" /></View>
+          <View style={styles.inputRow}><IconSymbol name="✉️" style={styles.inputIcon} /><TextInput value={email} editable={false} keyboardType="email-address" autoCapitalize="none" style={styles.input} placeholder="Nhập email" /></View>
 
           <Text style={styles.fieldLabel}>Giới thiệu bản thân</Text>
           <TextInput value={bio} onChangeText={setBio} multiline textAlignVertical="top" style={[styles.inputRow, styles.bioInput]} placeholder="Giới thiệu ngắn về bạn" />
@@ -54,17 +61,17 @@ export default function StaffPersonalInfoScreen() {
 
         <View style={styles.card}>
           <View style={styles.lockedHeading}><IconSymbol name="shield" size={18} color="#047857" /><View><Text style={styles.sectionTitle}>Thông tin đã xác thực</Text><Text style={styles.sectionHint}>Chỉ CleanMaster có thể thay đổi sau khi xét duyệt.</Text></View></View>
-          <ReadOnlyRow label="Họ và tên" value={staff?.fullName || 'Nguyễn Thị Hoa'} />
-          <ReadOnlyRow label="Mã nhân viên" value={staff?.id ? `NV-${staff.id.replace('staff-', '').padStart(3, '0')}` : 'NV-001'} />
-          <ReadOnlyRow label="CCCD" value={staff?.idCardNumber || '001089012345'} />
-          <ReadOnlyRow label="Ngày sinh" value={staff?.dateOfBirth || '1989-06-12'} />
-          <ReadOnlyRow label="Kinh nghiệm" value={`${staff?.experienceYears || 5} năm`} last />
+          <ReadOnlyRow label="Họ và tên" value={staff?.fullName || 'Chưa đăng nhập'} />
+          <ReadOnlyRow label="Mã nhân viên" value={staff?.id ? `NV-${staff.id.replace('staff-', '').padStart(3, '0')}` : 'Chưa đăng nhập'} />
+          <ReadOnlyRow label="CCCD" value={staff?.idCardNumber || 'Chưa cập nhật'} />
+          <ReadOnlyRow label="Ngày sinh" value={staff ? staffBirthLabel(staff) : 'Chưa cập nhật'} />
+          <ReadOnlyRow label="Kinh nghiệm" value={`${staff?.experienceYears ?? 0} năm`} last />
         </View>
 
         <View style={styles.notice}><IconSymbol name="info" size={16} color="#0369A1" /><Text style={styles.noticeText}>Nếu cần chỉnh sửa thông tin đã xác thực, vui lòng liên hệ bộ phận vận hành CleanMaster để được hỗ trợ.</Text></View>
       </ScrollView>
 
-      <View style={styles.bottomBar}><Pressable style={styles.saveButton} onPress={handleSave}><Text style={styles.saveButtonText}>Lưu thay đổi</Text></Pressable></View>
+      <View style={styles.bottomBar}><Pressable style={styles.saveButton} disabled={saving} onPress={handleSave}><Text style={styles.saveButtonText}>Lưu thay đổi</Text></Pressable></View>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }

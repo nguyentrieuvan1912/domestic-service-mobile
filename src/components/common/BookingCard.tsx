@@ -1,3 +1,4 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
@@ -5,7 +6,7 @@ import { Booking } from '@/types/booking';
 import { BookingStatusBadge } from './BookingStatusBadge';
 import { formatVND } from './Badge';
 import { IconSymbol } from './IconSymbol';
-import { getServiceById, getStaffById } from '@/data';
+import { bookingServiceView, ConnectedBooking } from '@/data/connectedBookings';
 
 interface BookingCardProps {
   booking: Booking;
@@ -22,10 +23,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   onReview,
   onRebook,
 }) => {
-  const service = getServiceById(booking.serviceId);
-  const staff = booking.staffId ? getStaffById(booking.staffId) : undefined;
+  const service = bookingServiceView(booking as ConnectedBooking);
+  const staff = (booking as ConnectedBooking & { staff?: { fullName: string; avatar: string } }).staff;
 
   const isCompleted = booking.status === 'COMPLETED';
+  const isClosed = ['CANCELLED', 'REFUNDING', 'REFUNDED', 'NO_STAFF_FOUND', 'ABSENT', 'REJECTED'].includes(booking.status);
+  const hasAcceptedStaff = (booking as ConnectedBooking).assignments?.some(item => ['ACCEPTED', 'COMPLETED'].includes(item.status));
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
@@ -46,7 +49,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
       {/* Middle row: Service image, title & package */}
       <View style={styles.serviceRow}>
         {service?.image ? (
-          <Image source={{ uri: service.image }} style={styles.serviceImage} />
+          <Image source={remoteImageSource(service.image)} style={styles.serviceImage} />
         ) : (
           <View style={styles.imagePlaceholder}>
             <IconSymbol name="🏡" style={{ fontSize: 20 }} />
@@ -61,16 +64,23 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           </Text>
           {staff ? (
             <View style={styles.staffAssignedRow}>
-              <Image source={{ uri: staff.avatar }} style={styles.staffThumb} />
-              <Text style={styles.staffAssignedName}>{staff.fullName}</Text>
+              <Image source={remoteImageSource(staff.avatar)} style={styles.staffThumb} />
+              <Text style={styles.staffAssignedName}>{!hasAcceptedStaff ? 'Nhân viên đã chọn: ' : ''}{staff.fullName}</Text>
             </View>
           ) : (
             <Text style={styles.matchingNote}>
-              {booking.status === 'MATCHING' ? '⚡ Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
+              {isClosed ? 'Đã dừng điều phối' : booking.status === 'MATCHING' ? '⚡ Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
             </Text>
           )}
         </View>
       </View>
+
+      {booking.status === 'CANCELLED' && (booking.cancelledAt || booking.cancellationReason) && (
+        <View style={styles.cancellationInfo}>
+          {!!booking.cancelledAt && <Text style={styles.cancellationText}>Hủy lúc {new Date(booking.cancelledAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</Text>}
+          {!!booking.cancellationReason && <Text style={styles.cancellationText}>{booking.cancellationReason}</Text>}
+        </View>
+      )}
 
       {/* Bottom row: Total amount & Quick action buttons */}
       <View style={styles.bottomRow}>
@@ -124,6 +134,8 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 };
 
 const styles = StyleSheet.create({
+  cancellationInfo: { paddingBottom: Spacing.two, gap: 3 },
+  cancellationText: { fontSize: 11, lineHeight: 16, color: BrandColors.gray600 },
   card: {
     backgroundColor: '#FFF',
     borderRadius: BorderRadius.xl,

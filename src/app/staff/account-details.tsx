@@ -1,4 +1,6 @@
-import React from 'react';
+import { remoteImageSource } from '@/utils/image-source';
+import React, { useState, useEffect } from 'react';
+import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,21 +20,18 @@ const PAGE_COPY: Record<DetailSection, { title: string; description: string }> =
   reviews: { title: 'Nhận xét từ khách hàng', description: 'Các phản hồi gần đây giúp bạn theo dõi chất lượng phục vụ.' },
 };
 
-const BADGES = [
-  { icon: '⏱️', label: 'Đúng giờ', count: 182 },
-  { icon: '✨', label: 'Cẩn thận & Tỉ mỉ', count: 210 },
-  { icon: '😊', label: 'Thân thiện, trung thực', count: 154 },
-  { icon: '🧼', label: 'Sạch sẽ vượt mong đợi', count: 198 },
-  { icon: '⚡', label: 'Tác phong chuyên nghiệp', count: 120 },
-];
+
 
 export default function StaffAccountDetailsScreen() {
-  const router = useRouter();
+  const router = useRouter(); const [, render] = useState(0);
+  useEffect(() => StaffService.subscribe(() => render(x=>x+1)), []);
   const { currentUser, currentStaff } = useAuth();
   const { section: rawSection, capabilityId } = useLocalSearchParams<{ section?: string; capabilityId?: string | string[] }>();
   const section: DetailSection = rawSection === 'skills' || rawSection === 'reviews' ? rawSection : 'badges';
   const page = PAGE_COPY[section];
   const reviews = currentStaff && currentUser?.role === 'STAFF' ? StaffService.getStaffReviews(currentStaff.id) : [];
+  const tags = new Map<string,number>(); reviews.forEach(r=>r.tags?.forEach(tag=>tags.set(tag,(tags.get(tag)||0)+1)));
+  const BADGES = [...tags].map(([label,count])=>({icon:'⭐',label,count}));
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else if (capabilityId) router.replace({ pathname: '/staff/account-details', params: { section: 'skills' } });
@@ -52,6 +51,7 @@ export default function StaffAccountDetailsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <StaffConnectionStatus />
         <Text style={styles.description}>{page.description}</Text>
 
         {section === 'badges' && <View style={styles.card}>
@@ -69,7 +69,7 @@ export default function StaffAccountDetailsScreen() {
         {section === 'reviews' && <View style={styles.card}>
           {reviews.map((review) => <View key={review.id} style={styles.reviewItem}>
             <View style={styles.reviewTop}>
-              <Image source={{ uri: review.customerAvatar || 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=250&auto=format&fit=crop&q=80' }} style={styles.reviewerAvatar} />
+              <Image source={remoteImageSource(review.customerAvatar || undefined)} style={styles.reviewerAvatar} />
               <View style={styles.detailCopy}><Text style={styles.detailTitle}>{review.customerName}</Text><Text style={styles.reviewDate}>{review.createdAt.split('T')[0]}</Text></View>
               <Text style={styles.rating}>{'★'.repeat(review.rating)}<Text style={styles.emptyStars}>{'★'.repeat(5 - review.rating)}</Text></Text>
             </View>

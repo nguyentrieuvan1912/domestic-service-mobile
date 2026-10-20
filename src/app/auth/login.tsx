@@ -6,35 +6,62 @@ import { StaffWelcomeOverlay } from '@/components/common/StaffWelcomeOverlay';
 import { WelcomeSweepOverlay } from '@/components/common/WelcomeSweepOverlay';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { clearRememberedLogin, loadRememberedLogin, LoginRole } from '@/utils/remembered-login';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type LoginRole = 'CUSTOMER' | 'STAFF';
-
-const ROLE_CONTENT: Record<LoginRole, { title: string; description: string; demo: string; account: string; icon: string }> = {
-  CUSTOMER: { title: 'Khách hàng', description: 'Đặt dịch vụ, theo dõi đơn và quản lý ngôi nhà của bạn.', demo: 'Trải nghiệm tài khoản khách hàng mẫu', account: '0901234001', icon: '🏠' },
-  STAFF: { title: 'Nhân viên', description: 'Nhận ca phù hợp, quản lý lịch làm và theo dõi thu nhập.', demo: 'Trải nghiệm tài khoản nhân viên mẫu', account: '0912001001', icon: '🧹' },
+const ROLE_CONTENT: Record<LoginRole, { title: string; description: string; icon: string }> = {
+  CUSTOMER: { title: 'Khách hàng', description: 'Đặt dịch vụ, theo dõi đơn và quản lý ngôi nhà của bạn.', icon: '🏠' },
+  STAFF: { title: 'Nhân viên', description: 'Nhận ca phù hợp, quản lý lịch làm và theo dõi thu nhập.', icon: '🧹' },
 };
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, quickLoginAsCustomer, quickLoginAsStaff } = useAuth();
+  const { login } = useAuth();
   const [role, setRole] = useState<LoginRole>('CUSTOMER');
-  const [account, setAccount] = useState(ROLE_CONTENT.CUSTOMER.account);
-  const [password, setPassword] = useState('123456');
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [restoringLogin, setRestoringLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showWelcome, setShowWelcome] = useState(false);
   const content = ROLE_CONTENT[role];
+  const busy = isLoading || restoringLogin || showWelcome;
 
-  const selectRole = (nextRole: LoginRole) => {
+  useEffect(() => {
+    let active = true;
+    void loadRememberedLogin().then(saved => {
+      if (!active) return;
+      setRole(saved.role); setAccount(saved.identifier); setPassword(saved.password); setRememberMe(saved.remember);
+    }).catch(() => { if (active) setErrorMessage('Không thể đọc thông tin đăng nhập đã ghi nhớ. Anh có thể nhập lại để đăng nhập.'); })
+      .finally(() => { if (active) setRestoringLogin(false); });
+    return () => { active = false; };
+  }, []);
+
+  const selectRole = async (nextRole: LoginRole) => {
+    if (busy || nextRole === role) return;
     setRole(nextRole);
-    setAccount(ROLE_CONTENT[nextRole].account);
-    setPassword('123456');
+    setAccount('');
+    setPassword('');
     setErrorMessage('');
+    setRememberMe(false); setRestoringLogin(true);
+    try {
+      const saved = await loadRememberedLogin(nextRole);
+      setAccount(saved.identifier); setPassword(saved.password); setRememberMe(saved.remember);
+    } catch { setErrorMessage('Không thể đọc thông tin đăng nhập đã ghi nhớ. Vui lòng nhập lại.'); }
+    finally { setRestoringLogin(false); }
+  };
+
+  const toggleRemember = async () => {
+    if (busy) return;
+    if (!rememberMe) { setRememberMe(true); return; }
+    setRestoringLogin(true);
+    try { await clearRememberedLogin(role); setRememberMe(false); setErrorMessage(''); }
+    catch { setErrorMessage('Chưa xóa được thông tin đã ghi nhớ. Vui lòng thử lại.'); }
+    finally { setRestoringLogin(false); }
   };
 
   const goToRoleFlow = () => {
@@ -42,24 +69,14 @@ export default function LoginScreen() {
     else router.replace('/(tabs)');
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (busy) return;
     setErrorMessage('');
-    if (!account.trim() || !password.trim()) {
-      setErrorMessage('Vui lòng nhập đầy đủ số điện thoại/email và mật khẩu.');
-      return;
-    }
+    if (!account.trim() || !password) { setErrorMessage('Vui lòng nhập email/số điện thoại và mật khẩu.'); return; }
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      if (login(account.trim(), role)) setShowWelcome(true);
-      else setErrorMessage(`Tài khoản này không thuộc nhóm ${content.title.toLowerCase()}. Hãy chọn đúng vai trò hoặc dùng tài khoản mẫu.`);
-    }, 450);
-  };
-
-  const handleDemo = (targetStaffId?: string) => {
-    if (role === 'STAFF') quickLoginAsStaff(targetStaffId || 'staff-001');
-    else quickLoginAsCustomer('cust-001');
-    setShowWelcome(true);
+    try { await login(account.trim(), password, role, rememberMe); setShowWelcome(true); }
+    catch (error) { setErrorMessage(error instanceof Error ? error.message : 'Không thể đăng nhập.'); }
+    finally { setIsLoading(false); }
   };
 
   return (
@@ -76,7 +93,7 @@ export default function LoginScreen() {
             <View style={styles.roleSwitch}>
               {(Object.keys(ROLE_CONTENT) as LoginRole[]).map((item) => {
                 const selected = role === item;
-                return <Pressable key={item} onPress={() => selectRole(item)} style={[styles.roleOption, selected && styles.roleOptionActive]}>
+                return <Pressable key={item} disabled={busy} onPress={() => { void selectRole(item); }} style={[styles.roleOption, selected && styles.roleOptionActive]}>
                   <IconSymbol name={ROLE_CONTENT[item].icon} size={22} />
                   <View style={styles.roleCopy}>
                     <Text style={[styles.roleTitle, selected && styles.roleTitleActive]}>{ROLE_CONTENT[item].title}</Text>
@@ -101,48 +118,27 @@ export default function LoginScreen() {
               <Text style={styles.inputLabel}>Số điện thoại hoặc email</Text>
               <View style={styles.inputWrapper}>
                 <IconSymbol name="phone" size={18} color={BrandColors.gray400} />
-                <TextInput style={styles.input} value={account} onChangeText={(value) => { setAccount(value); setErrorMessage(''); }} placeholder={role === 'STAFF' ? '0912 001 001' : '0901 234 001'} placeholderTextColor={BrandColors.gray400} keyboardType="email-address" autoCapitalize="none" />
+                <TextInput accessibilityLabel="Số điện thoại hoặc email" autoComplete="username" textContentType="username" style={styles.input} value={account} onChangeText={(value) => { setAccount(value); setErrorMessage(''); }} placeholder="Email hoặc số điện thoại của bạn" placeholderTextColor={BrandColors.gray400} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} editable={!busy} />
               </View>
 
               <Text style={[styles.inputLabel, styles.passwordLabel]}>Mật khẩu</Text>
               <View style={styles.inputWrapper}>
                 <IconSymbol name="lock" size={18} color={BrandColors.gray400} />
-                <TextInput style={styles.input} value={password} onChangeText={(value) => { setPassword(value); setErrorMessage(''); }} placeholder="Nhập mật khẩu" placeholderTextColor={BrandColors.gray400} secureTextEntry={!showPassword} />
+                <TextInput accessibilityLabel="Mật khẩu" autoComplete="current-password" textContentType="password" style={styles.input} value={password} onChangeText={(value) => { setPassword(value); setErrorMessage(''); }} placeholder="Nhập mật khẩu" placeholderTextColor={BrandColors.gray400} secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} editable={!busy} />
                 <Pressable onPress={() => setShowPassword((current) => !current)} hitSlop={8}><Text style={styles.showPassword}>{showPassword ? 'Ẩn' : 'Hiện'}</Text></Pressable>
               </View>
 
               <View style={styles.optionsRow}>
-                <Pressable style={styles.rememberRow} onPress={() => setRememberMe((current) => !current)}>
+                <Pressable accessibilityRole="checkbox" accessibilityLabel="Ghi nhớ đăng nhập" accessibilityState={{ checked: rememberMe, disabled: busy }} disabled={busy} style={styles.rememberRow} onPress={() => { void toggleRemember(); }}>
                   <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>{rememberMe && <Text style={styles.checkboxText}>✓</Text>}</View>
                   <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
                 </Pressable>
                 <Pressable onPress={() => Alert.alert('Quên mật khẩu', 'Tính năng khôi phục mật khẩu sẽ gửi mã xác thực tới thông tin tài khoản đã đăng ký.')}><Text style={styles.forgotText}>Quên mật khẩu?</Text></Pressable>
               </View>
 
-              <Pressable style={[styles.submitButton, isLoading && styles.buttonLoading]} onPress={handleLogin} disabled={isLoading}>
-                {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.submitButtonText}>Đăng nhập {content.title}</Text><Text style={styles.submitArrow}>›</Text></>}
+              <Pressable style={[styles.submitButton, busy && styles.buttonLoading]} onPress={handleLogin} disabled={busy}>
+                {isLoading || restoringLogin ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.submitButtonText}>Đăng nhập {content.title}</Text><Text style={styles.submitArrow}>›</Text></>}
               </Pressable>
-
-              {role === 'STAFF' ? (
-                <View style={{ gap: 8, marginTop: 11 }}>
-                  <Pressable style={styles.demoButton} onPress={() => handleDemo('staff-001')}>
-                    <IconSymbol name="✦" style={styles.demoSparkle} />
-                    <Text style={styles.demoButtonText}>NV 1: Nguyễn Thị Hoa (Bình Thạnh)</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.demoButton, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD', marginTop: 0 }]}
-                    onPress={() => handleDemo('staff-005')}
-                  >
-                    <IconSymbol name="✦" style={styles.demoSparkleBlue} />
-                    <Text style={[styles.demoButtonText, { color: '#0369A1' }]}>NV 2: Đỗ Văn Tuấn (Quận 1)</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <Pressable style={styles.demoButton} onPress={() => handleDemo()}>
-                  <IconSymbol name="✦" style={styles.demoSparkle} />
-                  <Text style={styles.demoButtonText}>{content.demo}</Text>
-                </Pressable>
-              )}
 
               {role === 'CUSTOMER' ? <View style={styles.registerRow}>
                 <Text style={styles.registerText}>Chưa có tài khoản? </Text>

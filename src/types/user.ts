@@ -31,6 +31,8 @@ export interface CustomerAddress {
 }
 
 export interface Customer {
+  savedAddressCount?: number;
+  defaultAddressLabel?: string;
   id: string;
   userId: string;
   fullName: string;
@@ -54,8 +56,9 @@ export interface Staff {
   phone: string;
   email: string;
   avatar: string;
-  gender: 'MALE' | 'FEMALE';
+  gender: 'MALE' | 'FEMALE' | 'OTHER';
   dateOfBirth: string;
+  birthYear?: number;
   idCardNumber: string; // CCCD
   experienceYears: number;
   rating: number; // e.g. 4.8
@@ -66,6 +69,9 @@ export interface Staff {
   isOnline: boolean;
   bio: string;
   competencies: string[]; // List of service category tags
+  eligibleServices?: { id: string; name: string }[];
+    availableUntil?: string;
+    availableUntilReason?: 'SCHEDULE_END' | 'OPERATING_HOURS' | 'NEXT_BOOKING';
   operatingDistricts: string[];
   isVerified?: boolean;
   distanceKm?: number;

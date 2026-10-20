@@ -1,3 +1,6 @@
+import { needsStaffResponse } from '@/utils/staff-response';
+import { bookingTravelStatus } from '@/utils/booking-travel-status';
+import { remoteImageSource } from '@/utils/image-source';
 import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState } from 'react';
 import {
@@ -10,7 +13,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
@@ -18,30 +21,26 @@ import { BookingStatusBadge } from '@/components/common/BookingStatusBadge';
 import { RatingStars } from '@/components/common/RatingStars';
 import { PriceSummary } from '@/components/common/PriceSummary';
 import { formatVND } from '@/components/common/Badge';
-import {
-  getBookingById,
-  getServiceById,
-  getStaffById,
-  getCustomerById,
-  getAddressesByCustomerId,
-  getInvoiceByBookingId,
-  mockBookings,
-} from '@/data';
+import { CustomerBookings, ConnectedBooking, bookingServiceView } from '@/data/connectedBookings';
+import { useBookingDetail, StoredInvoice } from '@/hooks/use-booking-detail';
+import type { Staff } from '@/types/user';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
-
-  const [booking, setBooking] = useState(
-    getBookingById(id || 'bk-001') || mockBookings[0]
-  );
+  const router = useRouter(); const data = useBookingDetail(id);
+  if (!data.booking) return <SafeAreaView style={styles.container}><Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}><Text>← Quay lại</Text></Pressable><Text>{data.loading ? 'Đang tải đơn hàng...' : data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable></SafeAreaView>;
+  if(needsStaffResponse(data.booking)) return <Redirect href={{pathname:'/booking/waiting',params:{id:data.booking.id}}} />;
+  return <BookingDetailContent initial={data.booking} staff={data.staff} invoice={data.invoice} />;
+}
+function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedBooking; staff?: Staff; invoice?: StoredInvoice }) {
+  const router = useRouter(); const [booking, setBooking] = useState(initial);
+  React.useEffect(() => setBooking(initial), [initial]);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-
-  const service = getServiceById(booking.serviceId);
-  const staff = booking.staffId ? getStaffById(booking.staffId) : getStaffById('staff-001');
-  const invoice = getInvoiceByBookingId(booking.id);
-
+  const service = bookingServiceView(booking);
   const isCompleted = booking.status === 'COMPLETED';
+  const travel = bookingTravelStatus(booking);
+  const savedSelections=Object.entries({...booking.service.configuration,...booking.service.answers}).filter(([,value]) => value != null && String(value).trim() !== '');
+  const acceptedStaff=booking.assignments.filter(item => ['ACCEPTED','COMPLETED'].includes(item.status));
   const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
@@ -49,19 +48,15 @@ export default function BookingDetailScreen() {
   const handleCancelBooking = () => {
     Alert.alert(
       'Xác nhận hủy đơn',
-      'Đơn hàng hủy trước 12h sẽ được hoàn 100% tiền về phương thức ban đầu. Bạn có muốn tiếp tục?',
+      `Bạn có muốn hủy đơn ${booking.bookingCode}? Các đơn khác vẫn giữ nguyên. Yêu cầu sẽ được kiểm tra theo trạng thái thực tế.`,
       [
         { text: 'Giữ lại đơn', style: 'cancel' },
         {
           text: 'Xác nhận hủy',
           style: 'destructive',
-          onPress: () => {
-            setBooking({
-              ...booking,
-              status: 'CANCELLED',
-              cancellationReason: 'Khách hàng hủy đơn chủ động',
-            });
-            Alert.alert('Đã hủy', 'Đơn hàng đã được chuyển sang trạng thái Đã hủy.');
+          onPress: async () => {
+            try { setBooking(await CustomerBookings.cancel(booking.id, 'Khách hàng hủy đơn chủ động')); Alert.alert('Đã hủy', `Đơn ${booking.bookingCode} đã được hủy trên hệ thống.`); }
+            catch (error) { Alert.alert('Chưa hủy được đơn', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
           },
         },
       ]
@@ -72,13 +67,13 @@ export default function BookingDetailScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Top Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+        <Pressable style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} hitSlop={8}>
           <IconSymbol name="back" size={20} color={BrandColors.gray800} />
         </Pressable>
         <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
         <Pressable
           style={styles.invoiceBtn}
-          onPress={() => setShowInvoiceModal(true)}>
+          onPress={() => invoice ? setShowInvoiceModal(true) : Alert.alert('Chưa có hóa đơn', 'Hóa đơn được phát hành sau khi có kết quả cuối cùng và quyết toán đơn hàng.')}>
           <Text style={styles.invoiceBtnText}>🧾 Hóa đơn</Text>
         </Pressable>
       </View>
@@ -102,7 +97,7 @@ export default function BookingDetailScreen() {
           {booking.status === 'MATCHING' && (
             <View style={styles.matchingNotice}>
               <Text style={styles.matchingNoticeText}>
-                ⚡ Đang tìm nhân viên phù hợp gần bạn trong bán kính 5km...
+                ⚡ Đang tìm nhân viên phù hợp gần bạn theo năng lực, khu vực và lịch làm việc...
               </Text>
             </View>
           )}
@@ -120,11 +115,11 @@ export default function BookingDetailScreen() {
         <View style={styles.sectionBox}>
           <Text style={styles.sectionHeading}>Dịch vụ đã đặt</Text>
           <View style={styles.serviceRow}>
-            <Image source={{ uri: service?.image }} style={styles.serviceThumb} />
+            <Image source={remoteImageSource(service?.image)} style={styles.serviceThumb} />
             <View style={{ flex: 1 }}>
               <Text style={styles.serviceName}>{service?.name}</Text>
               <Text style={styles.packageLabel}>
-                {booking.mode === 'MODE_A' ? 'Tự chọn thợ' : 'Hệ thống điều phối'} • {booking.requiredStaffCount} thợ
+                {booking.mode === 'MODE_A' ? 'Tự chọn nhân viên' : 'Khách đăng việc'} • {booking.requiredStaffCount} nhân viên
               </Text>
               <Text style={styles.scheduleText}>
                 🕒 {booking.bookingDate} • {booking.startTime} - {booking.endTime}
@@ -132,6 +127,11 @@ export default function BookingDetailScreen() {
             </View>
           </View>
 
+          {booking.mode === 'MODE_B' && ['PENDING','MATCHING'].includes(booking.status) && <View style={styles.addonSection}>
+            <Text style={styles.subHeading}>Lịch đã lưu — chờ nhân viên phù hợp nhận</Text>
+            <Text style={styles.scheduleText}>Đã nhận {acceptedStaff.length}/{booking.requiredStaffCount} nhân viên. Bạn có thể rời màn hình; lịch vẫn được giữ trên hệ thống.</Text>
+          </View>}
+          {(booking.service.quantity || 1) > 1 && <Text style={styles.scheduleText}>Số lượng gói: {booking.service.quantity}</Text>}
           {/* Add-ons list */}
           {booking.addOns && booking.addOns.length > 0 && (
             <View style={styles.addonSection}>
@@ -146,16 +146,23 @@ export default function BookingDetailScreen() {
           )}
         </View>
 
+        {savedSelections.length > 0 && <View style={styles.sectionBox}>
+          <Text style={styles.sectionHeading}>Nhu cầu đã lưu cùng lịch</Text>
+          {savedSelections.map(([key,value]) => <View key={key} style={{ marginBottom: 12 }}>
+            <Text style={styles.subHeading}>{booking.service.answerLabels?.[key] || booking.service.configurationLabels?.[key] || key}</Text>
+            <Text style={styles.scheduleText}>{typeof value === 'boolean' ? value ? 'Có' : 'Không' : Array.isArray(value) ? value.join(', ') : String(value)}</Text>
+          </View>)}
+        </View>}
         {/* Staff Card (If assigned) */}
         {staff && booking.status !== 'MATCHING' && booking.status !== 'NO_STAFF_FOUND' && (
           <View style={styles.sectionBox}>
             <Text style={styles.sectionHeading}>Nhân viên phụ trách</Text>
             <View style={styles.staffRow}>
-              <Image source={{ uri: staff.avatar }} style={styles.staffAvatar} />
+              <Image source={remoteImageSource(staff.avatar)} style={styles.staffAvatar} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.staffName}>{staff.fullName}</Text>
                 <RatingStars rating={staff.rating} size={12} reviewCount={staff.reviewCount} />
-                <Text style={styles.staffExp}>{staff.experienceYears} năm kinh nghiệm • Đã xác minh</Text>
+                <Text style={styles.staffExp}>{staff.experienceYears} năm kinh nghiệm</Text>
               </View>
             </View>
 
@@ -193,6 +200,14 @@ export default function BookingDetailScreen() {
               <View style={styles.timelineCol}>
                 <Text style={styles.timelineStepTitle}>Điều phối & Phân công thợ</Text>
                 <Text style={styles.timelineStepTime}>Thợ nhận việc và chuẩn bị di chuyển</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineStep} accessibilityLabel={`Thợ đang di chuyển tới. ${travel.description}`}>
+              <View style={[styles.timelineDot, travel.active && styles.timelineDotActive]} />
+              <View style={styles.timelineCol}>
+                <Text style={styles.timelineStepTitle}>Thợ đang di chuyển tới</Text>
+                <Text style={styles.timelineStepTime}>{travel.description}</Text>
               </View>
             </View>
 
@@ -268,9 +283,9 @@ export default function BookingDetailScreen() {
                   rebook: 'true',
                   serviceId: booking.serviceId,
                   packageId: booking.packageId,
-                  staffId: booking.staffId,
+                  staffId: booking.requiredStaffCount===1?booking.staffId:undefined,
                   addressId: booking.addressId,
-                  mode: booking.staffId ? 'MODE_A' : 'MODE_B',
+                  mode: booking.requiredStaffCount===1&&booking.staffId ? 'MODE_A' : 'MODE_B',
                 },
               })
             }>
@@ -299,13 +314,13 @@ export default function BookingDetailScreen() {
             </View>
 
             <ScrollView style={{ maxHeight: 400 }}>
-              <Text style={styles.invCode}>Số hóa đơn: {invoice?.invoiceNumber || `HD-2026-${booking.id}`}</Text>
-              <Text style={styles.invDate}>Ngày lập: {new Date().toLocaleDateString('vi-VN')}</Text>
+              <Text style={styles.invCode}>Số hóa đơn: {invoice?.invoiceNumber || ''}</Text>
+              <Text style={styles.invDate}>Ngày lập: {invoice?.issuedAt ? new Date(invoice.issuedAt).toLocaleDateString('vi-VN') : ''}</Text>
 
               <View style={styles.invDivider} />
 
               <Text style={styles.invCompany}>ĐƠN VỊ CUNG CẤP: HOMECARE PLATFORM</Text>
-              <Text style={styles.invSub}>Mã số thuế: 0312345678</Text>
+              <Text style={styles.invSub}>Chứng từ quyết toán dịch vụ</Text>
               <Text style={styles.invSub}>Dịch vụ: {service?.name}</Text>
 
               <View style={styles.invDivider} />
@@ -333,7 +348,7 @@ export default function BookingDetailScreen() {
                 <Text style={styles.invTotalLabel}>Tổng thanh toán:</Text>
                 <Text style={styles.invTotalVal}>{formatVND(booking.totalAmount)}</Text>
               </View>
-              <Text style={styles.invPaidStatus}>Trạng thái: Đã thanh toán hợp lệ</Text>
+              <Text style={styles.invPaidStatus}>Trạng thái: {invoice?.status}</Text>
             </ScrollView>
 
             <Pressable

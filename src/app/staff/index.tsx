@@ -1,5 +1,7 @@
+import { remoteImageSource } from '@/utils/image-source';
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,14 +18,15 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
 import { StaffService, StaffJobItem, StaffOperationalProfile } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { StaffScheduleNotice } from '@/components/staff/StaffScheduleReminder';
 import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
-import { selectMatchingItems } from '@/data/staffMatchingRules';
+import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
 import { StaffMatchingList, MatchingSortPicker, DEFAULT_MATCH_FILTER } from '@/components/staff/StaffMatchingList';
 import { EmptyState } from '@/components/common/EmptyState';
+import { MatchingModePicker, matchingModeCounts } from '@/components/staff/MatchingModePicker';
 
 export default function StaffDashboard() {
   const { currentUser, currentStaff } = useAuth();
@@ -37,8 +40,10 @@ function StaffDashboardContent() {
   const { unreadCount } = useNotifications();
   const matching = useStaffMatching();
   const [matchFilter, setMatchFilter] = useState(DEFAULT_MATCH_FILTER);
-  const matchCount = matching.data ? selectMatchingItems(matching.data, DEFAULT_MATCH_FILTER).length : 0;
-  const staffId = currentStaff?.id || 'staff-001';
+  const [matchMode, setMatchMode] = useState<'A' | 'B'>('B');
+  const counts = matchingModeCounts(matching.data);
+  const matchCount = counts[matchMode];
+  const staffId = currentStaff?.id || '';
 
   const [profile, setProfile] = useState<StaffOperationalProfile>(() => StaffService.getOperationalProfile(staffId));
   const [activeJob, setActiveJob] = useState<StaffJobItem | undefined>(undefined);
@@ -49,7 +54,7 @@ function StaffDashboardContent() {
   const staffAvatar =
     currentStaff?.avatar ||
     profile.avatar ||
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80';
+    '/api/v1/identity/staff-avatar.png';
 
   useEffect(() => {
     const updateData = () => {
@@ -62,8 +67,8 @@ function StaffDashboardContent() {
     return unsubscribe;
   }, [staffId]);
 
-  const handleToggleOnline = (value: boolean) => {
-    if (matching.actor) StaffMatchingRepository.setOnline(matching.actor, value);
+  const handleToggleOnline = async (value: boolean) => {
+    if (matching.actor) try { await StaffMatchingRepository.setOnline(matching.actor, value); } catch (error) { Alert.alert('Chưa lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
   };
 
   return (
@@ -71,13 +76,14 @@ function StaffDashboardContent() {
       <LinearGradient colors={['#ECFDF5', '#F8FAFC', '#FFFFFF']} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+            <StaffScheduleNotice />
             {/* Header */}
             <View style={styles.header}>
               <Pressable
                 style={styles.profileRow}
                 onPress={() => router.push('/staff/profile')}
               >
-                <Image source={{ uri: staffAvatar }} style={styles.avatar} />
+                <Image source={remoteImageSource(staffAvatar)} style={styles.avatar} />
                 <View>
                   <View style={styles.nameBadgeRow}>
                     <Text style={styles.greeting}>{staffName}</Text>
@@ -179,7 +185,7 @@ function StaffDashboardContent() {
 
                   <View style={styles.activeJobActionColumn}>
                     <Text style={styles.activeJobIncome}>
-                      +{activeJob.netIncome.toLocaleString('vi-VN')}đ
+                      {activeJob.incomePendingPolicy ? 'Chờ quyết toán' : '+'+activeJob.netIncome.toLocaleString('vi-VN')+'đ'}
                     </Text>
                     <Pressable
                       style={styles.activeJobBtn}
@@ -228,20 +234,21 @@ function StaffDashboardContent() {
             </View>
 
             {/* Available Shifts Section */}
+            <MatchingModePicker value={matchMode} onChange={setMatchMode} invitations={counts.A} open={counts.B} />
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Việc phù hợp</Text>
+                <Text style={styles.sectionTitle}>Tìm việc phù hợp</Text>
                 <Text style={styles.sectionSubtitle}>
                   Theo năng lực, khu vực và lịch đã lưu
                 </Text>
               </View>
-              <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open' } })}>
+              <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open', source: matchMode } })}>
                 <Text style={styles.seeAllText}>Xem tất cả ({matchCount}) ›</Text>
               </Pressable>
             </View>
 
             <MatchingSortPicker value={matchFilter.sort} onChange={sort => setMatchFilter(value => ({ ...value, sort }))} />
-            <StaffMatchingList matching={matching} filter={matchFilter} limit={3} />
+            <StaffMatchingList matching={matching} filter={{ ...matchFilter, mode: matchMode }} limit={3} />
 
             {/* Safety & Support Banner */}
             <View style={styles.supportCard}>

@@ -7,8 +7,8 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/hooks/use-notifications';
-import { StaffRepository } from '@/data/staffRepository';
-import { NotificationRepository } from '@/data/notificationRepository';
+import { StaffRepository } from '@/data/connectedStaffRepository';
+import { NotificationRepository } from '@/data/connectedNotifications';
 import { formatNotificationTime, getNotificationPresentation, getNotificationTarget } from '@/data/notificationAdapter';
 import type { NotificationActor } from '@/data/notificationAdapter';
 

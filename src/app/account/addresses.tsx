@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,43 +9,69 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { AddressCard } from '@/components/common/AddressCard';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
-import { getAddressesByCustomerId, mockCustomerAddresses } from '@/data';
+import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
+import { EmptyState } from '@/components/common/EmptyState';
+import { CatalogState } from '@/components/common/CatalogState';
 import { CustomerAddress } from '@/types/user';
+import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
+import { WardSelect } from '@/components/common/WardSelect';
 
 export default function AddressManagementScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    fromBooking?: string;
+    selectedId?: string;
+    mode?: string;
+    serviceId?: string;
+    staffId?: string;
+  }>();
   const { currentCustomer } = useAuth();
 
-  const customerId = currentCustomer?.id || 'cust-001';
-  const [addresses, setAddresses] = useState<CustomerAddress[]>(
-    getAddressesByCustomerId(customerId)
-  );
+  const { addresses, loading, error, retry, mutate, refresh } = useCustomerAddresses();
+  const administrative = useAdministrativeUnits();
+  const [saving, setSaving] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(params.selectedId || '');
+
+  // Auto select default address or first address when available
+  useEffect(() => {
+    if (addresses.length > 0) {
+      if (!selectedAddressId || !addresses.some(a => a.id === selectedAddressId)) {
+        const defaultOne = addresses.find(a => a.isDefault)?.id || addresses[0].id;
+        setSelectedAddressId(defaultOne);
+      }
+    }
+  }, [addresses, selectedAddressId]);
 
   // Add / Edit Modal state
   const [modalVisible, setModalVisible] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [title, setTitle] = useState('Nhà riêng');
-  const [recipientName, setRecipientName] = useState(currentCustomer?.fullName || 'Nguyễn Văn A');
-  const [recipientPhone, setRecipientPhone] = useState(currentCustomer?.phone || '0901234001');
+  const [recipientName, setRecipientName] = useState(currentCustomer?.fullName || '');
+  const [recipientPhone, setRecipientPhone] = useState(currentCustomer?.phone || '');
   const [streetAddress, setStreetAddress] = useState('');
-  const [district, setDistrict] = useState('Quận 1');
+  const [ward, setWard] = useState('');
+  const [legacyAddress, setLegacyAddress] = useState('');
   const [note, setNote] = useState('');
 
   // Delete modal state
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const openAddModal = () => {
+    if (!currentCustomer) { router.push('/auth/login'); return; }
     setEditingAddressId(null);
+    setRecipientName(currentCustomer.fullName);
+    setRecipientPhone(currentCustomer.phone);
     setTitle('Nhà riêng');
     setStreetAddress('');
-    setDistrict('Quận 1');
+    setWard(''); setLegacyAddress('');
     setNote('');
     setModalVisible(true);
   };
@@ -56,73 +82,92 @@ export default function AddressManagementScreen() {
     setRecipientName(addr.recipientName);
     setRecipientPhone(addr.recipientPhone);
     setStreetAddress(addr.streetAddress);
-    setDistrict(addr.district);
+    setWard(administrative.units.some(unit => unit.name === addr.ward) ? addr.ward : '');
+    setLegacyAddress(addr.district || !administrative.units.some(unit => unit.name === addr.ward) ? addr.fullAddress : '');
     setNote(addr.note || '');
     setModalVisible(true);
   };
 
-  const handleSave = () => {
-    if (!streetAddress.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập số nhà, tên đường.');
+  const handleConfirmSelect = (addr: CustomerAddress) => {
+    setSelectedAddressId(addr.id);
+    if (params.fromBooking) {
+      router.replace({
+        pathname: '/booking/new',
+        params: {
+          addressId: addr.id,
+          mode: params.mode as any,
+          serviceId: params.serviceId,
+          staffId: params.staffId,
+        },
+      });
+    }
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ người nhận, điện thoại và địa chỉ.');
       return;
     }
-
-    if (editingAddressId) {
-      // Edit
-      const updated = addresses.map((a) => {
-        if (a.id === editingAddressId) {
-          return {
-            ...a,
-            title,
-            recipientName,
-            recipientPhone,
-            streetAddress,
-            district,
-            note,
-            fullAddress: `${streetAddress}, ${district}, TP. Hồ Chí Minh`,
-          };
-        }
-        return a;
+    const selectedWard = administrative.units.find(unit => unit.name === ward.trim());
+    if (!selectedWard) { Alert.alert('Chọn phường/xã', 'Vui lòng chọn một phường/xã trong danh sách TP. Hồ Chí Minh.'); return; }
+    setSaving(true);
+    try {
+      const previous = addresses.find(item => item.id === editingAddressId);
+      const isFirst = addresses.length === 0;
+      const saved = await mutate(editingAddressId ? '/customer/addresses/' + editingAddressId : '/customer/addresses', editingAddressId ? 'PUT' : 'POST', {
+        title: title.trim(), recipientName: recipientName.trim(), recipientPhone: recipientPhone.trim(),
+        streetAddress: streetAddress.trim(), district: '', note: note.trim(),
+        ward: selectedWard.name, city: 'TP. Hồ Chí Minh', isDefault: previous?.isDefault || isFirst,
       });
-      setAddresses(updated);
-    } else {
-      // Add
-      const newAddr: CustomerAddress = {
-        id: `addr-${Date.now()}`,
-        customerId,
-        title,
-        recipientName,
-        recipientPhone,
-        streetAddress,
-        ward: 'Phường Đa Kao',
-        district,
-        city: 'TP. Hồ Chí Minh',
-        fullAddress: `${streetAddress}, ${district}, TP. Hồ Chí Minh`,
-        latitude: 10.78,
-        longitude: 106.7,
-        isDefault: addresses.length === 0,
-        note,
-      };
-      setAddresses([...addresses, newAddr]);
-    }
 
-    setModalVisible(false);
+      setModalVisible(false);
+      const newId = saved?.id ? String(saved.id) : undefined;
+      if (newId) {
+        setSelectedAddressId(newId);
+      }
+
+      if (params.fromBooking) {
+        Alert.alert(
+          'Thêm địa chỉ thành công',
+          'Đã lưu địa chỉ vào hệ thống. Bạn có muốn sử dụng địa chỉ này để tiếp tục đặt dịch vụ?',
+          [
+            { text: 'Ở lại quản lý', style: 'cancel' },
+            {
+              text: 'Tiếp tục đặt dịch vụ',
+              onPress: () => {
+                router.replace({
+                  pathname: '/booking/new',
+                  params: {
+                    addressId: newId,
+                    mode: params.mode as any,
+                    serviceId: params.serviceId,
+                    staffId: params.staffId,
+                  },
+                });
+              },
+            },
+          ]
+        );
+      }
+    } catch (cause) { Alert.alert('Chưa lưu được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
-  const handleSetDefault = (id: string) => {
-    const updated = addresses.map((a) => ({
-      ...a,
-      isDefault: a.id === id,
-    }));
-    setAddresses(updated);
-    Alert.alert('Thành công', 'Đã đặt địa chỉ làm mặc định phục vụ.');
+  const handleSetDefault = async (id: string) => {
+    if (saving) return;
+    setSaving(true);
+    try { await mutate('/customer/addresses/' + id + '/default', 'PATCH'); Alert.alert('Thành công', 'Đã đặt địa chỉ làm mặc định phục vụ.'); }
+    catch (cause) { Alert.alert('Chưa lưu được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = () => {
-    if (!deleteTargetId) return;
-    const updated = addresses.filter((a) => a.id !== deleteTargetId);
-    setAddresses(updated);
-    setDeleteTargetId(null);
+  const handleDelete = async () => {
+    if (!deleteTargetId || saving) return;
+    setSaving(true);
+    try { await mutate('/customer/addresses/' + deleteTargetId, 'DELETE'); setDeleteTargetId(null); }
+    catch (cause) { Alert.alert('Chưa xóa được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -132,28 +177,86 @@ export default function AddressManagementScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
           <IconSymbol name="back" size={20} color={BrandColors.gray800} />
         </Pressable>
-        <Text style={styles.headerTitle}>Sổ địa chỉ của bạn</Text>
-        <Pressable style={styles.addBtn} onPress={openAddModal}>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>Sổ địa chỉ của bạn</Text>
+          {params.fromBooking && (
+            <Text style={styles.headerSubtitle}>Chọn địa chỉ để đặt dịch vụ</Text>
+          )}
+        </View>
+        <Pressable style={styles.addBtn} disabled={saving || loading} onPress={openAddModal}>
           <Text style={styles.addBtnText}>+ Thêm</Text>
         </Pressable>
       </View>
 
+      {/* From Booking Notice */}
+      {params.fromBooking && addresses.length > 0 && (
+        <View style={styles.bookingNoticeBar}>
+          <IconSymbol name="location" size={18} color={BrandColors.primary} />
+          <Text style={styles.bookingNoticeText}>
+            Chạm vào địa chỉ bên dưới để chọn và tiếp tục đặt lịch
+          </Text>
+        </View>
+      )}
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
+        {!currentCustomer ? (
+          <EmptyState
+            icon="user"
+            title="Vui lòng đăng nhập"
+            description="Đăng nhập để quản lý sổ địa chỉ của bạn."
+            actionText="Đăng nhập"
+            onAction={() => router.push('/auth/login')}
+          />
+        ) : loading && addresses.length === 0 ? (
+          <CatalogState loading={loading} onRetry={retry} />
+        ) : error && addresses.length === 0 ? (
+          <CatalogState error={error} onRetry={retry} />
+        ) : addresses.length === 0 ? (
+          <EmptyState
+            icon="location"
+            title="Chưa có địa chỉ"
+            description="Thêm địa chỉ đầu tiên để đặt dịch vụ."
+            actionText="+ Thêm địa chỉ mới"
+            onAction={openAddModal}
+          />
+        ) : null}
+
         {addresses.map((addr) => (
           <AddressCard
             key={addr.id}
             address={addr}
             showActions
+            isSelected={addr.id === selectedAddressId}
+            onSelect={() => handleConfirmSelect(addr)}
             onEdit={() => openEditModal(addr)}
             onDelete={() => setDeleteTargetId(addr.id)}
             onSetDefault={() => handleSetDefault(addr.id)}
           />
         ))}
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: params.fromBooking && addresses.length > 0 ? 90 : 40 }} />
       </ScrollView>
+
+      {/* Bottom bar when coming from booking flow */}
+      {params.fromBooking && addresses.length > 0 && (
+        <View style={styles.bottomBar}>
+          <Pressable
+            style={styles.selectBtn}
+            onPress={() => {
+              const selected = addresses.find(a => a.id === selectedAddressId) || addresses[0];
+              if (selected) handleConfirmSelect(selected);
+            }}>
+            <LinearGradient
+              colors={BrandColors.primaryGradient}
+              style={styles.selectGradient}>
+              <IconSymbol name="check" size={18} color="#FFFFFF" />
+              <Text style={styles.selectBtnText}>Sử dụng địa chỉ này để đặt dịch vụ</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      )}
 
       {/* Add / Edit Modal */}
       <Modal
@@ -204,15 +307,17 @@ export default function AddressManagementScreen() {
                 placeholder="Số 123 Nguyễn Thị Minh Khai"
               />
 
-              <Text style={styles.fieldLabel}>Quận / Huyện</Text>
-              <TextInput
-                style={styles.input}
-                value={district}
-                onChangeText={setDistrict}
-                placeholder="Quận 1"
+              <Text style={styles.fieldLabel}>Phường / Xã (TP. Hồ Chí Minh)</Text>
+              <WardSelect
+                value={ward}
+                onChange={setWard}
+                units={administrative.units}
+                loading={administrative.loading}
+                error={administrative.error}
+                retry={administrative.retry}
               />
 
-              <Text style={styles.fieldLabel}>Ghi chú chỉ đường / số phòng</Text>
+              <Text style={styles.fieldLabel}>Ghi chú chỉ đường / số phòng (tùy chọn)</Text>
               <TextInput
                 style={styles.input}
                 value={note}
@@ -220,8 +325,8 @@ export default function AddressManagementScreen() {
                 placeholder="Tòa Landmark 2, tầng 15..."
               />
 
-              <Pressable style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Lưu địa chỉ</Text>
+              <Pressable style={styles.saveBtn} disabled={saving} onPress={handleSave}>
+                <Text style={styles.saveBtnText}>{saving ? 'Đang lưu...' : 'Lưu địa chỉ'}</Text>
               </Pressable>
             </ScrollView>
           </View>
@@ -266,10 +371,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitleWrap: {
+    alignItems: 'center',
+  },
   headerTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: BrandColors.gray900,
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: BrandColors.primaryDark,
+    marginTop: 2,
   },
   addBtn: {
     backgroundColor: BrandColors.primary,
@@ -282,8 +396,55 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
+  bookingNoticeBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: BrandColors.primaryLight,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#A7F3D0',
+  },
+  bookingNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: BrandColors.primaryDark,
+  },
   scrollContent: {
     padding: Spacing.three,
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    padding: Spacing.three,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  selectBtn: {
+    borderRadius: BorderRadius.full,
+    overflow: 'hidden',
+  },
+  selectGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  selectBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

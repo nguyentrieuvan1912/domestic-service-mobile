@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { remoteImageSource } from '@/utils/image-source';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -16,24 +17,27 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
-import { getAddressesByCustomerId, mockBookings, mockReviews } from '@/data';
+import { Redirect, useFocusEffect } from 'expo-router';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { currentCustomer, logout } = useAuth();
+  const { currentCustomer, logout, isLoading, refreshProfile } = useAuth();
+  const [profileError, setProfileError] = useState('');
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void refreshProfile().then(() => { if (active) setProfileError(''); }).catch(error => { if (active) setProfileError(error.message); });
+    return () => { active = false; };
+  }, [refreshProfile]));
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const addresses = currentCustomer ? getAddressesByCustomerId(currentCustomer.id) : [];
-  const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
-  const completedCount = mockBookings.filter(
-    (b) => b.customerId === currentCustomer?.id && b.status === 'COMPLETED'
-  ).length;
-
   const handleLogout = () => {
-    logout();
+    void logout().catch(() => Alert.alert('Đăng xuất', 'Đã thoát trên ứng dụng; chưa kết nối được backend để thu hồi phiên.'));
     setShowLogoutModal(false);
     router.replace('/auth/login');
   };
+
+  if (isLoading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text>Đang tải tài khoản...</Text></View>;
+  if (!currentCustomer) return <Redirect href="/auth/login" />;
 
   return (
     <LinearGradient
@@ -50,25 +54,19 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
 
+        {profileError ? <Text style={{ color: BrandColors.danger, marginBottom: 12 }}>{profileError}</Text> : null}
         {/* Customer Profile Card */}
         <Pressable
           style={styles.userCard}
           onPress={() => router.push('/account/personal-info')}>
-          <Image
-            source={{
-              uri:
-                currentCustomer?.avatar ||
-                'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=250&auto=format&fit=crop&q=80',
-            }}
-            style={styles.avatar}
-          />
+          {currentCustomer?.avatar ? <Image source={remoteImageSource(currentCustomer.avatar)} style={styles.avatar} /> : <View style={[styles.avatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' }]}><IconSymbol name="user" size={32} color={BrandColors.primary} /></View>}
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.userName}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
-              <Badge label="Thành viên VIP" variant="primary" size="sm" />
+              <Badge label="Khách hàng" variant="primary" size="sm" />
             </View>
-            <Text style={styles.userPhone}>📱 {currentCustomer?.phone || '0901234001'}</Text>
-            <Text style={styles.userEmail}>✉️ {currentCustomer?.email || 'khachhang@homecare.vn'}</Text>
+            <Text style={styles.userPhone}>📱 {currentCustomer?.phone || 'Chưa đăng nhập'}</Text>
+            <Text style={styles.userEmail}>✉️ {currentCustomer?.email || 'Chưa đăng nhập'}</Text>
           </View>
         </Pressable>
 
@@ -77,19 +75,19 @@ export default function ProfileScreen() {
           <Pressable
             style={styles.statBox}
             onPress={() => router.push('/(tabs)/bookings')}>
-            <Text style={styles.statNum}>{completedCount}</Text>
+            <Text style={styles.statNum}>{'—'}</Text>
             <Text style={styles.statLabel}>Đơn hoàn tất</Text>
           </Pressable>
 
           <View style={styles.statBox}>
-            <Text style={styles.statNum}>{currentCustomer?.rewardPoints || 1250}</Text>
+            <Text style={styles.statNum}>{currentCustomer?.rewardPoints ?? 0}</Text>
             <Text style={styles.statLabel}>Điểm thưởng</Text>
           </View>
 
           <Pressable
             style={styles.statBox}
             onPress={() => router.push('/account/addresses')}>
-            <Text style={styles.statNum}>{addresses.length}</Text>
+            <Text style={styles.statNum}>{currentCustomer.savedAddressCount ?? 0}</Text>
             <Text style={styles.statLabel}>Địa chỉ lưu</Text>
           </Pressable>
         </View>
@@ -106,7 +104,7 @@ export default function ProfileScreen() {
               <View>
                 <Text style={styles.menuLabel}>Sổ địa chỉ</Text>
                 <Text numberOfLines={1} style={styles.menuSub}>
-                  {defaultAddress ? defaultAddress.streetAddress : 'Thêm địa chỉ phục vụ'}
+                  {currentCustomer.defaultAddressLabel || 'Thêm địa chỉ phục vụ'}
                 </Text>
               </View>
             </View>

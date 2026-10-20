@@ -14,6 +14,7 @@
     "expo-linear-gradient": "~57.0.1",
     "expo-linking": "~57.0.9",
     "expo-router": "~57.0.19",
+    "expo-secure-store": "~57.0.4",
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
@@ -39,10 +40,20 @@
     "start": "expo start --port 8090",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android --port 8090",
+    "android:connect": "node scripts/connect-android-local.mjs",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs && node scripts/test-staff-availability.mjs && node scripts/test-staff-matching.mjs"
+    "test:weekly": "node scripts/test-weekly-availability.mjs",
+    "test:customer-booking": "node scripts/test-customer-booking-time.mjs",
+    "test:booking-timing": "node scripts/test-booking-timing-notice.mjs",
+    "test:booking-promotions": "node scripts/test-booking-promotions.mjs",
+    "test:favourite-duration": "node scripts/test-favourite-staff-duration.mjs",
+    "test:staff-response": "node scripts/test-staff-response.mjs",
+    "test:staff-profile": "node scripts/test-staff-profile.mjs",
+    "test:schedule-reminder": "node scripts/test-staff-schedule-reminder.mjs",
+    "test:service-booking": "node scripts/test-service-requirements.mjs && node scripts/test-staff-matching.mjs",
+    "test": "node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs && node scripts/test-staff-availability.mjs && node scripts/test-staff-matching.mjs && node scripts/test-connected-operations.mjs && node scripts/test-remembered-login.mjs && node scripts/test-service-requirements.mjs && node scripts/test-availability-save.mjs && node scripts/test-booking-resume.mjs && node scripts/test-package-recommendation.mjs"
   },
   "private": true
 }

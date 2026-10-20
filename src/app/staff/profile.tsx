@@ -1,3 +1,6 @@
+import { remoteImageSource } from '@/utils/image-source';
+import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
+import { EmptyState } from '@/components/common/EmptyState';
 import React from 'react';
 import {
   Alert,
@@ -16,9 +19,14 @@ import { useAuth } from '@/context/AuthContext';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffService } from '@/data/staffService';
 import { useStaffCapabilities } from '@/hooks/use-staff-capabilities';
-import { EmptyState } from '@/components/common/EmptyState';
+
 
 export default function StaffProfileScreen() {
+  const { currentStaff } = useAuth(); const router = useRouter();
+  if (!currentStaff) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="user" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
+  return <StaffProfileContent key={currentStaff.id} />;
+}
+function StaffProfileContent() {
   const router = useRouter();
   const { currentStaff, logout } = useAuth();
   const capabilityResource = useStaffCapabilities();
@@ -41,7 +49,7 @@ export default function StaffProfileScreen() {
         text: 'Đăng xuất',
         style: 'destructive',
         onPress: () => {
-          logout();
+          void logout().catch(() => Alert.alert('Đăng xuất', 'Đã thoát trên ứng dụng; chưa kết nối được backend để thu hồi phiên.'));
           router.replace('/auth/login');
         },
       },
@@ -51,6 +59,7 @@ export default function StaffProfileScreen() {
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StaffConnectionStatus />
         {/* Top Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Hồ sơ & Đánh giá</Text>
@@ -63,7 +72,7 @@ export default function StaffProfileScreen() {
           {/* Staff Hero Identity Card */}
           <Pressable style={styles.identityCard} onPress={() => router.push('/staff/personal-info')}>
             <View style={styles.identityTop}>
-              <Image source={{ uri: staff.avatar }} style={styles.avatar} />
+              <Image source={remoteImageSource(staff.avatar)} style={styles.avatar} />
               <View style={styles.identityInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.staffName}>{staff.fullName}</Text>
@@ -94,12 +103,12 @@ export default function StaffProfileScreen() {
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{staff.satisfactionRate}%</Text>
+                <Text style={styles.kpiValue}>{profile.reviewCount ? Math.round(StaffService.getStaffReviews(staffId).filter(r=>r.rating===5).length/profile.reviewCount*100)+'%' : '—'}</Text>
                 <Text style={styles.kpiLabel}>Hài lòng 5★</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{staff.completedBookingsCount ?? '—'}</Text>
+                <Text style={styles.kpiValue}>{StaffService.getCompletedJobs(staffId).length}</Text>
                 <Text style={styles.kpiLabel}>Ca thành công</Text>
               </View>
             </View>
@@ -107,6 +116,20 @@ export default function StaffProfileScreen() {
               <Text style={styles.editProfileHintText}>Chạm để xem và cập nhật thông tin cá nhân</Text>
               <Text style={styles.editProfileHintArrow}>›</Text>
             </View>
+          </Pressable>
+
+          <Pressable style={styles.scheduleCard} accessibilityRole="button"
+            accessibilityLabel="Đăng ký lịch làm việc và khu vực, bước đầu tiên để tìm và nhận việc"
+            onPress={() => router.push('/staff/availability')}>
+            <View style={styles.scheduleHeading}>
+              <View style={styles.scheduleIcon}><IconSymbol name="calendar" size={25} color="#047857" /></View>
+              <View style={styles.scheduleHeadingCopy}>
+                <Text style={styles.scheduleStep}>BƯỚC 1 • TRƯỚC KHI NHẬN VIỆC</Text>
+                <Text style={styles.scheduleTitle}>Đăng ký lịch làm việc</Text>
+              </View>
+            </View>
+            <Text style={styles.scheduleDescription}>Chọn giờ rảnh và khu vực hoạt động tại TP.HCM. Đăng ký đầy đủ lịch tuần để được xét nhận và tìm công việc phù hợp.</Text>
+            <View style={styles.scheduleAction}><Text style={styles.scheduleActionText}>Đăng ký / cập nhật lịch & khu vực</Text><IconSymbol name="chevronRight" size={18} color="#FFFFFF" /></View>
           </Pressable>
 
           {/* Account Utilities / Switch Role */}
@@ -133,16 +156,7 @@ export default function StaffProfileScreen() {
               <Text style={styles.utilityArrow}>›</Text>
             </Pressable>
 
-            <Pressable
-              style={styles.utilityRow}
-              onPress={() => router.push('/staff/availability')}
-            >
-              <View style={styles.utilityIconWrap}>
-                <IconSymbol name="calendar" size={18} color="#047857" />
-              </View>
-              <Text style={styles.utilityTitle}>Đăng ký lịch làm & khu vực</Text>
-              <Text style={styles.utilityArrow}>›</Text>
-            </Pressable>
+
 
             <Pressable
               style={styles.utilityRow}
@@ -186,6 +200,15 @@ export default function StaffProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  scheduleCard: { backgroundColor: '#ECFDF5', borderWidth: 2, borderColor: '#34D399', borderRadius: 20, padding: 16, gap: 13 },
+  scheduleHeading: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  scheduleIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D1FAE5' },
+  scheduleHeadingCopy: { flex: 1, gap: 5 },
+  scheduleStep: { color: '#047857', fontWeight: '800', fontSize: 10, letterSpacing: 0.5 },
+  scheduleTitle: { color: '#064E3B', fontWeight: '800', fontSize: 20 },
+  scheduleDescription: { color: '#065F46', fontSize: 13, lineHeight: 20 },
+  scheduleAction: { backgroundColor: '#047857', borderRadius: 12, padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  scheduleActionText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
   safeArea: { flex: 1 },
 

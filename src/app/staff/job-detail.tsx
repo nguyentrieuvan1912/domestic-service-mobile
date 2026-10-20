@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { remoteImageSource } from '@/utils/image-source';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Alert,
   Image,
@@ -18,8 +19,9 @@ import { BookingChatLink } from '@/components/common/BookingChatLink';
 import { useAuth } from '@/context/AuthContext';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
-import { StaffMatchingRepository } from '@/data/staffMatchingRepository';
-import { StaffMatchExplanation, opportunityTime } from '@/components/staff/StaffMatchingList';
+import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
+import { opportunityTime } from '@/components/staff/StaffMatchingList';
+import { operationRequest } from '@/api/operations';
 import { EmptyState } from '@/components/common/EmptyState';
 
 export default function StaffJobDetailScreen() {
@@ -32,9 +34,13 @@ function StaffJobDetailContent() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentStaff } = useAuth();
-  const staffId = currentStaff?.id || 'staff-001';
+  const staffId = currentStaff?.id || '';
   const matching = useStaffMatching();
-  const [showMatch, setShowMatch] = useState(false);
+  const [openDetails, setOpenDetails] = useState<Partial<OpenOpportunity>>();
+  const [detailError, setDetailError] = useState('');
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const [claimBusy, setClaimBusy] = useState(false);
+  const claiming = useRef(false);
 
   const [detailResult, setDetailResult] = useState<JobDetailResult>(() =>
     id ? StaffService.getJobDetail(staffId, id) : { kind: 'NOT_FOUND', reason: 'Không tìm thấy ca làm việc.' }
@@ -50,6 +56,25 @@ function StaffJobDetailContent() {
     const unsubscribe = StaffService.subscribe(update);
     return unsubscribe;
   }, [id, staffId]);
+  useEffect(() => {
+    if (detailResult.kind !== 'OPEN_OPPORTUNITY') return;
+    const controller = new AbortController();
+    setOpenDetails(undefined); setDetailError('');
+    void operationRequest<Partial<OpenOpportunity>>('booking', '/staff/opportunities/' + id, 'GET', undefined, controller.signal)
+      .then(value => { if (!controller.signal.aborted) setOpenDetails({ ...value, id: String(value.id) }); })
+      .catch(error => { if (!controller.signal.aborted) setDetailError(error instanceof Error ? error.message : 'Chưa tải được thông tin đơn.'); });
+    return () => controller.abort();
+  }, [id, staffId, detailResult.kind, detailAttempt]);
+
+  const claim = async () => {
+    if (claiming.current) return;
+    claiming.current = true; setClaimBusy(true); setDetailError('');
+    try {
+      const result = await StaffService.claimOpenShift(id, staffId);
+      if (result.success) setDetailResult({ kind: 'ASSIGNMENT', assignment: result.assignment });
+      else { setDetailError(result.reason); matching.retry(); }
+    } finally { claiming.current = false; setClaimBusy(false); }
+  };
 
   // Access Denied Screen (Security Guard against cross-staff access)
   if (detailResult.kind === 'FORBIDDEN') {
@@ -101,7 +126,7 @@ function StaffJobDetailContent() {
 
   const isAssignment = detailResult.kind === 'ASSIGNMENT';
   const assignment = isAssignment ? detailResult.assignment : undefined;
-  const opportunity = !isAssignment ? detailResult.opportunity : undefined;
+  const opportunity = !isAssignment ? { ...detailResult.opportunity, ...(openDetails?.id === id ? openDetails : {}) } : undefined;
   const commonItem = (assignment || opportunity)!;
   const matchItem = opportunity && matching.actor && matching.data ? StaffMatchingRepository.detail(matching.actor, opportunity.id) : undefined;
   const eligibility = { allowed: matching.status === 'READY' && !!matchItem?.eligibility.allowed, reason: matching.status === 'LOADING' ? 'Đang kiểm tra điều kiện…' : matching.status === 'ERROR' ? matching.error : matchItem?.eligibility.reasons.map(item => item.message).join('\n') };
@@ -142,8 +167,8 @@ function StaffJobDetailContent() {
           { text: 'Chưa' },
           {
             text: 'Xác nhận bắt đầu',
-            onPress: () => {
-              const res = StaffService.updateJobStatus(assignment.id, 'EN_ROUTE', staffId);
+            onPress: async () => {
+              const res = await StaffService.updateJobStatus(assignment.id, 'EN_ROUTE', staffId);
               if (!res.success && res.reason) {
                 Alert.alert('Lỗi', res.reason);
               }
@@ -159,8 +184,8 @@ function StaffJobDetailContent() {
           { text: 'Chưa' },
           {
             text: 'Bắt đầu làm việc ngay',
-            onPress: () => {
-              const res = StaffService.updateJobStatus(assignment.id, 'IN_PROGRESS', staffId);
+            onPress: async () => {
+              const res = await StaffService.updateJobStatus(assignment.id, 'IN_PROGRESS', staffId);
               if (!res.success && res.reason) {
                 Alert.alert('Lỗi', res.reason);
               }
@@ -171,17 +196,17 @@ function StaffJobDetailContent() {
     } else if (assignment.status === 'IN_PROGRESS') {
       Alert.alert(
         'Nghiệm thu & Hoàn thành',
-        `Bạn đã hoàn thành các hạng mục công việc và khách hàng đã nghiệm thu?\nThu nhập +${assignment.netIncome.toLocaleString('vi-VN')}đ sẽ được cộng ngay vào ví của bạn!`,
+        'Xác nhận các hạng mục đã hoàn thành? Thu nhập được ghi nhận sau khi quyết toán dịch vụ.',
         [
           { text: 'Kiểm tra lại' },
           {
             text: 'Hoàn thành ca làm',
-            onPress: () => {
-              const res = StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId);
+            onPress: async () => {
+              const res = await StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId);
               if (res.success) {
                 Alert.alert(
                   'Chúc mừng bạn đã hoàn thành ca! 🎉',
-                  `Đã cộng +${assignment.netIncome.toLocaleString('vi-VN')}đ vào số dư khả dụng của bạn. Hãy kiểm tra mục Ví & Thu nhập.`
+                  'Trạng thái hoàn thành đã được lưu. Thu nhập sẽ hiển thị khi đơn được quyết toán.'
                 );
               } else if (res.reason) {
                 Alert.alert('Không thể hoàn thành', res.reason);
@@ -193,9 +218,9 @@ function StaffJobDetailContent() {
     }
   };
 
-  const handleToggleChecklist = (checkId: string) => {
+  const handleToggleChecklist = async (checkId: string) => {
     if (!assignment) return;
-    const res = StaffService.toggleChecklistItem(assignment.id, checkId, staffId);
+    const res = await StaffService.toggleChecklistItem(assignment.id, checkId, staffId);
     if (res.assignment) {
       setDetailResult({ kind: 'ASSIGNMENT', assignment: res.assignment });
     }
@@ -221,23 +246,9 @@ function StaffJobDetailContent() {
   };
 
   const handleOpenMap = () => {
-    if (!assignment) return;
-    Alert.alert(
-      'Chỉ đường',
-      `Mở ứng dụng bản đồ để chỉ đường đến:\n${commonItem.address}`,
-      [
-        { text: 'Đóng' },
-        {
-          text: 'Mở bản đồ',
-          onPress: () => {
-            const query = encodeURIComponent(commonItem.address);
-            Linking.openURL(`https://maps.google.com/?q=${query}`).catch(() => {
-              Alert.alert('Chưa mở được bản đồ', 'Thiết bị chưa mở được ứng dụng bản đồ.');
-            });
-          },
-        },
-      ]
-    );
+    if (!commonItem.address) return;
+    void Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(commonItem.address)}`)
+      .catch(() => Alert.alert('Chưa mở được Google Maps', 'Thiết bị chưa mở được ứng dụng bản đồ.'));
   };
 
   const handleReportIssue = () => {
@@ -245,8 +256,8 @@ function StaffJobDetailContent() {
       'Báo cáo sự cố ca làm',
       'Vui lòng chọn loại sự cố bạn gặp phải:',
       [
-        { text: 'Khách không có nhà / không liên lạc được' },
-        { text: 'Khối lượng công việc phát sinh quá nhiều' },
+        { text: 'Khách không có nhà / không liên lạc được', onPress: async () => { try { await StaffService.reportIssue(staffId, commonItem.id, 'Khách không có nhà / không liên lạc được'); Alert.alert('Đã gửi', 'Sự cố đã được lưu để Admin xử lý.'); } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); } } },
+        { text: 'Khối lượng công việc phát sinh quá nhiều', onPress: async () => { try { await StaffService.reportIssue(staffId, commonItem.id, 'Khối lượng công việc phát sinh quá nhiều'); Alert.alert('Đã gửi', 'Sự cố đã được lưu để Admin xử lý.'); } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); } } },
         { text: 'Khác (Liên hệ tổng đài 1900 6868)' },
         { text: 'Đóng', style: 'cancel' },
       ]
@@ -257,7 +268,7 @@ function StaffJobDetailContent() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       {/* Top Navigation */}
       <View style={styles.topBar}>
-        <Pressable style={styles.iconCircle} onPress={() => router.back()}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Quay lại danh sách ca" style={styles.iconCircle} onPress={() => router.canGoBack() ? router.back() : router.replace('/staff/jobs')}>
           <IconSymbol name="back" size={22} color={BrandColors.gray800} />
         </Pressable>
         <View style={styles.topBarCenter}>
@@ -281,26 +292,27 @@ function StaffJobDetailContent() {
               <IconSymbol name="sparkles" size={20} color="#047857" />
               <Text style={styles.openNoticeTitle}>Điều kiện nhận ca</Text>
             </View>
-            <Text style={styles.openNoticeDesc}>
-              Xem dịch vụ, khu vực và thu nhập ước tính trước khi quyết định nhận một vị trí. Thông tin khách được mở sau khi nhận ca.
-            </Text>
+            <Text style={styles.openNoticeDesc}>Kiểm tra địa chỉ, thời gian và công việc khách đã chọn trước khi nhận ca.</Text>
             {!eligibility.allowed && <Text style={styles.openNoticeDesc}>{eligibility.reason}</Text>}
             <Pressable style={[styles.primaryActionButton, !eligibility.allowed && { backgroundColor: BrandColors.gray400 }]}
-              disabled={!eligibility.allowed} accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed }}
-              accessibilityLabel={eligibility.reason ?? 'Nhận ca làm việc này'} onPress={() => setShowMatch(true)}>
+              disabled={!eligibility.allowed || claimBusy || openDetails?.id !== id} accessibilityRole="button" accessibilityState={{ disabled: !eligibility.allowed || claimBusy || openDetails?.id !== id }}
+              accessibilityLabel="Nhận ca làm việc này" onPress={() => void claim()}>
               <Text style={styles.primaryActionText}>
-                {eligibility.allowed ? `Nhận ca làm việc này ngay (+${commonItem.netIncome.toLocaleString('vi-VN')}đ)` : 'Chưa đủ điều kiện nhận ca'}
+                {claimBusy ? 'Đang xác nhận nhận ca…' : matching.status === 'LOADING' ? 'Đang kiểm tra điều kiện…' : eligibility.allowed ? openDetails?.id !== id ? 'Đang tải thông tin đơn…' : 'Nhận ca làm việc này' : 'Chưa đủ điều kiện nhận ca'}
               </Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => matching.status === 'ERROR' ? matching.retry() : setShowMatch(true)}><Text style={{ color: BrandColors.primaryDark, fontWeight: '600' }}>{matching.status === 'ERROR' ? 'Thử lại kiểm tra điều kiện' : 'Vì sao phù hợp / Điều kiện chưa đạt'}</Text></Pressable>
-            <Pressable onPress={() => router.push({ pathname: '/staff/account-details', params: { section: 'skills' } })} accessibilityRole="button">
-              <Text style={{ color: BrandColors.primaryDark, fontWeight: '600' }}>Xem năng lực được xác nhận</Text>
-            </Pressable>
+            {!!detailError && <Text accessibilityRole="alert" style={{ color: '#B91C1C' }}>{detailError}</Text>}
+            {(!!detailError || matching.status === 'ERROR') && <Pressable accessibilityRole="button" onPress={() => { setDetailAttempt(value => value + 1); matching.retry(); }}><Text style={{ color: BrandColors.primaryDark }}>Tải lại thông tin ca</Text></Pressable>}
           </View>
         )}
 
+        {assignment?.status === 'CANCELLED' && <View style={styles.stepperCard}>
+          <Text style={[styles.stepperHeader, { color: '#B91C1C' }]}>Đã hủy lời mời / ca làm việc</Text>
+          <Text style={{ color: '#475569', lineHeight: 22 }}>{assignment.cancellationReason || 'Ca làm việc đã được hủy.'}</Text>
+          {assignment.responseTimedOut && <Text style={{ color: '#92400E', lineHeight: 22, marginTop: 8 }}>Hết thời gian nhận đơn. Hãy chú ý lời mời và phản hồi sớm hơn để có doanh thu tốt hơn.</Text>}
+        </View>}
         {/* Stepper Card only for Accepted Assignments */}
-        {isAssignment && assignment && (
+        {isAssignment && assignment && assignment.status !== 'CANCELLED' && (
           <>
             <View style={styles.stepperCard}>
               <Text style={styles.stepperHeader}>Tiến trình làm việc</Text>
@@ -372,7 +384,7 @@ function StaffJobDetailContent() {
                     ? 'Hãy chú ý an toàn giao thông. Khi đến nơi, bấm "Đã đến nơi" để xác nhận gặp gia chủ.'
                     : assignment.status === 'IN_PROGRESS'
                     ? 'Tập trung làm việc theo checklist. Sau khi gia chủ nghiệm thu, bấm hoàn thành để nhận tiền công.'
-                    : 'Tiền công đã được cộng trực tiếp vào ví. Khách hàng sẽ gửi đánh giá sao cho bạn.'}
+                    : 'Trạng thái hoàn thành đã được lưu. Thu nhập được ghi nhận sau khi quyết toán đơn.'}
                 </Text>
               </View>
             </View>
@@ -391,7 +403,7 @@ function StaffJobDetailContent() {
             ) : (
               <View style={styles.completedNotice}>
                 <Text style={styles.completedNoticeText}>
-                  ✅ Ca làm việc đã hoàn thành & đã nhận tiền công
+                  ✅ Ca làm việc đã hoàn thành • Thu nhập theo kết quả quyết toán
                 </Text>
               </View>
             )}
@@ -402,7 +414,7 @@ function StaffJobDetailContent() {
         {isAssignment && <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Khách hàng liên hệ</Text>
           <View style={styles.customerRow}>
-            {commonItem.customerAvatar ? <Image source={{ uri: commonItem.customerAvatar }} style={styles.customerAvatar} /> : <View style={[styles.customerAvatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 }]}><IconSymbol name="user" size={24} color={BrandColors.gray500} /></View>}
+            {commonItem.customerAvatar ? <Image source={remoteImageSource(commonItem.customerAvatar)} style={styles.customerAvatar} /> : <View style={[styles.customerAvatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 }]}><IconSymbol name="user" size={24} color={BrandColors.gray500} /></View>}
             <View style={styles.customerInfo}>
               <Text style={styles.customerName}>{commonItem.customerName}</Text>
               <Text style={styles.customerPhone}>{commonItem.customerPhone ? `📞 ${commonItem.customerPhone}` : 'Chưa có số điện thoại liên hệ'}</Text>
@@ -430,7 +442,7 @@ function StaffJobDetailContent() {
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Khung giờ làm việc</Text>
               <Text style={styles.infoValue}>
-                {matchItem ? opportunityTime(matchItem.opportunity) : `${commonItem.date} • ${commonItem.timeSlot}`}
+                {commonItem.startsAt && commonItem.endsAt ? opportunityTime({ startsAt: commonItem.startsAt, endsAt: commonItem.endsAt }) : `${commonItem.date} • ${commonItem.timeSlot}`}
               </Text>
             </View>
           </View>
@@ -438,17 +450,16 @@ function StaffJobDetailContent() {
           <View style={styles.infoRow}>
             <IconSymbol name="📍" style={styles.infoIcon} />
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>{isAssignment ? 'Địa chỉ cụ thể' : 'Khu vực làm việc'}</Text>
-              <Text style={styles.infoValue}>{isAssignment ? commonItem.address : `${commonItem.district}, TP. Hồ Chí Minh`}</Text>
-              <Text style={styles.infoSubValue}>Khu vực: {commonItem.district}, TP. Hồ Chí Minh</Text>
+              <Text style={styles.infoLabel}>Địa chỉ khách đã đặt</Text>
+              <Text style={styles.infoValue}>{commonItem.address || (detailError ? 'Chưa tải được địa chỉ cụ thể' : 'Đang tải địa chỉ…')}</Text>
+              <Text style={styles.infoSubValue}>Khu vực: {[commonItem.district, commonItem.city].filter(Boolean).join(', ')}</Text>
             </View>
           </View>
 
-          {isAssignment && <Pressable style={styles.mapButton} onPress={handleOpenMap}>
+          {!!commonItem.address && <Pressable accessibilityRole="button" style={styles.mapButton} onPress={handleOpenMap}>
             <IconSymbol name="location" size={16} color="#2563EB" />
-            <Text style={styles.mapButtonText}>Mở ứng dụng Bản đồ chỉ đường</Text>
+            <Text style={styles.mapButtonText}>Mở địa chỉ trên Google Maps</Text>
           </Pressable>}
-          {!isAssignment && <Text style={styles.infoSubValue}>Địa chỉ cụ thể và liên hệ khách được mở sau khi nhận ca.</Text>}
         </View>
 
         {/* Service Details & Notes */}
@@ -470,8 +481,10 @@ function StaffJobDetailContent() {
               <Text style={styles.addOnValue}>+ {commonItem.addOnsText}</Text>
             </View>
           ) : null}
+          {!!commonItem.relatedServicesText && <View style={styles.addOnBox}><Text style={styles.addOnLabel}>Dịch vụ khách chọn thêm:</Text><Text style={styles.addOnValue}>{commonItem.relatedServicesText}</Text></View>}
+          {commonItem.workSelections?.map((item, index) => <View key={`${item.label}-${index}`} style={styles.infoRow}><View style={styles.infoContent}><Text style={styles.infoLabel}>{item.label}</Text><Text style={styles.infoValue}>{item.value}</Text></View></View>)}
 
-          {isAssignment && commonItem.notes ? (
+          {commonItem.notes ? (
             <View style={styles.notesHighlight}>
               <Text style={styles.notesHighlightTitle}>💬 Ghi chú đặc biệt từ gia chủ:</Text>
               <Text style={styles.notesHighlightContent}>{commonItem.notes}</Text>
@@ -479,6 +492,14 @@ function StaffJobDetailContent() {
           ) : null}
         </View>
 
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Thanh toán đơn hàng</Text>
+          <View style={styles.financeRow}><Text style={styles.financeLabel}>Phương thức khách chọn:</Text><Text style={styles.financeValue}>{commonItem.paymentMethod === 'CASH' ? 'Tiền mặt' : commonItem.paymentMethod === 'BANK_TRANSFER_QR' ? 'Chuyển khoản QR' : commonItem.paymentMethod || 'Chưa có thông tin'}</Text></View>
+          <View style={styles.financeRow}><Text style={styles.financeLabel}>Tổng tiền đơn:</Text><Text style={styles.financeValue}>{commonItem.totalCustomerPaid.toLocaleString('vi-VN')}đ</Text></View>
+          <Text style={styles.financeNote}>{commonItem.paymentStatus === 'PAID' ? 'Đơn đã được xác nhận thanh toán.' : commonItem.paymentMethod === 'CASH' ? isAssignment ? 'Khách thanh toán tiền mặt sau khi hoàn thành. Thực hiện các bước theo tiến trình ca làm việc.' : 'Khách thanh toán tiền mặt khi hoàn thành. Nhận ca để tiếp tục di chuyển và thực hiện công việc.' : 'Thanh toán chưa được xác nhận.'}</Text>
+        </View>
+
+        {assignment?.bookingStatus==='MATCHING' && <View style={styles.card}><Text>Đơn đang chờ đủ nhân viên xác nhận. Bạn có thể xem thông tin ca và chuẩn bị trước.</Text></View>}
         {/* Work Checklist (Only for accepted assignments) */}
         {isAssignment && assignment?.checklist && assignment.checklist.length > 0 && (
           <View style={styles.card}>
@@ -517,7 +538,7 @@ function StaffJobDetailContent() {
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Minh bạch thu nhập ca này</Text>
           <View style={styles.financeRow}>
-            <Text style={styles.financeLabel}>{isAssignment ? 'Giá tham chiếu ca:' : 'Giá tham chiếu / vị trí:'}</Text>
+            <Text style={styles.financeLabel}>Tổng tiền toàn đơn:</Text>
             <Text style={styles.financeValue}>
               {commonItem.totalCustomerPaid.toLocaleString('vi-VN')}đ
             </Text>
@@ -525,13 +546,13 @@ function StaffJobDetailContent() {
           <View style={styles.financeRow}>
             <Text style={styles.financeLabel}>Phí vận hành ước tính:</Text>
             <Text style={styles.financeFee}>
-              -{commonItem.platformFee.toLocaleString('vi-VN')}đ
+              {commonItem.incomePendingPolicy ? 'Chờ quyết toán' : '-'+commonItem.platformFee.toLocaleString('vi-VN')+'đ'}
             </Text>
           </View>
           <View style={[styles.financeRow, styles.financeTotalRow]}>
             <Text style={styles.financeTotalLabel}>{isAssignment ? 'Thu nhập ca của bạn:' : 'Thu nhập ước tính / nhân viên:'}</Text>
             <Text style={styles.financeTotalAmount}>
-              +{commonItem.netIncome.toLocaleString('vi-VN')}đ
+              {commonItem.incomePendingPolicy ? 'Chờ quyết toán' : '+'+commonItem.netIncome.toLocaleString('vi-VN')+'đ'}
             </Text>
           </View>
           <Text style={styles.financeNote}>
@@ -545,7 +566,6 @@ function StaffJobDetailContent() {
           <Text style={styles.helpText}>Cần hỗ trợ sự cố khẩn cấp? Liên hệ Admin ngay</Text>
         </Pressable>
       </ScrollView>
-      {showMatch && opportunity && <StaffMatchExplanation matching={matching} opportunityId={opportunity.id} onClose={() => setShowMatch(false)} onClaimed={job => setDetailResult({ kind: 'ASSIGNMENT', assignment: job })} />}
     </SafeAreaView>
   );
 }
