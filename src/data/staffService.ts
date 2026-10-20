@@ -64,6 +64,7 @@ const activeStaffId = () => operationSession()?.profile.role === 'STAFF' ? opera
  */
 export const StaffService = {
   load: StaffRepository.load,
+  refreshWallet: StaffRepository.refreshWallet,
   getBankAccounts: StaffRepository.getBankAccounts,
   addBank: StaffRepository.addBank,
   reportIssue: StaffRepository.reportIssue,

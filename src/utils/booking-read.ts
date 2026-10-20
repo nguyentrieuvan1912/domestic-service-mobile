@@ -2,7 +2,7 @@
 export async function retryBookingRead<T>(read: () => Promise<T>, signal: AbortSignal): Promise<T> {
   try { return await read(); }
   catch (error) {
-    if (signal.aborted || !(error instanceof Error) || ![
+    if (signal.aborted || !(error instanceof Error) || ('readRetried' in error && error.readRetried) || ![
       'Kết nối quá lâu. Vui lòng thử lại.',
       'Không kết nối được backend. Vui lòng thử lại.',
     ].includes(error.message)) throw error;

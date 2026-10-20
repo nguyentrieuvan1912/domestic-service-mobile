@@ -105,12 +105,13 @@ export interface StaffWalletTransaction {
   title: string;
   date: string;
   amount: number;
-  type: 'INCOME' | 'WITHDRAW' | 'BONUS' | 'FEE';
+  type: 'INCOME' | 'WITHDRAW' | 'BONUS' | 'FEE' | 'TOP_UP';
   status: 'SUCCESS' | 'PENDING' | 'FAILED';
   bookingCode?: string;
 }
 
 export interface StaffWalletBalance {
+  reserved?: number;
   available: number;
   pending: number;
   totalEarned: number;

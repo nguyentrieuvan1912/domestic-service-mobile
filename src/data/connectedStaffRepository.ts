@@ -12,6 +12,7 @@ import type { StaffCapabilityActor, StaffCapabilityRecord, CapabilityRestriction
 import type { MatchingSnapshot, MatchItem } from '@/types/staff-matching';
 import type { JobStepStatus } from './staffStateTransitions';
 
+type WalletResponse = { balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string }[] };
 type Bank = { id: string; bankCode: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
 const listeners = new Set<() => void>();
 let revision = 0, owner = '', loaded = false, failure = '', loading: Promise<void> | null = null;
@@ -60,6 +61,17 @@ async function loadSchedule(signal?: AbortSignal) {
   scheduleLoading = task;
   try { await task; } finally { if (scheduleLoading === task) scheduleLoading = null; }
 }
+function applyWallet(wallet: WalletResponse) {
+      balance = wallet.balance;
+      transactions = wallet.transactions.filter(item => item.bucket === 'AVAILABLE' && !['HOLD', 'RELEASE'].includes(item.type)).map(item => ({ id: String(item.id), title: item.type === 'TOP_UP' ? 'Nạp tiền chuyển khoản' : item.type === 'EARNING' ? 'Thu nhập ca làm' : item.type === 'REWARD' ? 'Thưởng' : item.type === 'PENALTY' ? 'Khoản phạt' : 'Bút toán ' + item.type, date: new Date(item.createdAt).toLocaleString('vi-VN'), amount: item.amount, type: item.type === 'TOP_UP' ? 'TOP_UP' : item.type === 'EARNING' ? 'INCOME' : item.type === 'REWARD' ? 'BONUS' : 'FEE', status: 'SUCCESS' }));
+      transactions.push(...wallet.withdrawals.map(item => ({ id: 'withdrawal-' + item.id, title: 'Yêu cầu rút tiền', date: new Date(item.requestedAt).toLocaleString('vi-VN'), amount: item.amount, type: 'WITHDRAW' as const, status: item.status === 'PAID' ? 'SUCCESS' as const : ['REJECTED','FAILED','CANCELLED'].includes(item.status) ? 'FAILED' as const : 'PENDING' as const })));
+}
+async function refreshWallet(signal?: AbortSignal) {
+  const active = assertStaff();
+  const wallet = await operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET', undefined, signal);
+  if (active.token !== operationSession()?.token || signal?.aborted) return;
+  applyWallet(wallet); notify();
+}
 async function load(signal?: AbortSignal) {
   const active = assertStaff();
   if (loading) return loading;
@@ -71,7 +83,7 @@ async function load(signal?: AbortSignal) {
         operationRequest<{ items: { opportunity: Record<string, unknown>; eligibility: MatchItem['eligibility'] }[] }>('booking', '/staff/me/matching', 'GET', undefined, signal),
         operationRequest<{ capabilities: Record<string, unknown>[]; restrictions: Record<string, unknown>[] }>('booking', '/staff/me/capabilities', 'GET', undefined, signal),
         loadSchedule(signal),
-        operationRequest<{ balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string }[] }>('finance', '/staff/me/wallet', 'GET', undefined, signal),
+        operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET', undefined, signal),
         operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET', undefined, signal),
         operationRequest<{ id: number; customerId: number; rating: number; comment: string; createdAt: string; tags: string[] }[]>('booking', '/reviews', 'GET', undefined, signal),
         loadHcmAdministrativeUnits(),
@@ -81,9 +93,7 @@ async function load(signal?: AbortSignal) {
       matchItems = rawMatching.items.map(item => ({ ...item, opportunity: { ...item.opportunity, id: String(item.opportunity.id), serviceId: String(item.opportunity.serviceId), invitedStaffId: item.opportunity.invitedStaffId == null ? undefined : String(item.opportunity.invitedStaffId) } as unknown as MatchItem['opportunity'] }));
       records = rawCaps.capabilities.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: String(item.serviceId), note: item.note || undefined, approvedAt: item.approvedAt || undefined, validFrom: item.validFrom || undefined, validUntil: item.validUntil || undefined } as StaffCapabilityRecord));
       restrictions = rawCaps.restrictions.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: item.serviceId == null ? undefined : String(item.serviceId), endsAt: item.endsAt || undefined } as CapabilityRestrictionRecord));
-      balance = wallet.balance;
-      transactions = wallet.transactions.filter(item => item.bucket === 'AVAILABLE' && !['HOLD', 'RELEASE'].includes(item.type)).map(item => ({ id: String(item.id), title: item.type === 'EARNING' ? 'Thu nhập ca làm' : item.type === 'REWARD' ? 'Thưởng' : item.type === 'PENALTY' ? 'Khoản phạt' : 'Bút toán ' + item.type, date: new Date(item.createdAt).toLocaleString('vi-VN'), amount: item.amount, type: item.type === 'EARNING' ? 'INCOME' : item.type === 'REWARD' ? 'BONUS' : 'FEE', status: 'SUCCESS' }));
-      transactions.push(...wallet.withdrawals.map(item => ({ id: 'withdrawal-' + item.id, title: 'Yêu cầu rút tiền', date: new Date(item.requestedAt).toLocaleString('vi-VN'), amount: item.amount, type: 'WITHDRAW' as const, status: item.status === 'PAID' ? 'SUCCESS' as const : ['REJECTED','FAILED','CANCELLED'].includes(item.status) ? 'FAILED' as const : 'PENDING' as const })));
+      applyWallet(wallet);
       banks = rawBanks.map(item => ({ ...item, id: String(item.id) }));
       reviews = rawReviews.map(item => ({ ...item, id: String(item.id), customerName: 'Khách hàng #' + item.customerId, customerAvatar: '', tags: item.tags || [] }));
       loaded = true; failure = ''; notify();
@@ -116,7 +126,7 @@ async function refreshWork(signal?: AbortSignal) {
 }
 async function refreshAfterWrite() { try { await load(); } catch { /* The write has committed; UI presents the refresh error separately. */ } }
 export const StaffRepository = {
-  load,
+  load, refreshWallet,
   loadSchedule,
   getScheduleLoadState: () => ({ loaded: scheduleLoaded, error: scheduleFailure }),
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },

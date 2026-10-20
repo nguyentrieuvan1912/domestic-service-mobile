@@ -17,15 +17,20 @@ export function useStaffMatching() {
   useFocusEffect(useCallback(() => {
     if (!query.actor) return;
     const controller = new AbortController();
-    let ready=false;
-    const refresh = () => { if (ready && !controller.signal.aborted && AppState.currentState === 'active') void StaffMatchingRepository.refresh(query.actor!, controller.signal).catch(() => {}); };
-    const timer = setInterval(refresh, 5000);
-    const foreground = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
-    void StaffMatchingRepository.load(query.actor, controller.signal).then(() => {
-      if (!controller.signal.aborted) { ready=true; setState({ key: query.key, status: 'READY' }); }
-    }).catch((error: unknown) => {
-      if (!controller.signal.aborted) setState({ key: query.key, status: 'ERROR', error: error instanceof Error ? error.message : 'Chưa tải được việc phù hợp.' });
-    });
+    let ready = false, inFlight = false;
+    const refresh = async () => {
+      if (inFlight || controller.signal.aborted || AppState.currentState !== 'active') return;
+      inFlight = true;
+      try {
+        await (ready ? StaffMatchingRepository.refresh(query.actor!, controller.signal) : StaffMatchingRepository.load(query.actor!, controller.signal));
+        if (!controller.signal.aborted) { ready = true; setState({ key: query.key, status: 'READY' }); }
+      } catch (error) {
+        if (!controller.signal.aborted && !ready) setState({ key: query.key, status: 'ERROR', error: error instanceof Error ? error.message : 'Chưa tải được việc phù hợp.' });
+      } finally { inFlight = false; }
+    };
+    const timer = setInterval(() => void refresh(), 5000);
+    const foreground = AppState.addEventListener('change', next => { if (next === 'active') void refresh(); });
+    void refresh();
     return () => { controller.abort(); clearInterval(timer); foreground.remove(); };
   }, [query]));
   const scoped = state.key === key ? state : { key, status: 'LOADING' as const };

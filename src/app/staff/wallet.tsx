@@ -1,6 +1,7 @@
+import { StaffTopupPanel } from '@/components/staff/StaffTopupPanel';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
 import { EmptyState } from '@/components/common/EmptyState';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Alert,
   Modal,
@@ -31,7 +32,7 @@ function StaffWalletContent() {
   const staffId = currentStaff?.id || '';
 
   const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
-  const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'WITHDRAW' | 'BONUS'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'WITHDRAW' | 'BONUS' | 'TOP_UP'>('ALL');
 
   // Withdraw Modal State
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
@@ -54,6 +55,7 @@ function StaffWalletContent() {
   }, [staffId]);
 
   const { balance, transactions } = wallet;
+  const refreshWallet = useCallback(() => { void StaffService.refreshWallet().catch(() => {}); }, []);
 
   const filteredTransactions = transactions.filter((tx) => {
     if (filterType === 'ALL') return true;
@@ -157,48 +159,17 @@ function StaffWalletContent() {
 
             <View style={styles.linkedBankRow}>
               <Text style={styles.linkedBankText}>
-                🏦 Thụ hưởng: Vietcombank (****9821) - {accountName}
+                {bankAccounts.length ? '🏦 ' + bankAccounts.map(bank => bank.bankCode + ' (****' + bank.accountNumber.slice(-4) + ') · ' + bank.accountHolder + (bank.status === 'VERIFIED' ? ' · Đã xác minh' : ' · Chờ xác minh')).join('\n') : 'Chưa liên kết tài khoản ngân hàng nhận tiền.'}
               </Text>
             </View>
           </LinearGradient>
 
-          {/* Weekly Income Bar Overview */}
           <View style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <Text style={styles.cardTitle}>Hiệu suất thu nhập tuần này</Text>
-              <Text style={styles.chartTotal}>2.480.000đ</Text>
-            </View>
-            <Text style={styles.chartSub}>Tăng 12% so với tuần trước (Đạt chỉ tiêu)</Text>
-
-            {/* Weekly Bars Simulation */}
-            <View style={styles.barsContainer}>
-              {[
-                { day: 'T2', amount: '350k', height: 45 },
-                { day: 'T3', amount: '480k', height: 60 },
-                { day: 'T4', amount: '290k', height: 35 },
-                { day: 'T5', amount: '520k', height: 75 },
-                { day: 'T6', amount: '440k', height: 55 },
-                { day: 'T7', amount: '400k', height: 50, active: true },
-                { day: 'CN', amount: '0k', height: 10 },
-              ].map((item, i) => (
-                <View key={i} style={styles.barColumn}>
-                  <Text style={styles.barAmount}>{item.amount}</Text>
-                  <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.barFill,
-                        { height: item.height },
-                        item.active && styles.barFillActive,
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.barDay, item.active && styles.barDayActive]}>
-                    {item.day}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <Text style={styles.cardTitle}>Tiền đang giữ cho yêu cầu rút</Text>
+            <Text style={styles.chartTotal}>{(balance.reserved || 0).toLocaleString('vi-VN')}đ</Text>
+            <Text style={styles.chartSub}>Khoản này chưa được chuyển về ngân hàng và không thể tạo yêu cầu rút khác.</Text>
           </View>
+          <StaffTopupPanel onCredited={refreshWallet} />
 
           {/* Transactions Filter & History */}
           <View style={styles.historySection}>
@@ -213,6 +184,7 @@ function StaffWalletContent() {
                 [
                   { key: 'ALL', label: 'Tất cả' },
                   { key: 'INCOME', label: 'Tiền công' },
+                  { key: 'TOP_UP', label: 'Nạp tiền' },
                   { key: 'WITHDRAW', label: 'Rút tiền' },
                   { key: 'BONUS', label: 'Thưởng/Tip' },
                 ] as const
@@ -235,7 +207,7 @@ function StaffWalletContent() {
             {/* Transaction Items */}
             <View style={styles.txList}>
               {filteredTransactions.map((tx) => {
-                const isPositive = tx.type === 'INCOME' || tx.type === 'BONUS';
+                const isPositive = tx.type === 'INCOME' || tx.type === 'BONUS' || tx.type === 'TOP_UP';
                 return (
                   <View key={tx.id} style={styles.txItem}>
                     <View

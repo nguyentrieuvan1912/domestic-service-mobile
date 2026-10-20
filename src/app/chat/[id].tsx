@@ -1,3 +1,4 @@
+import { BookingCallButton } from '@/components/common/BookingCallButton';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -151,13 +152,7 @@ function ChatContent({ actor, conversation, phase, bookingCode, goBack }: ChatCo
           <Text style={styles.headerSubtitle}>{bookingCode} • {CHAT_PHASE_LABELS[phase]}</Text>
           <Text style={styles.headerSubtitle}>{conversation.serviceName}</Text>
         </View>
-        <View style={styles.callUnavailable} accessibilityLabel="Gọi thoại chưa được hỗ trợ">
-          <Pressable disabled accessibilityRole="button" accessibilityState={{ disabled: true }}
-            accessibilityLabel="Gọi thoại chưa được hỗ trợ" style={[styles.callBtn, styles.callBtnDisabled]}>
-            <IconSymbol name="phone" size={18} color={BrandColors.gray400} />
-          </Pressable>
-          <Text style={styles.headerSubtitle}>Chưa hỗ trợ</Text>
-        </View>
+        <BookingCallButton conversationId={conversationId} disabled={isLocked} />
       </View>
       <View style={[styles.privacyBanner, isLocked && styles.privacyBannerLocked]}>
         <Text style={[styles.privacyBannerText, isLocked && styles.privacyBannerTextLocked]}>

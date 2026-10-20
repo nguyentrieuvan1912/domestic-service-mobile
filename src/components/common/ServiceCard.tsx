@@ -38,7 +38,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
             {service.shortDescription || service.description}
           </Text>
           <View style={styles.horizontalFooter}>
-            <View>
+            <View style={styles.priceGroup}>
               <Text style={styles.priceLabel}>Giá từ</Text>
               <Text style={styles.priceValue}>
                 {formatVND(service.basePrice)}
@@ -73,7 +73,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({
           <RatingStars rating={service.rating} size={12} reviewCount={service.reviewCount} />
         </View>
         <View style={styles.verticalFooter}>
-          <View>
+          <View style={styles.priceGroup}>
             <Text style={styles.priceLabel}>Chỉ từ</Text>
             <Text style={styles.priceValue}>
               {formatVND(service.basePrice)}
@@ -148,6 +148,8 @@ const styles = StyleSheet.create({
   },
   verticalFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 8,
@@ -157,6 +159,10 @@ const styles = StyleSheet.create({
   priceLabel: {
     fontSize: 11,
     color: BrandColors.gray400,
+  },
+  priceGroup: {
+    maxWidth: '100%',
+    minWidth: 0,
   },
   priceValue: {
     fontSize: 15,
@@ -169,12 +175,16 @@ const styles = StyleSheet.create({
     color: BrandColors.gray500,
   },
   bookButton: {
+    maxWidth: '100%',
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: BrandColors.primary,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: BorderRadius.lg,
   },
   bookButtonText: {
+    textAlign: 'center',
     color: '#FFF',
     fontSize: 12,
     fontWeight: '700',
@@ -193,6 +203,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   horizontalImage: {
+    flexShrink: 0,
     width: 90,
     height: 90,
     borderRadius: BorderRadius.md,
@@ -200,25 +211,25 @@ const styles = StyleSheet.create({
   },
   horizontalBody: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'space-between',
   },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 6,
   },
   horizontalTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: BrandColors.gray900,
-    flex: 1,
+    width: '100%',
   },
   hotBadge: {
+    maxWidth: '100%',
     backgroundColor: '#FEE2E2',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    marginLeft: 6,
   },
   hotBadgeText: {
     color: BrandColors.danger,
@@ -233,6 +244,8 @@ const styles = StyleSheet.create({
   },
   horizontalFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },

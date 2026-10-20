@@ -14,7 +14,7 @@ export const CustomerBookings = {
   list: () => items,
   get: (id: string) => items.find(item => item.id === id),
   async load() { const session = operationSession(); if (!session || session.profile.role !== 'CUSTOMER') { items = []; notify(); return; } const epoch = readEpoch; const data = await operationRequest<Record<string, unknown>[]>('booking', '/bookings'); if (session.token === operationSession()?.token && epoch === readEpoch) { items = data.map(bookingView); notify(); } },
-  async detail(id: string) { customerSession(); const epoch = readEpoch; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id)); if(epoch === readEpoch) { items = [item, ...items.filter(b => b.id !== id)]; notify(); } return item; },
+  async detail(id: string, signal?: AbortSignal) { customerSession(); const epoch = readEpoch; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id, 'GET', undefined, signal)); if(epoch === readEpoch) { items = [item, ...items.filter(b => b.id !== id)]; notify(); } return item; },
   async staffResponse(id: string, action: 'EXTEND' | 'CANCEL' | 'STOP', round: number) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/staff-response', 'POST', { action, round })); readEpoch++; items = [item, ...items.filter(b => b.id !== id)]; notify(); return item; },
   async cancel(id: string, reason: string) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/cancel', 'POST', { reason })); readEpoch++; items = items.map(b => b.id === id ? item : b); notify(); return item; },
 };

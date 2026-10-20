@@ -1,0 +1,59 @@
+
+> domestic-service-mobile@1.0.0 test
+> node scripts/test-staff-transitions.mjs && node scripts/test-chat.mjs && node scripts/test-notifications.mjs && node scripts/test-staff-capabilities.mjs && node scripts/test-catalog.mjs && node scripts/test-staff-availability.mjs && node scripts/test-staff-matching.mjs && node scripts/test-connected-operations.mjs && node scripts/test-remembered-login.mjs && node scripts/test-service-requirements.mjs && node scripts/test-availability-save.mjs && node scripts/test-booking-resume.mjs && node scripts/test-package-recommendation.mjs && node scripts/test-quick-rebook.mjs && node scripts/test-staff-response.mjs && node scripts/test-community.mjs
+
+=== RUNNING STAFF DOMAIN & TRANSITIONS SUITE ===
+
+Group 1: Typed Mapping (UserId <-> StaffId)
+✓ Group 1: All mapping tests passed
+
+Group 2: Terminal Status Guards
+✓ Group 2: Terminal status guards passed
+
+Group 3: Valid Job Progressions
+✓ Group 3: Valid transitions passed
+
+Group 4: Invalid State Transitions
+✓ Group 4: Invalid transition blocks passed
+
+Group 5: Authorization & Existence Guards
+✓ Group 5: Authorization and existence guards passed
+
+Group 6: Idempotent Wallet Completion
+✓ Group 6: Idempotent wallet completion passed
+
+=== ALL 6 TEST GROUPS COMPLETED SUCCESSFULLY ===
+(node:69396) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///E:/KhoaLuanTN/SourceCode/domestic-service-mobile/src/data/staffStateTransitions.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to E:\KhoaLuanTN\SourceCode\domestic-service-mobile\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Chat: access, mapping, actors, policy, persistence, failure/retry, cancellation and live closure passed.
+Notifications: account ownership, timestamp/grouping, targets/permissions, deleted targets, persistence, badge subscriptions, scoped read-all, failure/retry and cancellation passed.
+Capabilities: actor/ownership, empty, redaction, approval/validity boundaries, restrictions, failure/retry/cancellation and claim revalidation without side effects passed.
+Catalog: Gateway URL, native network errors, HTTP states, cancellation and retry passed.
+Availability: timezone/horizon, grid/bounds, normalization, containment/overlap, both buffer boundaries, actor scoping, draft isolation, saved matching, retries/abort, revisions and booking revalidation passed.
+Matching: owned pure eligibility/reasons, capability/restriction/online, schedule/buffer boundaries, privacy, filters/sorts/empty states, abort/retry, stale claims and multi-position races passed.
+Matching modes: own invitations counted even while ineligible; foreign invitations excluded; open jobs require eligibility; search remains scoped.
+Job search: exact service and local work-date filters passed.
+Connected operations: persisted-response mutations, failed-write isolation, role scoping, account cache reset, stale-response rejection and revoked-session clearing passed.
+Connected chat: accepted-booking lookup, bounded receipt, unread update, stale-poll rejection and account reset passed.
+Polling performance: 20 identical chat, notification and job polls caused zero extra store updates; real unread/job changes were delivered and concurrent job requests were deduplicated.
+Chat smoothness: unchanged thread stability, receipt retry/dedup, committed-send confirmation despite inbox failure, late-poll protection, idempotent acknowledgement and failed-send isolation passed.
+Transport resilience: transient GET recovery, bounded attempts, no mutation/business retry, account guard through body decode and cancellation during backoff passed.
+Response body deadlines: stalled reads terminate with one retry; stalled writes terminate without replay.
+Remembered login: cold-launch token removal, secure native storage, role isolation, opt-out, corrupt data, failed storage and no browser password persistence passed.
+Service questionnaires: required fields, boolean false, numeric bounds/integer counts and service-specific choices passed.
+Guided service setup: ordered single-question screens, current-step gating, optional skip, boolean false, package ownership, quantity duration and required staffing passed.
+Area staffing: whole-team coverage, quantity scaling, manual under-staff rejection and decimal boundary passed.
+Availability save: lost response and stale revision reconcile only against matching newer persisted week; changed slots/areas/preferences, missing registration, unchanged revision and failed verification retain the error. No write retry.
+Booking resume: foreground/focus revalidation, background cancellation, bounded read retries, no business-error retry, address refresh without unmount and cross-account response isolation passed.
+Booking detail: immediate core rendering, optional-service isolation, retained data on refresh error and order/account isolation passed.
+Staff matching: failed initial load automatically recovers on the next active poll.
+Package recommendation: debounced real-hook request parameters, stale-area rejection, invalid input, pause/resume, Mode A staff limit and manual retry passed.
+Rebook payment/promotion: unsupported method blocked, explicit cash choice persisted, changed/invalid voucher invalidates old totals and only verified new promo is submitted.
+Legacy rebook: absent/invalid requirements are editable, saved configuration restores without guessing, false stays valid, incomplete previews blocked and corrected answers sent to backend.
+Quick rebook: three valid future times, preserved owned snapshot, full-service staff intersection, busy-staff blocking, selected/auto modes, idempotent explicit retry, addon quote invalidation, stale response and foreground gates passed.
+Staff response: persisted deadlines, elapsed/reopened countdown, expiry boundaries, pending/expired/closed/accepted homepage routes passed.
+Retry: original address/time/full duration/package/extras/answers/configuration/promo/notes restored; latest invitation marked; quote/request identity never reused.
+Customer travel timeline: real assignment EN_ROUTE, accepted/arrived/completed/cancelled and multiple-staff states passed.
+Community: media limits, server confirmation, interrupted-upload recovery, secret exclusion, provider host and threaded comment deduplication passed.

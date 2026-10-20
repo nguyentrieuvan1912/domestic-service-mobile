@@ -1,0 +1,55 @@
+env: load .env.local
+env: export EXPO_PUBLIC_API_BASE_URL EXPO_PUBLIC_WEB_API_BASE_URL
+Using src/app as the root directory for Expo Router.
+React Compiler enabled
+Starting Metro Bundler
+
+| (node:62040) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:62040) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Android Bundled 18457ms node_modules\expo-router\entry.js (1863 modules)
+
+› Assets (46):
+assets\images\ai-mascot.png (529KB)
+assets\images\brand\cleanmaster-logo-v1.png (843KB)
+assets\images\categories\ac_cleaning.png (24KB)
+assets\images\categories\ac_maintenance.png (30KB)
+assets\images\categories\child_care.png (37KB)
+assets\images\categories\cleaning_deep.png (27KB)
+assets\images\categories\cleaning_hourly.png (29KB)
+assets\images\categories\cleaning_upholstery.png (29KB)
+assets\images\categories\cooking.png (35KB)
+assets\images\categories\dryer_cleaning.png (31KB)
+assets\images\categories\elderly_care.png (30KB)
+assets\images\categories\grocery_shopping.png (31KB)
+assets\images\categories\laundry.png (25KB)
+assets\images\categories\other_services.png (29KB)
+assets\images\categories\pet_care.png (33KB)
+assets\images\categories\plant_care.png (32KB)
+assets\images\categories\refrigerator_cleaning.png (25KB)
+assets\images\categories\washing_machine.png (29KB)
+assets\images\staff-welcome\cleanmaster-staff-scooter.png (1.9MB)
+node_modules\@expo-google-fonts\material-symbols\400Regular\MaterialSymbols_400Regular.ttf (964KB)
+node_modules\expo-router\assets\arrow_down.png (9.5KB)
+node_modules\expo-router\assets\arrow_right.xml (307B)
+node_modules\expo-router\assets\checkmark.xml (312B)
+node_modules\expo-router\assets\error.png (469B)
+node_modules\expo-router\assets\file.png (138B)
+node_modules\expo-router\assets\forward.png (188B)
+node_modules\expo-router\assets\pkg.png (364B)
+node_modules\expo-router\assets\react-navigation\elements\back-icon-mask.png (653B)
+node_modules\expo-router\assets\react-navigation\elements\back-icon.png (4 variations | 152B)
+node_modules\expo-router\assets\react-navigation\elements\clear-icon.png (4 variations | 425B)
+node_modules\expo-router\assets\react-navigation\elements\close-icon.png (4 variations | 235B)
+node_modules\expo-router\assets\react-navigation\elements\search-icon.png (4 variations | 599B)
+node_modules\expo-router\assets\sitemap.png (465B)
+node_modules\expo-router\assets\unmatched.png (4.8KB)
+
+› android bundles (1):
+_expo/static/js/android/entry-664d7cacc48f536f8a1e922cf3f9a7e4.hbc (5MB)
+
+› Files (1):
+metadata.json (3.1KB)
+
+Exported: .local-notes/community-feed-layout-export

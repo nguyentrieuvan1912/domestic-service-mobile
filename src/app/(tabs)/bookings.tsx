@@ -133,19 +133,7 @@ export default function BookingsScreen() {
                     params: { bookingId: b.id },
                   })
                 }
-                onRebook={() =>
-                  router.push({
-                    pathname: '/booking/new',
-                    params: {
-                      rebook: 'true',
-                      serviceId: b.serviceId,
-                      packageId: b.packageId,
-                      staffId: b.staffId,
-                      addressId: b.addressId,
-                      mode: b.staffId ? 'MODE_A' : 'MODE_B',
-                    },
-                  })
-                }
+                onRebook={() => router.push({ pathname: '/booking/rebook', params: { sourceId: b.id } })}
               />
             ))
           )}
