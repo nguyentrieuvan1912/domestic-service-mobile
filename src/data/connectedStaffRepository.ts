@@ -68,8 +68,9 @@ function applyWallet(wallet: WalletResponse) {
 }
 async function refreshWallet(signal?: AbortSignal) {
   const active = assertStaff();
-  const wallet = await operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET', undefined, signal);
+  const [wallet, rawBanks] = await Promise.all([operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET', undefined, signal), operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET', undefined, signal)]);
   if (active.token !== operationSession()?.token || signal?.aborted) return;
+  banks = rawBanks.map(bank => ({ ...bank, id: String(bank.id) }));
   applyWallet(wallet); notify();
 }
 async function load(signal?: AbortSignal) {
@@ -182,7 +183,7 @@ export const StaffRepository = {
       async () => { sameSession(); const actual = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability'); sameSession(); return actual; });
     sameSession(); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule;
   },
-  async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank || bank.includes(item.bankCode) && bank.includes(item.accountNumber.slice(-4))); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
+  async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
   async addBank(staff: string, bankCode: string, accountNumber: string, accountHolder: string) { assertStaff(staff); await operationRequest('finance', '/staff/me/bank-accounts', 'POST', { bankCode, accountNumber, accountHolder }); await refreshAfterWrite(); },
   async reportIssue(staff: string, id: string, reason: string) { assertStaff(staff); return operationRequest('booking', '/bookings/' + id + '/incidents', 'POST', { reason }); },
   getCapabilitySnapshot: capabilitySnapshot,
