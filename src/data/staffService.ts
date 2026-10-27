@@ -130,6 +130,8 @@ export const StaffService = {
     return StaffRepository.getWallet(staffId);
   },
 
+  cancelWithdrawal(id: number, staffId: string = activeStaffId()) { return StaffRepository.cancelWithdrawal(staffId, id); },
+
   withdrawMoney(
     amount: number,
     bankName: string,

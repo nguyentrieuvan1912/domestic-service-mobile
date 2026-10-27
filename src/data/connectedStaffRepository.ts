@@ -12,9 +12,10 @@ import type { StaffCapabilityActor, StaffCapabilityRecord, CapabilityRestriction
 import type { MatchingSnapshot, MatchItem } from '@/types/staff-matching';
 import type { JobStepStatus } from './staffStateTransitions';
 
-type WalletResponse = { balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string }[] };
-type Bank = { id: string; bankCode: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
+type WalletResponse = { balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string; payoutMessage?: string; rejectionReason?: string; cancellationReason?: string; cancelledAt?: string }[] };
+type Bank = { id: string; bankCode: string; bankName?: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
 const listeners = new Set<() => void>();
+let walletRequest = 0;
 let revision = 0, owner = '', loaded = false, failure = '', loading: Promise<void> | null = null;
 let assignments: AcceptedAssignment[] = [], matchItems: MatchItem[] = [];
 let records: StaffCapabilityRecord[] = [], restrictions: CapabilityRestrictionRecord[] = [];
@@ -22,6 +23,7 @@ let banks: Bank[] = [];
 let reviews: { id: string; customerName: string; customerAvatar: string; rating: number; comment: string; createdAt: string; tags: string[] }[] = [];
 let balance: StaffWalletBalance = { available: 0, pending: 0, totalEarned: 0, withdrawn: 0 };
 let transactions: StaffWalletTransaction[] = [];
+let withdrawals: WalletResponse['withdrawals'] = [];
 const initialSchedule = (): AvailabilitySnapshot => ({ saved: { days: [], areaIds: [], matchNotifications: true, revision: 0, updatedAt: '' }, bookings: [], unknownBookingCodes: [] });
 let schedule = initialSchedule();
 let scheduleLoaded = false, scheduleFailure = '', scheduleLoading: Promise<void> | null = null;
@@ -29,7 +31,7 @@ function areaView(value: AvailabilitySnapshot): AvailabilitySnapshot { return { 
 function notify() { revision++; listeners.forEach(listener => { try { listener(); } catch { /* A role change can unmount a previously scoped subscriber. */ } }); }
 subscribeSession(() => {
   const active = operationSession(); const next = active?.profile.role === 'STAFF' ? active.userId : '';
-  if (next !== owner) { owner = next; loaded = false; failure = ''; assignments = []; matchItems = []; records = []; restrictions = []; banks = []; reviews = []; balance = { available: 0, pending: 0, totalEarned: 0, withdrawn: 0 }; transactions = []; schedule = initialSchedule(); loading = null; scheduleLoaded = false; scheduleFailure = ''; scheduleLoading = null; }
+  if (next !== owner) { walletRequest++; owner = next; loaded = false; failure = ''; assignments = []; matchItems = []; records = []; restrictions = []; banks = []; reviews = []; balance = { available: 0, pending: 0, totalEarned: 0, withdrawn: 0 }; transactions = []; withdrawals = []; schedule = initialSchedule(); loading = null; scheduleLoaded = false; scheduleFailure = ''; scheduleLoading = null; }
   notify();
 });
 function assertStaff(id?: string) { const active = operationSession(); if (!active || active.profile.role !== 'STAFF' || id && active.userId !== id) throw new Error('Vui lòng đăng nhập đúng tài khoản nhân viên.'); return active; }
@@ -63,19 +65,22 @@ async function loadSchedule(signal?: AbortSignal) {
 }
 function applyWallet(wallet: WalletResponse) {
       balance = wallet.balance;
+      withdrawals = wallet.withdrawals;
       transactions = wallet.transactions.filter(item => item.bucket === 'AVAILABLE' && !['HOLD', 'RELEASE'].includes(item.type)).map(item => ({ id: String(item.id), title: item.type === 'TOP_UP' ? 'Nạp tiền chuyển khoản' : item.type === 'EARNING' ? 'Thu nhập ca làm' : item.type === 'REWARD' ? 'Thưởng' : item.type === 'PENALTY' ? 'Khoản phạt' : 'Bút toán ' + item.type, date: new Date(item.createdAt).toLocaleString('vi-VN'), amount: item.amount, type: item.type === 'TOP_UP' ? 'TOP_UP' : item.type === 'EARNING' ? 'INCOME' : item.type === 'REWARD' ? 'BONUS' : 'FEE', status: 'SUCCESS' }));
-      transactions.push(...wallet.withdrawals.map(item => ({ id: 'withdrawal-' + item.id, title: 'Yêu cầu rút tiền', date: new Date(item.requestedAt).toLocaleString('vi-VN'), amount: item.amount, type: 'WITHDRAW' as const, status: item.status === 'PAID' ? 'SUCCESS' as const : ['REJECTED','FAILED','CANCELLED'].includes(item.status) ? 'FAILED' as const : 'PENDING' as const })));
+      transactions.push(...wallet.withdrawals.map(item => ({ id: 'withdrawal-' + item.id, withdrawalStatus: item.status, title: 'Rút tiền #' + item.id, date: new Date(item.requestedAt).toLocaleString('vi-VN'), amount: item.amount, type: 'WITHDRAW' as const, status: item.status === 'PAID' ? 'SUCCESS' as const : ['REJECTED','FAILED','CANCELLED'].includes(item.status) ? 'FAILED' as const : 'PENDING' as const, detail: item.cancellationReason || item.payoutMessage || item.rejectionReason || '', statusLabel: item.status === 'PAID' ? 'Đã chuyển về ngân hàng' : item.status === 'APPROVED' ? 'Đã duyệt · Chờ chuyển' : item.status === 'PROCESSING' ? 'Đang chuyển / đối soát' : item.status === 'PENDING' ? 'Chờ admin duyệt' : item.status === 'CANCELLED' ? 'Đã hủy · Đã hoàn về ví' : 'Đã từ chối / thất bại' })));
 }
 async function refreshWallet(signal?: AbortSignal) {
   const active = assertStaff();
+  const request = ++walletRequest;
   const [wallet, rawBanks] = await Promise.all([operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET', undefined, signal), operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET', undefined, signal)]);
-  if (active.token !== operationSession()?.token || signal?.aborted) return;
+  if (active.token !== operationSession()?.token || signal?.aborted || request !== walletRequest) return;
   banks = rawBanks.map(bank => ({ ...bank, id: String(bank.id) }));
   applyWallet(wallet); notify();
 }
 async function load(signal?: AbortSignal) {
   const active = assertStaff();
   if (loading) return loading;
+  const walletSequence = ++walletRequest;
   const task = (async () => {
     try {
       await loadHcmAdministrativeUnits();
@@ -94,7 +99,7 @@ async function load(signal?: AbortSignal) {
       matchItems = rawMatching.items.map(item => ({ ...item, opportunity: { ...item.opportunity, id: String(item.opportunity.id), serviceId: String(item.opportunity.serviceId), invitedStaffId: item.opportunity.invitedStaffId == null ? undefined : String(item.opportunity.invitedStaffId) } as unknown as MatchItem['opportunity'] }));
       records = rawCaps.capabilities.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: String(item.serviceId), note: item.note || undefined, approvedAt: item.approvedAt || undefined, validFrom: item.validFrom || undefined, validUntil: item.validUntil || undefined } as StaffCapabilityRecord));
       restrictions = rawCaps.restrictions.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: item.serviceId == null ? undefined : String(item.serviceId), endsAt: item.endsAt || undefined } as CapabilityRestrictionRecord));
-      applyWallet(wallet);
+      if (walletSequence === walletRequest) applyWallet(wallet);
       banks = rawBanks.map(item => ({ ...item, id: String(item.id) }));
       reviews = rawReviews.map(item => ({ ...item, id: String(item.id), customerName: 'Khách hàng #' + item.customerId, customerAvatar: '', tags: item.tags || [] }));
       loaded = true; failure = ''; notify();
@@ -138,7 +143,7 @@ export const StaffRepository = {
     return { staffId: staff, userId: staff, fullName: p.fullName, phone: p.phone, email: p.email, avatar: p.avatar, bio: p.bio || '', rating: reviews.length ? reviews.reduce((sum,r)=>sum+r.rating,0)/reviews.length : 5, reviewCount: reviews.length, completionRate: assignments.length ? Math.round(assignments.filter(a => a.status === 'COMPLETED').length / assignments.length * 100) : 0, isOnline: p.isOnline, autoAccept: false, maxDistanceKm: 0, primaryDistrict: areaNamesForIds(schedule.saved.areaIds)[0] || '', operatingDistricts: areaNamesForIds(schedule.saved.areaIds), specialties: records.filter(c => c.status === 'APPROVED').map(c => c.serviceName) };
   },
   getAssignments(staff: string) { assertStaff(staff); return assignments; },
-  getWallet(staff: string) { assertStaff(staff); return { balance, transactions }; },
+  getWallet(staff: string) { assertStaff(staff); return { balance, transactions, withdrawals }; },
   getBankAccounts(staff: string) { assertStaff(staff); return banks; },
   getStaffReviews(staff: string) { assertStaff(staff); return reviews; },
   getScheduleSnapshot(staff: string) { assertStaff(staff); return schedule; },
@@ -182,6 +187,14 @@ export const StaffRepository = {
       () => operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...payload, revision: version }),
       async () => { sameSession(); const actual = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability'); sameSession(); return actual; });
     sameSession(); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule;
+  },
+  async cancelWithdrawal(staff: string, id: number) {
+    assertStaff(staff);
+    walletRequest++;
+    const result = await operationRequest<{ id: number; status: string; amount: number }>('finance', `/staff/me/withdrawals/${id}/cancel`, 'POST');
+    if (result.status !== 'CANCELLED') throw new Error('Yêu cầu chưa được xác nhận hủy. Vui lòng kiểm tra lại trạng thái.');
+    try { await refreshWallet(); return { ...result, refreshPending: false }; }
+    catch { return { ...result, refreshPending: true }; }
   },
   async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
   async addBank(staff: string, bankCode: string, accountNumber: string, accountHolder: string) { assertStaff(staff); await operationRequest('finance', '/staff/me/bank-accounts', 'POST', { bankCode, accountNumber, accountHolder }); await refreshAfterWrite(); },

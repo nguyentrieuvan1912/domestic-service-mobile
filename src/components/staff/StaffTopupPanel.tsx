@@ -10,13 +10,15 @@ type Topup = { id: number; amount: number; status: string; requestKey: string; q
 const labels: Record<string, string> = { CREATING: 'Đang tạo / cần khôi phục', PENDING: 'Chờ chuyển khoản', PAID: 'Đã nhận tiền', CANCELLED: 'Đã hủy liên kết', EXPIRED: 'Hết hạn liên kết', REVIEW: 'Cần đối soát số tiền' };
 const money = (n: number) => n.toLocaleString('vi-VN') + 'đ';
 
-export function StaffTopupPanel({ onCredited }: { onCredited: () => void }) {
+export function StaffTopupPanel({ visible, onClose, onCredited }: { visible: boolean; onClose: () => void; onCredited: () => void }) {
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [items, setItems] = useState<Topup[]>([]);
   const [amount, setAmount] = useState('10000');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Topup | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const close = () => { setSelected(null); onClose(); };
   const [now, setNow] = useState(Date.now());
   const { width } = useWindowDimensions();
   const loadSequence = useRef(0);
@@ -40,19 +42,20 @@ export function StaffTopupPanel({ onCredited }: { onCredited: () => void }) {
     if (newlyPaid) onCredited();
   }, [onCredited]);
   useEffect(() => {
-    if (!selected) return;
+    if (!visible || !selected) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [selected?.id]);
+  }, [selected?.id, visible]);
   useFocusEffect(useCallback(() => {
+    if (!visible) return;
     const controller = new AbortController();
     const refresh = () => { if (AppState.currentState === 'active') void load(controller.signal).catch(cause => { if (current() && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tải được yêu cầu nạp.'); }); };
     refresh();
     const timer = setInterval(refresh, 10000);
     const listener = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
     return () => { controller.abort(); clearInterval(timer); listener.remove(); };
-  }, [load]));
+  }, [load, visible]));
 
   const execute = async (work: () => Promise<unknown>) => {
     if (locked.current) return;
@@ -80,16 +83,26 @@ export function StaffTopupPanel({ onCredited }: { onCredited: () => void }) {
   });
   const seconds = selected ? Math.max(0, Math.ceil((Date.parse(selected.expiresAt) - now) / 1000)) : 0;
   const payable = selected?.status === 'PENDING' && seconds > 0 && !!selected.qrCode;
-  return <View style={s.card}>
-    <Text style={s.title}>Nạp tiền vào số dư</Text>
-    <Text style={s.note}>{capabilities?.message || 'Đang kiểm tra kết nối thanh toán…'}</Text>
-    <Text style={s.note}>Chuyển khoản theo mã riêng. Số dư chỉ tăng sau khi backend xác minh đã nhận đủ tiền; tiền nạp không tính là thu nhập ca làm.</Text>
+  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={close}>
+    <SafeAreaView style={s.screen}>
+      <View style={s.header}>
+        {selected && <Pressable accessibilityRole="button" accessibilityLabel="Quay lại nhập số tiền nạp" onPress={() => setSelected(null)} style={s.back}><Text style={s.link}>‹</Text></Pressable>}
+        <Text style={s.heading}>{selected ? 'Chi tiết giao dịch nạp' : 'Nạp tiền vào ví'}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Đóng màn hình nạp tiền" onPress={close} style={s.close}><Text style={s.link}>Đóng</Text></Pressable>
+      </View>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+        {!selected && <View style={s.card}>
+
+    {!capabilities?.topupEnabled && <Text style={s.note}>{capabilities?.message || 'Đang kiểm tra kết nối thanh toán…'}</Text>}
+    <Text style={s.note}>Chọn số tiền cần nạp. Ví được cập nhật sau khi xác minh chuyển khoản; tiền nạp không tính vào thu nhập ca làm.</Text>
     <TextInput accessibilityLabel="Số tiền nạp" keyboardType="number-pad" value={amount} editable={!busy} onChangeText={value => setAmount(value.replace(/\D/g, ''))} style={s.input} />
     <View style={s.wrap}>{[10000, 50000, 100000].map(value => <Pressable key={value} disabled={busy} onPress={() => setAmount(String(value))} style={s.chip}><Text style={s.link}>{money(value)}</Text></Pressable>)}</View>
     <Pressable accessibilityRole="button" disabled={busy || !capabilities?.topupEnabled} onPress={() => create()} style={[s.button, (!capabilities?.topupEnabled || busy) && s.disabled]}><Text style={s.white}>{busy ? 'Đang xử lý…' : 'Nạp tiền · Hiện mã QR'}</Text></Pressable>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <Pressable disabled={busy} onPress={() => void execute(async () => {})} style={s.chip}><Text style={s.link}>Tải lại trạng thái</Text></Pressable>
-    {items.slice(0, 10).map(item => <View key={item.id} style={s.record}>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHistory }} onPress={() => setShowHistory(value => !value)} style={s.historyToggle}><View style={{ flex: 1 }}><Text style={s.link}>Lịch sử nạp tiền ({items.length})</Text>{items.some(item => ['CREATING', 'PENDING', 'REVIEW'].includes(item.status)) && <Text style={s.historyHint}>Có giao dịch đang chờ xử lý</Text>}</View><Text style={s.link}>{showHistory ? 'Thu gọn' : 'Xem'}</Text></Pressable>
+    {showHistory && !items.length && <Text style={s.note}>Chưa có yêu cầu nạp tiền.</Text>}
+    {showHistory && items.slice(0, 10).map(item => <View key={item.id} style={s.record}>
       <Text style={s.title}>{money(item.amount)} · #{item.id}</Text>
       <Text style={item.status === 'PAID' ? s.link : s.note}>{labels[item.status] || item.status}</Text>
       <Text style={s.note}>{new Date(item.createdAt).toLocaleString('vi-VN')} · Đã nhận: {money(item.amountReceived)}</Text>
@@ -99,10 +112,7 @@ export function StaffTopupPanel({ onCredited }: { onCredited: () => void }) {
         <Pressable disabled={busy} style={s.chip} onPress={() => check(item)}><Text style={s.link}>Kiểm tra giao dịch với payOS</Text></Pressable>
       </>}
     </View>)}
-    <Modal visible={!!selected} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setSelected(null)}>
-      <SafeAreaView style={s.screen}>
-        <View style={s.header}><Text style={s.heading}>Nạp tiền bằng chuyển khoản</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng màn hình nạp tiền" onPress={() => setSelected(null)} style={s.close}><Text style={s.link}>Đóng</Text></Pressable></View>
-        <ScrollView contentContainerStyle={s.content}>
+        </View>}
           {selected && <>
             <View style={s.summary}><Text style={s.note}>Số tiền nạp · #{selected.id}</Text><Text style={s.amount}>{money(selected.amount)}</Text>
               <View style={[s.badge, selected.status === 'PAID' ? s.success : s.waiting]}><Text style={s.status}>{selected.status === 'PENDING' && !seconds ? 'Hết thời gian chuyển khoản' : labels[selected.status] || selected.status}</Text></View>
@@ -127,12 +137,15 @@ export function StaffTopupPanel({ onCredited }: { onCredited: () => void }) {
             {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
             <Text style={s.centerNote}>Đóng màn hình vẫn giữ yêu cầu nạp trong lịch sử. Việc đóng màn hình không xác nhận thanh toán hoặc hủy giao dịch.</Text>
           </>}
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
-  </View>;
+      </ScrollView>
+    </SafeAreaView>
+  </Modal>;
 }
+
 const s = StyleSheet.create({
+  historyToggle: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 16, paddingBottom: 4, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  historyHint: { color: '#64748B', fontSize: 12, marginTop: 4 },
+  back: { padding: 10 },
   card: { padding: 16, borderRadius: 18, backgroundColor: '#fff', gap: 12, marginBottom: 16, borderWidth: 1, borderColor: '#DCE8E2' },
   title: { color: '#163A2C', fontWeight: '700', fontSize: 15 }, note: { color: '#64748B', fontSize: 12, lineHeight: 19 },
   input: { borderWidth: 1, borderColor: '#B4CDBF', padding: 13, borderRadius: 12, fontSize: 18, color: '#163A2C' },
