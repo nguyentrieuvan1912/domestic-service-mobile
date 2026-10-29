@@ -1,6 +1,7 @@
+import { useFocusEffect } from 'expo-router';
 import { staffBirthLabel } from '@/utils/staff-profile';
 import { remoteImageSource } from '@/utils/image-source';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +11,8 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function StaffPersonalInfoScreen() {
   const router = useRouter();
-  const { currentStaff, updateStaffProfile } = useAuth();
+  const { currentStaff, updateStaffProfile, refreshProfile } = useAuth();
+  useFocusEffect(useCallback(() => { void refreshProfile().catch(() => undefined); }, [refreshProfile]));
   const staff = currentStaff;
   const [phone, setPhone] = useState(staff?.phone || '');
   const email = staff?.email || '';
@@ -42,7 +44,7 @@ export default function StaffPersonalInfoScreen() {
         <View style={styles.avatarSection}>
           <Image source={remoteImageSource(staff?.avatar || '/api/v1/identity/staff-avatar.png')} style={styles.avatar} />
           <Text style={styles.avatarName}>{staff?.fullName || 'Chưa đăng nhập'}</Text>
-          <Text style={styles.avatarHint}>Ảnh đại diện được đồng bộ từ hồ sơ tài khoản.</Text>
+          <Text style={styles.avatarHint}>Ảnh phải rõ mặt, chính chủ. Vui lòng liên hệ Admin nếu cần thay đổi ảnh đại diện.</Text>
         </View>
 
         <View style={styles.card}>

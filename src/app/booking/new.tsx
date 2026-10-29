@@ -1,3 +1,4 @@
+import { BookingExitButton } from '@/components/booking/BookingExitButton';
 import { FavouriteDurationPopup } from '@/components/booking/FavouriteDurationPopup';
 import { favouriteDurationIssue, shorterFavouritePackage, roundedBookingMinutes } from '@/utils/favourite-staff-duration';
 import { StaffResponseWaiting } from '@/components/booking/StaffResponseWaiting';
@@ -101,6 +102,7 @@ export default function NewBookingScreen() {
         locations={BrandColors.softBgGradientLocations}
         style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <View style={styles.stateIconCircle}>
               <IconSymbol name="user" size={38} color={BrandColors.primary} />
@@ -132,6 +134,7 @@ export default function NewBookingScreen() {
         locations={BrandColors.softBgGradientLocations}
         style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <ActivityIndicator size="large" color={BrandColors.primary} />
             <Text style={styles.stateLoadingTitle}>Đang tải dịch vụ và địa chỉ...</Text>
@@ -151,6 +154,7 @@ export default function NewBookingScreen() {
         locations={BrandColors.softBgGradientLocations}
         style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <View style={[styles.stateIconCircle, { backgroundColor: BrandColors.dangerLight }]}>
               <IconSymbol name="warning" size={38} color={BrandColors.danger} />
@@ -208,6 +212,7 @@ export default function NewBookingScreen() {
         locations={BrandColors.softBgGradientLocations}
         style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <View style={styles.stateIconCircle}>
               <IconSymbol name="receipt" size={38} color={BrandColors.primary} />
@@ -729,6 +734,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
               Bước {stepCurrent + 1} / {stepTotal}
             </Text>
           </View>
+          <BookingExitButton disabled={saving} saved={!!createdBooking} />
           <Pressable
             style={styles.bellButton}
             onPress={() => router.push('/notifications')}
@@ -799,6 +805,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
               <View style={styles.brandDot} />
               <Text style={styles.brandTitle}>CleanMaster</Text>
             </View>
+            <BookingExitButton disabled={saving} />
             <Pressable
               style={styles.giftBadgeBtn}
               onPress={() => Alert.alert('Ưu đãi đang có', catalog.promotions.length ? catalog.promotions.map(p=>p.code+': '+p.description).join('\n') : 'Chưa có mã ưu đãi đang hoạt động.')}>
@@ -914,6 +921,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
         locations={BrandColors.softBgGradientLocations}
         style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          <View style={{ alignItems: 'flex-end', padding: 12 }}><BookingExitButton disabled={saving} saved={!!createdBooking} /></View>
           <View style={styles.stateCenterContainer}>
             <View style={styles.stateIconCircle}>
               <IconSymbol name="user" size={38} color={BrandColors.primary} />
@@ -4152,22 +4160,34 @@ const styles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
     paddingVertical: 4,
   },
   priceKey: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 13,
     color: BrandColors.gray600,
   },
   priceVal: {
+    flexShrink: 0,
+    maxWidth: '45%',
+    textAlign: 'right',
     fontSize: 13,
     fontWeight: '600',
     color: BrandColors.gray800,
   },
   priceKeyDiscount: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 13,
     color: BrandColors.success,
   },
   priceValDiscount: {
+    flexShrink: 0,
+    maxWidth: '45%',
+    textAlign: 'right',
     fontSize: 13,
     fontWeight: '700',
     color: BrandColors.success,
@@ -4181,13 +4201,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   totalLabel: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '700',
     color: BrandColors.gray900,
   },
   totalAmount: {
+    flexShrink: 0,
+    maxWidth: '60%',
+    textAlign: 'right',
     fontSize: 18,
     fontWeight: '800',
     color: BrandColors.primary,

@@ -1,3 +1,4 @@
+import { BookingExitButton } from '@/components/booking/BookingExitButton';
 import React, { useState } from 'react';
 import {
   View,
@@ -136,7 +137,7 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
               </Text>
             </View>
 
-            <View style={styles.placeholderBtn} />
+            <BookingExitButton />
           </View>
 
           {/* Progress bar line */}

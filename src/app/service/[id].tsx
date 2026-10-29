@@ -13,7 +13,7 @@ import {
   ScrollView,
   Pressable,
   Image,
-  Dimensions,
+  useWindowDimensions,
   TextInput,
   Alert,
 } from 'react-native';
@@ -27,7 +27,6 @@ import { usePublicBookingResource } from '@/hooks/use-public-booking-resource';
 import type { ServiceBundle, RelatedServiceItem } from '@/data/serviceBundles';
 import { catalogSummaryView } from '@/api/catalog-view';
 
-const { width } = Dimensions.get('window');
 
 type ActiveTab = 'CONFIG' | 'PACKAGES' | 'REVIEWS' | 'INFO';
 
@@ -63,6 +62,8 @@ function CatalogDetailLoader({ id }: { id: string }) {
 
 function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
   const router = useRouter();
+  const viewport = useWindowDimensions();
+  const twoColumnTabs = viewport.width < 340 || viewport.fontScale > 1.2;
   const { service, packages, addOns } = catalogDetailView(detail);
   const reviewResource = usePublicBookingResource<{id:number;rating:number;comment:string;createdAt:string}[]>('/services/'+service.id+'/reviews');
   const reviews = (reviewResource.data || []).map(r=>({...r,customerName:'Khách hàng',customerAvatar:''}));
@@ -170,13 +171,17 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
           </View>
 
           {/* Badges */}
-          <View style={styles.badgesRow}>
-            {service.highlightBadges.map((badge, idx) => (
-              <View key={idx} style={styles.badgePill}>
-                <Text style={styles.badgePillText}>✓ {badge}</Text>
-              </View>
-            ))}
-          </View>
+          {service.highlightBadges.length > 0 && <View style={styles.highlightsSection}>
+            <Text style={styles.highlightsTitle}>Điểm nổi bật</Text>
+            <View style={styles.badgesRow}>
+              {service.highlightBadges.map((badge, idx) => (
+                <View key={idx} style={[styles.badgePill, { width: Math.floor((viewport.width - 32 - 2 * Spacing.three - 8) / 2) }, (service.highlightBadges.length % 2 === 1 && idx === service.highlightBadges.length - 1 || viewport.fontScale > 1.2) && styles.badgeFull]}>
+                  <View style={styles.badgeCheck}><IconSymbol name="check" size={14} color="#15803D" /></View>
+                  <Text style={styles.badgePillText}>{badge}</Text>
+                </View>
+              ))}
+            </View>
+          </View>}
 
           <Text style={styles.serviceDesc}>
             {service.detailedDescription || service.description}
@@ -184,38 +189,16 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
         </View>
 
         {/* TABS NAVIGATION */}
-        <View style={styles.tabNav}>
-          <Pressable
-            style={[styles.tabButton, activeTab === 'CONFIG' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('CONFIG')}>
-            <Text style={[styles.tabButtonText, activeTab === 'CONFIG' && styles.tabButtonTextActive]}>
-              Thông tin dịch vụ
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.tabButton, activeTab === 'PACKAGES' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('PACKAGES')}>
-            <Text style={[styles.tabButtonText, activeTab === 'PACKAGES' && styles.tabButtonTextActive]}>
-              Gói & Tiện ích ({packages.length})
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.tabButton, activeTab === 'INFO' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('INFO')}>
-            <Text style={[styles.tabButtonText, activeTab === 'INFO' && styles.tabButtonTextActive]}>
-              Quy trình & Tiêu chuẩn
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.tabButton, activeTab === 'REVIEWS' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('REVIEWS')}>
-            <Text style={[styles.tabButtonText, activeTab === 'REVIEWS' && styles.tabButtonTextActive]}>
-              Đánh giá ({service.reviewCount})
-            </Text>
-          </Pressable>
+        <View accessibilityRole="tablist" style={[styles.tabNav, twoColumnTabs && styles.tabNavWrap]}>
+          {([
+            { key: 'CONFIG', label: 'Thông tin', accessibility: 'Thông tin dịch vụ' },
+            { key: 'PACKAGES', label: 'Gói dịch vụ', accessibility: `Gói và tiện ích, ${packages.length} gói` },
+            { key: 'INFO', label: 'Quy trình', accessibility: 'Quy trình và tiêu chuẩn' },
+            { key: 'REVIEWS', label: 'Đánh giá', accessibility: `Đánh giá, ${service.reviewCount} nhận xét` },
+          ] as const).map(tab => <Pressable key={tab.key} accessibilityRole="tab" accessibilityState={{ selected: activeTab === tab.key }} accessibilityLabel={tab.accessibility}
+            style={[styles.tabButton, twoColumnTabs && styles.tabButtonHalf, activeTab === tab.key && styles.tabButtonActive]} onPress={() => setActiveTab(tab.key)}>
+            <Text numberOfLines={1} style={[styles.tabButtonText, activeTab === tab.key && styles.tabButtonTextActive]}>{tab.label}</Text>
+          </Pressable>)}
         </View>
 
         {/* TAB 1: DYNAMIC CONFIGURATION FOR SERVICE */}
@@ -227,7 +210,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
             </Text>
 
             <Pressable accessibilityRole="button" style={[styles.bookNowBtn,{padding:16,alignSelf:'stretch',marginBottom:16}]} onPress={handleBookNow}>
-              <Text style={styles.bookNowText}>Bắt đầu đặt dịch vụ →</Text>
+              <Text style={styles.bookNowText}>Đặt dịch vụ →</Text>
             </Pressable>
             {detail.requirements.length>0 && <Text style={styles.reqText}>Bạn sẽ được hướng dẫn chọn: {detail.requirements.map(field=>field.label).join(' • ')}.</Text>}
 
@@ -263,8 +246,8 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                   style={[styles.pkgCard, isSelected && styles.pkgCardSelected]}
                   onPress={() => setSelectedPackageId(pkg.id)}>
                   <View style={styles.pkgTopRow}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={styles.cardInfo}>
+                      <View style={styles.pkgHeading}>
                         <Text style={styles.pkgName}>{pkg.name}</Text>
                         {pkg.isPopular && (
                           <View style={styles.pkgHotBadge}>
@@ -303,7 +286,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                       style={[styles.addonItem, isChecked && styles.addonItemSelected]}
                       onPress={() => toggleAddOn(add.id)}>
                       <Image source={remoteImageSource(add.image)} style={styles.addonThumb} />
-                      <View style={{ flex: 1 }}>
+                      <View style={styles.cardInfo}>
                         <Text style={styles.addonName}>{add.name}</Text>
                         <Text numberOfLines={2} style={styles.addonDesc}>{add.description}</Text>
                         <Text style={styles.addonPrice}>+{formatVND(add.price)}</Text>
@@ -352,7 +335,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
               <View style={{ marginTop: Spacing.four }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <IconSymbol name="💡" style={{ fontSize: 16 }} />
-                  <Text style={styles.sectionHeading}>Dịch vụ thường được đặt cùng</Text>
+                  <Text style={[styles.sectionHeading, styles.shrinkText]}>Dịch vụ thường được đặt cùng</Text>
                 </View>
                 <Text style={styles.subHeading}>
                   AI đề xuất các dịch vụ bổ trợ có thể thực hiện cùng thời điểm để tối ưu chi phí
@@ -361,20 +344,20 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
                 {relatedServices.map((item) => (
                   <View key={item.service.id} style={styles.relatedCard}>
                     <Image source={remoteImageSource(item.service.image)} style={styles.relatedThumb} />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.relatedName}>{item.service.name}</Text>
+                    <View style={styles.cardInfo}>
                         <View style={styles.relatedPill}>
                           <Text style={styles.relatedPillText}>AI Gợi ý</Text>
                         </View>
-                      </View>
+                      <Text style={styles.relatedName}>{item.service.name}</Text>
                       <Text numberOfLines={2} style={styles.relatedReason}>
                         {item.reason}
                       </Text>
                       <View style={styles.relatedFooterRow}>
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                        <View style={styles.relatedPrices}>
                           <Text style={styles.relatedPrice}>{formatVND(item.discountedPrice)}</Text>
-                          <Text style={styles.relatedOldPrice}>{formatVND(item.service.basePrice)}</Text>
+                          {item.discountedPrice < item.service.basePrice && (
+                            <Text style={styles.relatedOldPrice}>{formatVND(item.service.basePrice)}</Text>
+                          )}
                         </View>
                         <Pressable
                           style={styles.relatedActionBtn}
@@ -450,7 +433,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
           </View>
         )}
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: 160 }} />
       </ScrollView>
 
       {/* STICKY BOTTOM BOOKING BAR */}
@@ -463,7 +446,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
         </View>
 
         <Pressable style={styles.bookNowBtn} onPress={handleBookNow}>
-          <Text style={styles.bookNowText}>Bắt đầu đặt dịch vụ →</Text>
+          <Text style={styles.bookNowText}>Đặt dịch vụ →</Text>
         </Pressable>
       </SafeAreaView>
     </View>
@@ -511,6 +494,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
+    borderBottomLeftRadius: BorderRadius.xl,
+    borderBottomRightRadius: BorderRadius.xl,
+    marginHorizontal: 16,
     marginTop: -20,
     padding: Spacing.three,
     borderBottomWidth: 1,
@@ -529,6 +515,7 @@ const styles = StyleSheet.create({
   },
   ratingRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
   },
@@ -541,6 +528,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   basePriceBadge: {
+    maxWidth: '42%',
+    flexShrink: 0,
     alignItems: 'flex-end',
     backgroundColor: '#ECFDF5',
     paddingHorizontal: 10,
@@ -560,22 +549,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: BrandColors.gray500,
   },
+  highlightsSection: { marginVertical: 12, gap: 10 },
+  highlightsTitle: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  badgeFull: { width: '100%' },
+  badgeCheck: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center' },
   badgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginVertical: Spacing.two,
+    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
   },
   badgePill: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     backgroundColor: '#F0FDF4',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#DCFCE7',
   },
   badgePillText: {
-    fontSize: 11,
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 18,
     color: '#15803D',
     fontWeight: '600',
   },
@@ -586,35 +587,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tabNav: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    flexDirection: 'row', backgroundColor: '#EAF3EF', marginHorizontal: 16, marginTop: 16,
+    padding: 4, gap: 4, borderRadius: 14, borderWidth: 1, borderColor: '#DCE8E2',
   },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabButtonActive: {
-    borderBottomColor: BrandColors.primary,
-  },
-  tabButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.gray500,
-  },
-  tabButtonTextActive: {
-    color: BrandColors.primary,
-    fontWeight: '800',
-  },
-  tabContentSection: {
-    backgroundColor: '#FFF',
-    padding: Spacing.three,
-    marginTop: 8,
-  },
+  tabNavWrap: { flexWrap: 'wrap' },
+  tabButton: { flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  tabButtonHalf: { flexBasis: '48%', flexGrow: 1 },
+  tabButtonActive: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#A7DBC8' },
+  tabButtonText: { fontSize: 12, lineHeight: 18, fontWeight: '600', color: '#64748B', textAlign: 'center' },
+  tabButtonTextActive: { color: '#047857', fontWeight: '800' },
+  tabContentSection: { backgroundColor: '#FFF', padding: 16, marginHorizontal: 16, marginTop: 16, borderRadius: 18, borderWidth: 1, borderColor: '#E2E8F0' },
   sectionHeading: {
     fontSize: 16,
     fontWeight: '800',
@@ -785,9 +767,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
   },
   pkgTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 10,
+  },
+  cardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  shrinkText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pkgHeading: {
     alignItems: 'flex-start',
+    gap: 6,
   },
   pkgName: {
     fontSize: 14,
@@ -795,6 +787,7 @@ const styles = StyleSheet.create({
     color: BrandColors.gray900,
   },
   pkgHotBadge: {
+    maxWidth: '100%',
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -811,8 +804,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   pkgPriceCol: {
-    alignItems: 'flex-end',
-    paddingLeft: 8,
+    alignItems: 'flex-start',
+    maxWidth: '100%',
   },
   pkgPrice: {
     fontSize: 15,
@@ -841,6 +834,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4',
   },
   addonThumb: {
+    flexShrink: 0,
     width: 60,
     height: 60,
     borderRadius: BorderRadius.md,
@@ -862,6 +856,7 @@ const styles = StyleSheet.create({
     color: BrandColors.primary,
   },
   addonCheck: {
+    flexShrink: 0,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -977,9 +972,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFF',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'stretch',
+    gap: 10,
     paddingHorizontal: Spacing.three,
     paddingTop: 10,
     paddingBottom: 10,
@@ -992,7 +988,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   bottomPriceCol: {
-    justifyContent: 'center',
+    width: '100%',
+    minWidth: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   bottomPriceLabel: {
     fontSize: 11,
@@ -1004,12 +1006,19 @@ const styles = StyleSheet.create({
     color: BrandColors.primary,
   },
   bookNowBtn: {
+    width: '100%',
+    maxWidth: '100%',
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 1,
     backgroundColor: BrandColors.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: BorderRadius.full,
   },
   bookNowText: {
+    textAlign: 'center',
     color: '#FFF',
     fontSize: 14,
     fontWeight: '800',
@@ -1031,6 +1040,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.three,
   },
   bundleCalloutBadge: {
+    maxWidth: '100%',
     alignSelf: 'flex-start',
     backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
@@ -1056,9 +1066,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   bundleCalloutFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 10,
     borderTopWidth: 1,
     borderTopColor: '#BBF7D0',
     paddingTop: 8,
@@ -1074,12 +1082,16 @@ const styles = StyleSheet.create({
     color: BrandColors.primary,
   },
   bundleCalloutBtn: {
+    maxWidth: '100%',
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: BrandColors.primary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
   },
   bundleCalloutBtnText: {
+    textAlign: 'center',
     color: '#FFF',
     fontSize: 11,
     fontWeight: '800',
@@ -1088,7 +1100,7 @@ const styles = StyleSheet.create({
   // Related Services in Detail
   relatedCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#FFF',
     borderRadius: BorderRadius.xl,
     padding: 10,
@@ -1098,16 +1110,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   relatedThumb: {
+    flexShrink: 0,
     width: 60,
     height: 60,
     borderRadius: BorderRadius.md,
   },
   relatedName: {
+    lineHeight: 19,
     fontSize: 13,
     fontWeight: '800',
     color: BrandColors.gray900,
   },
   relatedPill: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    marginBottom: 5,
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1125,10 +1142,14 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   relatedFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 8,
     marginTop: 2,
+  },
+  relatedPrices: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    gap: 6,
   },
   relatedPrice: {
     fontSize: 13,
@@ -1141,12 +1162,17 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   relatedActionBtn: {
+    alignSelf: 'flex-end',
+    maxWidth: '100%',
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: BrandColors.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: BorderRadius.md,
   },
   relatedActionText: {
+    textAlign: 'center',
     fontSize: 11,
     fontWeight: '700',
     color: BrandColors.primaryDark,

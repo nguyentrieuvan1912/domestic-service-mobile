@@ -38,6 +38,8 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
 const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    maxWidth: '100%',
     alignItems: 'center',
     gap: 4,
   },
@@ -46,6 +48,7 @@ const styles = StyleSheet.create({
     color: BrandColors.gray800,
   },
   reviewCountText: {
+    flexShrink: 1,
     color: BrandColors.gray500,
   },
 });

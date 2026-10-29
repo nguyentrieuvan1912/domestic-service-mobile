@@ -64,6 +64,7 @@ const activeStaffId = () => operationSession()?.profile.role === 'STAFF' ? opera
  */
 export const StaffService = {
   load: StaffRepository.load,
+  refreshWallet: StaffRepository.refreshWallet,
   getBankAccounts: StaffRepository.getBankAccounts,
   addBank: StaffRepository.addBank,
   reportIssue: StaffRepository.reportIssue,
@@ -128,6 +129,8 @@ export const StaffService = {
   getWallet(staffId: string = activeStaffId()) {
     return StaffRepository.getWallet(staffId);
   },
+
+  cancelWithdrawal(id: number, staffId: string = activeStaffId()) { return StaffRepository.cancelWithdrawal(staffId, id); },
 
   withdrawMoney(
     amount: number,

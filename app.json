@@ -8,7 +8,12 @@
     "scheme": "cleanmaster",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.domesticservice.cleanmaster",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Cho phép dùng micro để gọi cho khách hàng hoặc nhân viên trong đơn hàng.",
+        "NSCameraUsageDescription": "Cho phép dùng camera khi bạn bật video trong cuộc gọi."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +22,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.domesticservice.cleanmaster"
     },
     "web": {
       "output": "static",
@@ -34,11 +40,21 @@
         }
       ],
       "expo-video",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cf5f80c7-fd42-40d6-b25a-2940a5343676"
+      }
+    },
+    "owner": "quangvinh3010"
   }
 }

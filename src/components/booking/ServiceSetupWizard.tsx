@@ -1,3 +1,4 @@
+import { BookingExitButton } from '@/components/booking/BookingExitButton';
 import { useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +40,7 @@ export function ServiceSetupWizard(props: Props) {
     <View style={styles.header}>
       <Pressable accessibilityRole="button" accessibilityLabel="Quay lại bước trước" onPress={()=>{Keyboard.dismiss();setError(undefined);props.back();}} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
       <View style={{flex:1,gap:4}}><Text style={styles.serviceName} numberOfLines={1}>{detail.service.name}</Text><Text style={styles.progressText}>Bước {index+1} / {props.totalSteps || steps.length} · Thiết lập dịch vụ</Text></View>
+      <BookingExitButton />
     </View>
     <View accessibilityLabel={`Bước ${index+1} trên ${props.totalSteps || steps.length}`} style={styles.progressTrack}><View style={[styles.progressFill,{width:`${(index+1)/(props.totalSteps || steps.length)*100}%`}]} /></View>
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>

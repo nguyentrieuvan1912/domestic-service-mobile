@@ -61,3 +61,51 @@ focused=false;activity.dirty=true;activity.flush();assert.equal(activity.value.a
 focused=true;activity.dirty=true;activity.flush();assert.equal(activity.value.revision,revision+2,'Returning to booking rechecks current data');activity.unmount();
 Module._load=load;
 console.log('Booking resume: foreground/focus revalidation, background cancellation, bounded read retries, no business-error retry, address refresh without unmount and cross-account response isolation passed.');
+// Booking detail renders core data without waiting for optional services and retains it on refresh failure.
+const detailReads=[],auxiliaryReads=[];
+const liveBooking={id:'161',customerId:'1',staffId:'97',staff:{fullName:'Staff'},status:'CONFIRMED',assignments:[],service:{},address:{}};
+const bookingsMock={get:()=>undefined,detail:(id,signal)=>new Promise((resolve,reject)=>{detailReads.push({id,signal,resolve,reject});signal?.addEventListener('abort',()=>reject(new Error('Aborted')),{once:true});})};
+const priorLoader=Module._load;
+Module._load=function(name,...args){
+ if(name==='react')return react;
+ if(name==='react-native')return{AppState:appState};
+ if(name==='expo-router')return{useFocusEffect:callback=>react.useEffect(()=>focused?callback():undefined,[focused,callback])};
+ if(name==='@/context/AuthContext')return{useAuth:()=>account};
+ if(name==='@/data/connectedBookings')return{CustomerBookings:bookingsMock};
+ if(name==='@/api/operations')return{operationRequest:(service,path,method,body,signal)=>new Promise((resolve,reject)=>{auxiliaryReads.push({service,path,signal,resolve,reject});signal?.addEventListener('abort',()=>reject(new Error('Aborted')),{once:true});})};
+ if(name==='@/utils/staff-profile')return require('../src/utils/staff-profile.ts');
+ return priorLoader.call(this,name,...args);
+};
+account={...account,currentCustomer:{id:'1'},accessToken:'detail-session'};
+let detailId='161';const detail=mount(()=>require('../src/hooks/use-booking-detail.ts').useBookingDetail(detailId));
+assert.equal(detailReads.length,1);detailReads[0].resolve(liveBooking);await settle(detail);
+assert.equal(detail.value.booking.id,'161');assert.equal(detail.value.loading,false,'The booking is visible while Finance is still pending');
+assert.equal(auxiliaryReads.length,1,'A staff snapshot avoids unnecessary staff-directory lookup');
+auxiliaryReads[0].reject(new Error('Finance timed out'));await settle(detail);
+assert.equal(detail.value.booking.id,'161');assert.equal(detail.value.error,'');assert.match(detail.value.invoiceError,/Finance/);
+emit('active');detailReads.at(-1).reject(new Error('Network timed out'));await settle(detail);
+assert.equal(detail.value.booking.id,'161','A failed background read cannot replace the screen with an error');assert.match(detail.value.refreshError,/Network/);
+detailId='162';detail.dirty=true;detail.flush();assert.equal(detail.value.booking,undefined,'Route changes must not show the previous order');
+const oldDetail=detailReads.at(-1);account={...account,currentCustomer:{id:'2'},accessToken:'other-detail-session'};detail.dirty=true;detail.flush();
+oldDetail.resolve(liveBooking);await settle(detail);assert.equal(detail.value.booking,undefined,'Late reads must not cross account boundaries');
+detail.unmount();
+console.log('Booking detail: immediate core rendering, optional-service isolation, retained data on refresh error and order/account isolation passed.');
+// A failed first job search must recover on the next scheduled refresh without tapping Retry.
+react.useMemo=(factory,deps)=>react.useCallback(factory,deps)();
+react.useSyncExternalStore=(_subscribe,snapshot)=>snapshot();
+const staffLoads=[];const staffActor={userId:'97',staffId:'97'};
+const beforeStaffLoader=Module._load;
+Module._load=function(name,...args){
+ if(name==='@/data/staffCapabilityAdapter')return{getCapabilityActor:()=>staffActor};
+ if(name==='@/data/connectedStaffRepository')return{StaffRepository:{subscribe:()=>()=>{},getStoreRevision:()=>0},StaffMatchingRepository:{load:()=>new Promise((resolve,reject)=>staffLoads.push({resolve,reject})),refresh:async()=>{},read:()=>({items:[]})}};
+ return beforeStaffLoader.call(this,name,...args);
+};
+const originalInterval=global.setInterval,originalClear=global.clearInterval;let jobPoll;
+global.setInterval=callback=>{jobPoll=callback;return 1;};global.clearInterval=()=>{};
+account={...account,currentUser:{id:'97',role:'STAFF'},currentStaff:{id:'97'},currentCustomer:null};
+const jobs=mount(require('../src/hooks/use-staff-matching.ts').useStaffMatching);
+staffLoads[0].reject(new Error('Connection timed out'));await settle(jobs);assert.equal(jobs.value.status,'ERROR');
+jobPoll();assert.equal(staffLoads.length,2,'An initial error must not disable polling');staffLoads[1].resolve();await settle(jobs);
+assert.equal(jobs.value.status,'READY');jobs.unmount();
+global.setInterval=originalInterval;global.clearInterval=originalClear;
+console.log('Staff matching: failed initial load automatically recovers on the next active poll.');

@@ -12,8 +12,11 @@ import type { StaffCapabilityActor, StaffCapabilityRecord, CapabilityRestriction
 import type { MatchingSnapshot, MatchItem } from '@/types/staff-matching';
 import type { JobStepStatus } from './staffStateTransitions';
 
-type Bank = { id: string; bankCode: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
+type WalletResponse = { balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string; payoutMessage?: string; rejectionReason?: string; cancellationReason?: string; cancelledAt?: string }[] };
+type Bank = { id: string; bankCode: string; bankName?: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
 const listeners = new Set<() => void>();
+let walletRequest = 0;
+let sessionToken = '';
 let revision = 0, owner = '', loaded = false, failure = '', loading: Promise<void> | null = null;
 let assignments: AcceptedAssignment[] = [], matchItems: MatchItem[] = [];
 let records: StaffCapabilityRecord[] = [], restrictions: CapabilityRestrictionRecord[] = [];
@@ -21,6 +24,7 @@ let banks: Bank[] = [];
 let reviews: { id: string; customerName: string; customerAvatar: string; rating: number; comment: string; createdAt: string; tags: string[] }[] = [];
 let balance: StaffWalletBalance = { available: 0, pending: 0, totalEarned: 0, withdrawn: 0 };
 let transactions: StaffWalletTransaction[] = [];
+let withdrawals: WalletResponse['withdrawals'] = [];
 const initialSchedule = (): AvailabilitySnapshot => ({ saved: { days: [], areaIds: [], matchNotifications: true, revision: 0, updatedAt: '' }, bookings: [], unknownBookingCodes: [] });
 let schedule = initialSchedule();
 let scheduleLoaded = false, scheduleFailure = '', scheduleLoading: Promise<void> | null = null;
@@ -28,7 +32,7 @@ function areaView(value: AvailabilitySnapshot): AvailabilitySnapshot { return { 
 function notify() { revision++; listeners.forEach(listener => { try { listener(); } catch { /* A role change can unmount a previously scoped subscriber. */ } }); }
 subscribeSession(() => {
   const active = operationSession(); const next = active?.profile.role === 'STAFF' ? active.userId : '';
-  if (next !== owner) { owner = next; loaded = false; failure = ''; assignments = []; matchItems = []; records = []; restrictions = []; banks = []; reviews = []; balance = { available: 0, pending: 0, totalEarned: 0, withdrawn: 0 }; transactions = []; schedule = initialSchedule(); loading = null; scheduleLoaded = false; scheduleFailure = ''; scheduleLoading = null; }
+  if (next !== owner || (active?.token || '') !== sessionToken) { sessionToken = active?.token || ''; workRefresh = null; walletRequest++; owner = next; loaded = false; failure = ''; assignments = []; matchItems = []; records = []; restrictions = []; banks = []; reviews = []; balance = { available: 0, pending: 0, totalEarned: 0, withdrawn: 0 }; transactions = []; withdrawals = []; schedule = initialSchedule(); loading = null; scheduleLoaded = false; scheduleFailure = ''; scheduleLoading = null; }
   notify();
 });
 function assertStaff(id?: string) { const active = operationSession(); if (!active || active.profile.role !== 'STAFF' || id && active.userId !== id) throw new Error('Vui lòng đăng nhập đúng tài khoản nhân viên.'); return active; }
@@ -39,20 +43,23 @@ function capabilitySnapshot(): StaffCapabilitySnapshot {
   return { capabilities, restrictions: views, eligibleCount: capabilities.filter(item => item.canReceive).length, checkedAt: new Date(now).toISOString() };
 }
 const assignmentView = (item: Record<string, unknown>): AcceptedAssignment => ({ ...item, id: String(item.id), staffId: String(item.staffId), customerId: String(item.customerId), serviceId: String(item.serviceId), conversationId: item.conversationId == null ? undefined : String(item.conversationId) } as unknown as AcceptedAssignment);
+// Shared reads are session-owned. A screen leaving must not abort another subscriber.
+// Transport deadlines and token guards still bound requests and isolate accounts.
 async function loadSchedule(signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error('Đã hủy thao tác.');
   const active = assertStaff();
   if (scheduleLoading) return scheduleLoading;
   const task = (async () => {
     try {
-      const raw = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'GET', undefined, signal);
-      if (active.token !== operationSession()?.token || signal?.aborted) return;
+      const raw = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'GET');
+      if (active.token !== operationSession()?.token) return;
       // A pending read must not replace a newer schedule saved while it was in flight.
       const nextSchedule = !scheduleLoaded || raw.saved.revision >= schedule.saved.revision ? reuseSnapshot(schedule, areaView(raw)) : schedule;
       const changed=nextSchedule !== schedule || !scheduleLoaded || !!scheduleFailure;
       schedule=nextSchedule; scheduleLoaded = true; scheduleFailure = '';
       if(changed) notify();
     } catch (error) {
-      if (active.token !== operationSession()?.token || signal?.aborted) return;
+      if (active.token !== operationSession()?.token) return;
       scheduleFailure = error instanceof Error ? error.message : 'Chưa kiểm tra được lịch làm việc.';
       notify(); throw error;
     }
@@ -60,48 +67,63 @@ async function loadSchedule(signal?: AbortSignal) {
   scheduleLoading = task;
   try { await task; } finally { if (scheduleLoading === task) scheduleLoading = null; }
 }
+function applyWallet(wallet: WalletResponse) {
+      balance = wallet.balance;
+      withdrawals = wallet.withdrawals;
+      transactions = wallet.transactions.filter(item => item.bucket === 'AVAILABLE' && !['HOLD', 'RELEASE'].includes(item.type)).map(item => ({ id: String(item.id), title: item.type === 'TOP_UP' ? 'Nạp tiền chuyển khoản' : item.type === 'EARNING' ? 'Thu nhập ca làm' : item.type === 'REWARD' ? 'Thưởng' : item.type === 'PENALTY' ? 'Khoản phạt' : 'Bút toán ' + item.type, date: new Date(item.createdAt).toLocaleString('vi-VN'), amount: item.amount, type: item.type === 'TOP_UP' ? 'TOP_UP' : item.type === 'EARNING' ? 'INCOME' : item.type === 'REWARD' ? 'BONUS' : 'FEE', status: 'SUCCESS' }));
+      transactions.push(...wallet.withdrawals.map(item => ({ id: 'withdrawal-' + item.id, withdrawalStatus: item.status, title: 'Rút tiền #' + item.id, date: new Date(item.requestedAt).toLocaleString('vi-VN'), amount: item.amount, type: 'WITHDRAW' as const, status: item.status === 'PAID' ? 'SUCCESS' as const : ['REJECTED','FAILED','CANCELLED'].includes(item.status) ? 'FAILED' as const : 'PENDING' as const, detail: item.cancellationReason || item.payoutMessage || item.rejectionReason || '', statusLabel: item.status === 'PAID' ? 'Đã chuyển về ngân hàng' : item.status === 'APPROVED' ? 'Đã duyệt · Chờ chuyển' : item.status === 'PROCESSING' ? 'Đang chuyển / đối soát' : item.status === 'PENDING' ? 'Chờ admin duyệt' : item.status === 'CANCELLED' ? 'Đã hủy · Đã hoàn về ví' : 'Đã từ chối / thất bại' })));
+}
+async function refreshWallet(signal?: AbortSignal) {
+  const active = assertStaff();
+  const request = ++walletRequest;
+  const [wallet, rawBanks] = await Promise.all([operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET', undefined, signal), operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET', undefined, signal)]);
+  if (active.token !== operationSession()?.token || signal?.aborted || request !== walletRequest) return;
+  banks = rawBanks.map(bank => ({ ...bank, id: String(bank.id) }));
+  applyWallet(wallet); notify();
+}
 async function load(signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error('Đã hủy thao tác.');
   const active = assertStaff();
   if (loading) return loading;
+  const walletSequence = ++walletRequest;
   const task = (async () => {
     try {
       await loadHcmAdministrativeUnits();
       const [rawAssignments, rawMatching, rawCaps, , wallet, rawBanks, rawReviews] = await Promise.all([
-        operationRequest<Record<string, unknown>[]>('booking', '/staff/me/assignments', 'GET', undefined, signal),
-        operationRequest<{ items: { opportunity: Record<string, unknown>; eligibility: MatchItem['eligibility'] }[] }>('booking', '/staff/me/matching', 'GET', undefined, signal),
-        operationRequest<{ capabilities: Record<string, unknown>[]; restrictions: Record<string, unknown>[] }>('booking', '/staff/me/capabilities', 'GET', undefined, signal),
-        loadSchedule(signal),
-        operationRequest<{ balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string }[] }>('finance', '/staff/me/wallet', 'GET', undefined, signal),
-        operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET', undefined, signal),
-        operationRequest<{ id: number; customerId: number; rating: number; comment: string; createdAt: string; tags: string[] }[]>('booking', '/reviews', 'GET', undefined, signal),
+        operationRequest<Record<string, unknown>[]>('booking', '/staff/me/assignments', 'GET'),
+        operationRequest<{ items: { opportunity: Record<string, unknown>; eligibility: MatchItem['eligibility'] }[] }>('booking', '/staff/me/matching', 'GET'),
+        operationRequest<{ capabilities: Record<string, unknown>[]; restrictions: Record<string, unknown>[] }>('booking', '/staff/me/capabilities', 'GET'),
+        loadSchedule(),
+        operationRequest<WalletResponse>('finance', '/staff/me/wallet', 'GET'),
+        operationRequest<(Omit<Bank, 'id'> & { id: number })[]>('finance', '/staff/me/bank-accounts', 'GET'),
+        operationRequest<{ id: number; customerId: number; rating: number; comment: string; createdAt: string; tags: string[] }[]>('booking', '/reviews', 'GET'),
         loadHcmAdministrativeUnits(),
       ]);
-      if (active.token !== operationSession()?.token || signal?.aborted) return;
+      if (active.token !== operationSession()?.token) return;
       assignments = rawAssignments.map(raw=>{const assignment=assignmentView(raw);const income=wallet.incomes.find(i=>String(i.bookingId)===assignment.id && i.status==='SETTLED');return income?{...assignment,netIncome:income.staffAmount,platformFee:income.platformFee,incomePendingPolicy:false}:assignment;});
       matchItems = rawMatching.items.map(item => ({ ...item, opportunity: { ...item.opportunity, id: String(item.opportunity.id), serviceId: String(item.opportunity.serviceId), invitedStaffId: item.opportunity.invitedStaffId == null ? undefined : String(item.opportunity.invitedStaffId) } as unknown as MatchItem['opportunity'] }));
       records = rawCaps.capabilities.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: String(item.serviceId), note: item.note || undefined, approvedAt: item.approvedAt || undefined, validFrom: item.validFrom || undefined, validUntil: item.validUntil || undefined } as StaffCapabilityRecord));
       restrictions = rawCaps.restrictions.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: item.serviceId == null ? undefined : String(item.serviceId), endsAt: item.endsAt || undefined } as CapabilityRestrictionRecord));
-      balance = wallet.balance;
-      transactions = wallet.transactions.filter(item => item.bucket === 'AVAILABLE' && !['HOLD', 'RELEASE'].includes(item.type)).map(item => ({ id: String(item.id), title: item.type === 'EARNING' ? 'Thu nhập ca làm' : item.type === 'REWARD' ? 'Thưởng' : item.type === 'PENALTY' ? 'Khoản phạt' : 'Bút toán ' + item.type, date: new Date(item.createdAt).toLocaleString('vi-VN'), amount: item.amount, type: item.type === 'EARNING' ? 'INCOME' : item.type === 'REWARD' ? 'BONUS' : 'FEE', status: 'SUCCESS' }));
-      transactions.push(...wallet.withdrawals.map(item => ({ id: 'withdrawal-' + item.id, title: 'Yêu cầu rút tiền', date: new Date(item.requestedAt).toLocaleString('vi-VN'), amount: item.amount, type: 'WITHDRAW' as const, status: item.status === 'PAID' ? 'SUCCESS' as const : ['REJECTED','FAILED','CANCELLED'].includes(item.status) ? 'FAILED' as const : 'PENDING' as const })));
+      if (walletSequence === walletRequest) applyWallet(wallet);
       banks = rawBanks.map(item => ({ ...item, id: String(item.id) }));
       reviews = rawReviews.map(item => ({ ...item, id: String(item.id), customerName: 'Khách hàng #' + item.customerId, customerAvatar: '', tags: item.tags || [] }));
       loaded = true; failure = ''; notify();
-    } catch (error) { if(active.token!==operationSession()?.token || signal?.aborted)return; failure = error instanceof Error ? error.message : 'Chưa tải được dữ liệu nhân viên.'; loaded = false; notify(); throw error; }
+    } catch (error) { if(active.token!==operationSession()?.token)return; failure = error instanceof Error ? error.message : 'Chưa tải được dữ liệu nhân viên.'; loaded = false; notify(); throw error; }
   })();
   loading = task;
   try { await task; } finally { if (loading === task) loading = null; }
 }
 let workRefresh: Promise<void> | null = null;
 async function refreshWork(signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error('Đã hủy thao tác.');
   if (workRefresh) return workRefresh;
   const active = assertStaff();
   const task = (async () => {
     const [rawAssignments, rawMatching] = await Promise.all([
-      operationRequest<Record<string, unknown>[]>('booking', '/staff/me/assignments', 'GET', undefined, signal),
-      operationRequest<{ items: { opportunity: Record<string, unknown>; eligibility: MatchItem['eligibility'] }[] }>('booking', '/staff/me/matching', 'GET', undefined, signal),
+      operationRequest<Record<string, unknown>[]>('booking', '/staff/me/assignments', 'GET'),
+      operationRequest<{ items: { opportunity: Record<string, unknown>; eligibility: MatchItem['eligibility'] }[] }>('booking', '/staff/me/matching', 'GET'),
     ]);
-    if (active.token !== operationSession()?.token || signal?.aborted) return;
+    if (active.token !== operationSession()?.token) return;
     const nextAssignments = reuseSnapshot(assignments, rawAssignments.map(raw => {
       const next = assignmentView(raw), previous = assignments.find(item => item.id === next.id);
       return previous?.incomePendingPolicy === false ? { ...next, netIncome: previous.netIncome, platformFee: previous.platformFee, incomePendingPolicy: false } : next;
@@ -116,7 +138,7 @@ async function refreshWork(signal?: AbortSignal) {
 }
 async function refreshAfterWrite() { try { await load(); } catch { /* The write has committed; UI presents the refresh error separately. */ } }
 export const StaffRepository = {
-  load,
+  load, refreshWallet,
   loadSchedule,
   getScheduleLoadState: () => ({ loaded: scheduleLoaded, error: scheduleFailure }),
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
@@ -127,7 +149,7 @@ export const StaffRepository = {
     return { staffId: staff, userId: staff, fullName: p.fullName, phone: p.phone, email: p.email, avatar: p.avatar, bio: p.bio || '', rating: reviews.length ? reviews.reduce((sum,r)=>sum+r.rating,0)/reviews.length : 5, reviewCount: reviews.length, completionRate: assignments.length ? Math.round(assignments.filter(a => a.status === 'COMPLETED').length / assignments.length * 100) : 0, isOnline: p.isOnline, autoAccept: false, maxDistanceKm: 0, primaryDistrict: areaNamesForIds(schedule.saved.areaIds)[0] || '', operatingDistricts: areaNamesForIds(schedule.saved.areaIds), specialties: records.filter(c => c.status === 'APPROVED').map(c => c.serviceName) };
   },
   getAssignments(staff: string) { assertStaff(staff); return assignments; },
-  getWallet(staff: string) { assertStaff(staff); return { balance, transactions }; },
+  getWallet(staff: string) { assertStaff(staff); return { balance, transactions, withdrawals }; },
   getBankAccounts(staff: string) { assertStaff(staff); return banks; },
   getStaffReviews(staff: string) { assertStaff(staff); return reviews; },
   getScheduleSnapshot(staff: string) { assertStaff(staff); return schedule; },
@@ -172,7 +194,15 @@ export const StaffRepository = {
       async () => { sameSession(); const actual = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability'); sameSession(); return actual; });
     sameSession(); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule;
   },
-  async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank || bank.includes(item.bankCode) && bank.includes(item.accountNumber.slice(-4))); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
+  async cancelWithdrawal(staff: string, id: number) {
+    assertStaff(staff);
+    walletRequest++;
+    const result = await operationRequest<{ id: number; status: string; amount: number }>('finance', `/staff/me/withdrawals/${id}/cancel`, 'POST');
+    if (result.status !== 'CANCELLED') throw new Error('Yêu cầu chưa được xác nhận hủy. Vui lòng kiểm tra lại trạng thái.');
+    try { await refreshWallet(); return { ...result, refreshPending: false }; }
+    catch { return { ...result, refreshPending: true }; }
+  },
+  async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
   async addBank(staff: string, bankCode: string, accountNumber: string, accountHolder: string) { assertStaff(staff); await operationRequest('finance', '/staff/me/bank-accounts', 'POST', { bankCode, accountNumber, accountHolder }); await refreshAfterWrite(); },
   async reportIssue(staff: string, id: string, reason: string) { assertStaff(staff); return operationRequest('booking', '/bookings/' + id + '/incidents', 'POST', { reason }); },
   getCapabilitySnapshot: capabilitySnapshot,

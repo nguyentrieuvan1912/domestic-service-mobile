@@ -1,0 +1,7 @@
+Legacy rebook repair 2026-10-20
+
+Actual database: completed booking115/service2 saved answers={} configuration={}; current Catalog service2 requires homeType,areaM2,priorityAreas,hasSupplies. No information was dropped by read, but first quick-rebook implementation had no input path for historical missing requirements. Original order untouched.
+
+Shared restoration now copies existing same-key valid configuration values into answers when the saved answer is absent; does not invent required choices or false defaults. Quick rebook stores editable answers, validates current requirements before preview, displays initially missing/invalid fields inline using existing ServiceQuestions, supports editing other requirements without a new wizard, and exposes a pricing link to scroll to repair section. After user supplies answers, existing quote/availability pipeline resumes; parameter changes invalidate stale responses. Readiness remains blocked until valid and server-confirmed quote/eligibility. Clarifies why staff lookup is pending rather than showing an endless loading message.
+
+Validation: TypeScript, actual-hook regression suite including incomplete historical answer request suppression, boolean false vs missing, valid configuration restore, invalid values not guessed, repaired payload and historical immutability; Android export passed. Native Customer_Test on actual booking115 showed all4 missing inputs on one screen after Fast Refresh. No guessed selections, booking POST, payments or source-order edits performed. Metro8090 running and gateway healthUP.

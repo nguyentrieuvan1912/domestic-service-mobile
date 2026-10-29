@@ -1,8 +1,13 @@
+import { BankLinkModal } from '@/components/staff/BankLinkModal';
+import { operationRequest } from '@/api/operations';
+import { useFocusEffect } from 'expo-router';
+import { StaffTopupPanel } from '@/components/staff/StaffTopupPanel';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
 import { EmptyState } from '@/components/common/EmptyState';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Alert,
+  AppState,
   Modal,
   Pressable,
   ScrollView,
@@ -31,18 +36,30 @@ function StaffWalletContent() {
   const staffId = currentStaff?.id || '';
 
   const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
-  const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'WITHDRAW' | 'BONUS'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'INCOME' | 'WITHDRAW' | 'BONUS' | 'TOP_UP'>('ALL');
 
   // Withdraw Modal State
   const [isWithdrawVisible, setIsWithdrawVisible] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('1000000');
   const [selectedBank, setSelectedBank] = useState('');
   const [saving, setSaving] = useState(false);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const cancelLock = useRef(false);
   const requestKey = useRef('withdraw-' + Date.now());
   const [linkVisible, setLinkVisible] = useState(false);
-  const [bankCode, setBankCode] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const accountName = currentStaff?.fullName?.toUpperCase() || '';
+  const [topupVisible, setTopupVisible] = useState(false);
+  const [withdrawalRules, setWithdrawalRules] = useState({ minimum: 50000, maximum: 1000000, configured: false, message: 'Đang kiểm tra Kênh chi…' });
+  useFocusEffect(useCallback(() => {
+    const controller = new AbortController(); let running = false;
+    const update = async () => { if (running || AppState.currentState !== 'active') return; running = true; try {
+      const rules = await operationRequest<typeof withdrawalRules>('finance', '/withdrawal-capabilities', 'GET', undefined, controller.signal);
+      if (!controller.signal.aborted) setWithdrawalRules(rules);
+      await StaffService.refreshWallet(controller.signal);
+    } catch { /* The existing connection status handles network errors. */ } finally { running = false; } };
+    void update(); const timer = setInterval(() => void update(), 10000);
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') void update(); });
+    return () => { controller.abort(); clearInterval(timer); listener.remove(); };
+  }, []));
 
   useEffect(() => {
     const update = () => {
@@ -53,7 +70,20 @@ function StaffWalletContent() {
     return unsubscribe;
   }, [staffId]);
 
-  const { balance, transactions } = wallet;
+  const { balance, transactions, withdrawals = [] } = wallet;
+  const pendingWithdrawals = withdrawals.filter(item => item.status === 'PENDING');
+  const cancelWithdrawal = async (id: number) => {
+    if (cancelLock.current) return;
+    cancelLock.current = true; setCancellingId(id);
+    try {
+      const result = await StaffService.cancelWithdrawal(id, staffId);
+      Alert.alert('Đã hủy yêu cầu rút', result.refreshPending ? 'Khoản giữ đã được hoàn trên hệ thống. Chưa tải được số dư mới; ví sẽ tự cập nhật khi kết nối lại.' : `${result.amount.toLocaleString('vi-VN')}đ đã được hoàn về số dư khả dụng.`);
+    } catch (cause) {
+      Alert.alert('Chưa hủy được yêu cầu', cause instanceof Error ? cause.message : 'Vui lòng kiểm tra trạng thái và thử lại.');
+      void StaffService.refreshWallet().catch(() => {});
+    } finally { cancelLock.current = false; setCancellingId(null); }
+  };
+  const refreshWallet = useCallback(() => { void StaffService.refreshWallet().catch(() => {}); }, []);
 
   const filteredTransactions = transactions.filter((tx) => {
     if (filterType === 'ALL') return true;
@@ -65,11 +95,12 @@ function StaffWalletContent() {
   };
 
   const bankAccounts = StaffService.getBankAccounts(staffId);
-  const bankOptions = bankAccounts.filter(bank => bank.status === 'VERIFIED').map(bank => bank.bankCode + ' (****' + bank.accountNumber.slice(-4) + ')');
+  const bankOptions = bankAccounts.filter(bank => bank.status === 'VERIFIED');
+  const accountName = bankOptions.find(bank => bank.id === selectedBank)?.accountHolder || '';
   const handleConfirmWithdraw = async () => {
     if (saving) return;
     const amountNum = Number(withdrawAmount.replace(/\D/g, ''));
-    if (!Number.isSafeInteger(amountNum) || amountNum < 50000) { Alert.alert('Lỗi', 'Số tiền rút tối thiểu là 50.000đ.'); return; }
+    if (!Number.isSafeInteger(amountNum) || amountNum < withdrawalRules.minimum || amountNum > withdrawalRules.maximum) { Alert.alert('Lỗi', `Số tiền rút từ ${withdrawalRules.minimum.toLocaleString('vi-VN')}đ đến ${withdrawalRules.maximum.toLocaleString('vi-VN')}đ.`); return; }
     if (!selectedBank) { Alert.alert('Chưa có tài khoản nhận', 'Liên kết ngân hàng và chờ Admin xác minh trước khi rút.'); return; }
     setSaving(true);
     try {
@@ -79,18 +110,12 @@ function StaffWalletContent() {
     } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
-  const linkBank = async () => {
-    if (saving) return; setSaving(true);
-    try { await StaffService.addBank(staffId, bankCode.trim(), accountNumber.trim(), accountName); setLinkVisible(false); Alert.alert('Đã lưu', 'Tài khoản ngân hàng đang chờ Admin xác minh.'); }
-    catch (error) { Alert.alert('Chưa lưu được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
-    finally { setSaving(false); }
-  };
+
 
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StaffConnectionStatus />
-        <Pressable onPress={() => setLinkVisible(true)} style={{ padding: 12 }}><Text style={{ color: '#047857', fontWeight: '700' }}>Liên kết tài khoản ngân hàng ({bankAccounts.length})</Text></Pressable>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Ví & Thu nhập</Text>
@@ -123,13 +148,7 @@ function StaffWalletContent() {
                   {balance.available.toLocaleString('vi-VN')}đ
                 </Text>
               </View>
-              <Pressable
-                style={styles.withdrawActionBtn}
-                onPress={() => setIsWithdrawVisible(true)}
-              >
-                <IconSymbol name="cash" size={16} color="#047857" />
-                <Text style={styles.withdrawActionText}>Rút tiền</Text>
-              </Pressable>
+
             </View>
 
             <View style={styles.walletDivider} />
@@ -157,48 +176,32 @@ function StaffWalletContent() {
 
             <View style={styles.linkedBankRow}>
               <Text style={styles.linkedBankText}>
-                🏦 Thụ hưởng: Vietcombank (****9821) - {accountName}
+                {bankAccounts.length ? '🏦 ' + bankAccounts.map(bank => (bank.bankName || 'Chưa xác định ngân hàng') + ' (****' + bank.accountNumber.slice(-4) + ') · ' + bank.accountHolder + (bank.status === 'VERIFIED' ? ' · Đã xác minh' : ' · Chờ xác minh')).join('\n') : 'Chưa liên kết tài khoản ngân hàng nhận tiền.'}
               </Text>
             </View>
           </LinearGradient>
 
-          {/* Weekly Income Bar Overview */}
-          <View style={styles.chartCard}>
-            <View style={styles.chartHeader}>
-              <Text style={styles.cardTitle}>Hiệu suất thu nhập tuần này</Text>
-              <Text style={styles.chartTotal}>2.480.000đ</Text>
-            </View>
-            <Text style={styles.chartSub}>Tăng 12% so với tuần trước (Đạt chỉ tiêu)</Text>
-
-            {/* Weekly Bars Simulation */}
-            <View style={styles.barsContainer}>
-              {[
-                { day: 'T2', amount: '350k', height: 45 },
-                { day: 'T3', amount: '480k', height: 60 },
-                { day: 'T4', amount: '290k', height: 35 },
-                { day: 'T5', amount: '520k', height: 75 },
-                { day: 'T6', amount: '440k', height: 55 },
-                { day: 'T7', amount: '400k', height: 50, active: true },
-                { day: 'CN', amount: '0k', height: 10 },
-              ].map((item, i) => (
-                <View key={i} style={styles.barColumn}>
-                  <Text style={styles.barAmount}>{item.amount}</Text>
-                  <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.barFill,
-                        { height: item.height },
-                        item.active && styles.barFillActive,
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.barDay, item.active && styles.barDayActive]}>
-                    {item.day}
-                  </Text>
-                </View>
-              ))}
-            </View>
+          <View style={styles.walletActions}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Mở nạp tiền vào ví" onPress={() => setTopupVisible(true)} style={styles.walletAction}>
+              <IconSymbol name="plus" size={20} color="#047857" /><Text style={styles.walletActionLabel}>Nạp tiền</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Mở yêu cầu rút tiền" onPress={() => setIsWithdrawVisible(true)} style={styles.walletAction}>
+              <IconSymbol name="cash" size={20} color="#047857" /><Text style={styles.walletActionLabel}>Rút tiền</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Liên kết tài khoản ngân hàng" onPress={() => setLinkVisible(true)} style={styles.walletAction}>
+              <IconSymbol name="office" size={20} color="#047857" /><Text style={styles.walletActionLabel}>Ngân hàng</Text>
+            </Pressable>
           </View>
+          {!!balance.reserved && balance.reserved > 0 && <View style={styles.chartCard}>
+            <Text style={styles.cardTitle}>Tiền đang giữ cho yêu cầu rút</Text>
+            <Text style={styles.chartTotal}>{(balance.reserved || 0).toLocaleString('vi-VN')}đ</Text>
+            <Text style={styles.chartSub}>Khoản này đang được giữ riêng, chưa thể dùng để thanh toán hoặc tạo yêu cầu rút khác.</Text>
+            {pendingWithdrawals.map(item => <View key={item.id} style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 12, marginTop: 12, gap: 8 }}>
+              <Text style={{ fontSize: 13, color: '#475569' }}>Yêu cầu #{item.id} · {item.amount.toLocaleString('vi-VN')}đ · Chờ Admin duyệt</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Hủy yêu cầu rút số ${item.id}`} disabled={cancellingId !== null} onPress={() => Alert.alert('Hủy yêu cầu rút?', `${item.amount.toLocaleString('vi-VN')}đ sẽ được hoàn về số dư khả dụng nếu Admin chưa duyệt yêu cầu.`, [{ text: 'Giữ yêu cầu', style: 'cancel' }, { text: 'Hủy yêu cầu rút', style: 'destructive', onPress: () => void cancelWithdrawal(item.id) }])} style={{ borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFF7F7', borderRadius: 10, padding: 12, alignItems: 'center', opacity: cancellingId !== null ? 0.5 : 1 }}><Text style={{ color: '#B91C1C', fontSize: 13, fontWeight: '700' }}>{cancellingId === item.id ? 'Đang hủy…' : 'Hủy yêu cầu rút'}</Text></Pressable>
+            </View>)}
+            {!pendingWithdrawals.length && <Text style={[styles.chartSub, { marginTop: 8 }]}>Yêu cầu đã được duyệt hoặc đang đối soát nên không thể tự hủy.</Text>}
+          </View>}
 
           {/* Transactions Filter & History */}
           <View style={styles.historySection}>
@@ -213,6 +216,7 @@ function StaffWalletContent() {
                 [
                   { key: 'ALL', label: 'Tất cả' },
                   { key: 'INCOME', label: 'Tiền công' },
+                  { key: 'TOP_UP', label: 'Nạp tiền' },
                   { key: 'WITHDRAW', label: 'Rút tiền' },
                   { key: 'BONUS', label: 'Thưởng/Tip' },
                 ] as const
@@ -235,7 +239,8 @@ function StaffWalletContent() {
             {/* Transaction Items */}
             <View style={styles.txList}>
               {filteredTransactions.map((tx) => {
-                const isPositive = tx.type === 'INCOME' || tx.type === 'BONUS';
+                const isCancelledWithdrawal = tx.type === 'WITHDRAW' && tx.withdrawalStatus === 'CANCELLED';
+                const isPositive = tx.type === 'INCOME' || tx.type === 'BONUS' || tx.type === 'TOP_UP';
                 return (
                   <View key={tx.id} style={styles.txItem}>
                     <View
@@ -247,26 +252,27 @@ function StaffWalletContent() {
                       <IconSymbol
                         name={isPositive ? 'cash' : 'wallet'}
                         size={18}
-                        color={isPositive ? '#047857' : '#DC2626'}
+                        color={isCancelledWithdrawal ? '#64748B' : isPositive ? '#047857' : '#DC2626'}
                       />
                     </View>
 
                     <View style={styles.txInfo}>
                       <Text style={styles.txTitle}>{tx.title}</Text>
                       <Text style={styles.txDate}>{tx.date}</Text>
+                      {tx.detail ? <Text style={[styles.txDate, { marginTop: 4, flexShrink: 1 }]}>{tx.detail}</Text> : null}
                     </View>
 
                     <View style={styles.txAmountWrap}>
                       <Text
                         style={[
                           styles.txAmount,
-                          { color: isPositive ? '#047857' : '#DC2626' },
+                          { color: isCancelledWithdrawal ? '#64748B' : isPositive ? '#047857' : '#DC2626' },
                         ]}
                       >
-                        {isPositive ? '+' : '-'}
+                        {isCancelledWithdrawal ? '' : isPositive ? '+' : '-'}
                         {tx.amount.toLocaleString('vi-VN')}đ
                       </Text>
-                      <Text style={styles.txStatus}>{tx.status === 'SUCCESS' ? 'Đã ghi nhận' : tx.status === 'FAILED' ? 'Đã từ chối' : 'Chờ xử lý'}</Text>
+                      <Text style={styles.txStatus}>{tx.statusLabel || (tx.status === 'SUCCESS' ? 'Đã ghi nhận' : tx.status === 'FAILED' ? 'Đã từ chối' : 'Chờ xử lý')}</Text>
                     </View>
                   </View>
                 );
@@ -276,7 +282,8 @@ function StaffWalletContent() {
         </ScrollView>
       </SafeAreaView>
 
-      <Modal visible={linkVisible} transparent animationType="slide" onRequestClose={() => setLinkVisible(false)}><View style={styles.modalOverlay}><View style={styles.modalContent}><Text style={styles.modalTitle}>Liên kết ngân hàng</Text><Text style={styles.inputLabel}>Mã hoặc tên ngân hàng</Text><TextInput style={styles.readOnlyInput} value={bankCode} onChangeText={setBankCode} /><Text style={styles.inputLabel}>Số tài khoản</Text><TextInput style={styles.readOnlyInput} keyboardType="numeric" value={accountNumber} onChangeText={setAccountNumber} /><Text style={styles.inputLabel}>Chủ tài khoản</Text><Text style={styles.availableHint}>{accountName}</Text><Pressable disabled={saving} onPress={linkBank} style={{ padding: 16 }}><Text style={{ color: '#047857', fontWeight: '700' }}>{saving ? 'Đang lưu…' : 'Lưu tài khoản'}</Text></Pressable><Pressable onPress={() => setLinkVisible(false)} style={{ padding: 12 }}><Text>Đóng</Text></Pressable></View></View></Modal>
+      <StaffTopupPanel visible={topupVisible} onClose={() => setTopupVisible(false)} onCredited={refreshWallet} />
+      <BankLinkModal visible={linkVisible} onClose={() => setLinkVisible(false)} onSave={async (bin, account, holder) => { await StaffService.addBank(staffId, bin, account, holder); Alert.alert('Đã lưu tài khoản', 'Thông tin đã được lưu và đang chờ admin đối chiếu với ngân hàng.'); }} />
       {/* Interactive Withdraw Modal */}
       <Modal
         visible={isWithdrawVisible}
@@ -300,12 +307,12 @@ function StaffWalletContent() {
               <Text style={styles.inputLabel}>Tài khoản nhận tiền</Text>
               <View style={styles.bankSelectWrap}>
                 {bankOptions.map((bank) => {
-                  const selected = selectedBank === bank;
+                  const selected = selectedBank === bank.id;
                   return (
                     <Pressable
-                      key={bank}
+                      key={bank.id}
                       style={[styles.bankOption, selected && styles.bankOptionActive]}
-                      onPress={() => setSelectedBank(bank)}
+                      onPress={() => setSelectedBank(bank.id)}
                     >
                       <IconSymbol name="🏦" style={styles.bankEmoji} />
                       <Text
@@ -314,7 +321,7 @@ function StaffWalletContent() {
                           selected && styles.bankOptionTextActive,
                         ]}
                       >
-                        {bank}
+                        {bank.bankName || 'Chưa xác định ngân hàng'} · {bank.accountNumber}
                       </Text>
                       {selected && <Text style={styles.bankCheck}>✓</Text>}
                     </Pressable>
@@ -347,7 +354,7 @@ function StaffWalletContent() {
 
               {/* Quick Select Buttons */}
               <View style={styles.quickAmountRow}>
-                {[500000, 1000000, 2000000].map((val) => (
+                {[withdrawalRules.minimum, 100000, 500000].filter((value, index, values) => value <= withdrawalRules.maximum && values.indexOf(value) === index).map((val) => (
                   <Pressable
                     key={val}
                     style={styles.quickAmountBtn}
@@ -369,7 +376,7 @@ function StaffWalletContent() {
               <View style={styles.feeNotice}>
                 <IconSymbol name="check" size={14} color="#047857" />
                 <Text style={styles.feeNoticeText}>
-                  Miễn phí giao dịch • Chuyển khoản tức thì 24/7
+                  {withdrawalRules.message}
                 </Text>
               </View>
 
@@ -377,7 +384,7 @@ function StaffWalletContent() {
                 style={styles.confirmWithdrawBtn}
                 disabled={saving} onPress={handleConfirmWithdraw}
               >
-                <Text style={styles.confirmWithdrawText}>Xác nhận rút tiền ngay</Text>
+                <Text style={styles.confirmWithdrawText}>Gửi yêu cầu rút tiền</Text>
               </Pressable>
             </ScrollView>
           </View>
@@ -392,6 +399,9 @@ function StaffWalletContent() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  walletActions: { flexDirection: 'row', gap: 10 },
+  walletAction: { flex: 1, minWidth: 0, minHeight: 76, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 6, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 14 },
+  walletActionLabel: { color: '#334155', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   safeArea: { flex: 1 },
 
   header: {
@@ -538,12 +548,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  txInfo: { flex: 1 },
+  txInfo: { flex: 1, minWidth: 0, paddingRight: 8 },
   txTitle: { fontSize: 13, fontWeight: '800', color: BrandColors.gray900 },
   txDate: { fontSize: 11, color: BrandColors.gray500, marginTop: 2 },
-  txAmountWrap: { alignItems: 'flex-end' },
+  txAmountWrap: { alignItems: 'flex-end', maxWidth: '46%' },
   txAmount: { fontSize: 14, fontWeight: '900' },
-  txStatus: { fontSize: 10, color: '#047857', marginTop: 1, fontWeight: '700' },
+  txStatus: { fontSize: 10, color: '#047857', marginTop: 1, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
 
   // Modal Styles
   modalOverlay: {

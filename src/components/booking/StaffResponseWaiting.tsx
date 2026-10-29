@@ -53,10 +53,11 @@ export function StaffResponseWaiting({ bookingId }: { bookingId: string }) {
         {!booking ? <ActivityIndicator color={BrandColors.primary} size="large" /> : <>
           <View style={styles.aura}><Image source={remoteImageSource(String(booking.staff?.avatar || '/api/v1/identity/staff-avatar.png'))} style={styles.avatar} /></View>
           <Text style={styles.title}>{accepted ? `${name} đã nhận đơn!` : expired ? `${name} chưa nhận đơn` : waiting ? `Đang chờ ${name} xác nhận...` : 'Đơn đã kết thúc'}</Text>
-          <Text style={styles.subtitle}>{accepted ? 'Bạn có thể xem chi tiết và theo dõi ca làm việc.' : waiting ? 'Yêu cầu đã được gửi trực tiếp đến nhân viên. Mỗi lượt chờ tối đa 3 phút.' : booking.cancellationReason || 'Vui lòng xem lại chi tiết đơn hàng.'}</Text>
+          <Text style={styles.subtitle}>{accepted ? 'Bạn có thể xem chi tiết và theo dõi ca làm việc.' : waiting ? 'Yêu cầu đã được gửi trực tiếp đến nhân viên. Mỗi lượt chờ tối đa 5 phút.' : booking.cancellationReason || 'Vui lòng xem lại chi tiết đơn hàng.'}</Text>
           {waiting && <View style={styles.badge}><IconSymbol name="clock" size={18} color={BrandColors.primary} /><Text style={styles.badgeText}>{expired ? 'Đã hết thời gian nhận đơn' : seconds > 0 ? `Thời gian chờ còn lại: ${responseClock(seconds)}` : 'Đang kiểm tra phản hồi của nhân viên...'}</Text></View>}
           <Text style={styles.code}>Mã đơn: {booking.bookingCode}</Text>
-          {waiting && <View style={styles.notice}><IconSymbol name="info" size={20} color={BrandColors.primary} /><Text style={styles.noticeText}>Bạn có thể về trang chủ và mở lại đơn đang chờ ở đầu trang. Hết giờ, bạn có thể chờ thêm 3 phút hoặc hủy để tìm nhân viên khác.</Text></View>}
+          {waiting && <View style={styles.notice}><IconSymbol name="info" size={20} color={BrandColors.primary} /><Text style={styles.noticeText}>Bạn có thể về trang chủ và mở lại đơn đang chờ ở đầu trang. Hết giờ, bạn có thể chờ thêm 5 phút hoặc hủy để tìm nhân viên khác.</Text></View>}
+          {booking.mode === 'MODE_A' && ['NO_STAFF_FOUND', 'REJECTED'].includes(booking.status) && <Pressable style={styles.primary} onPress={() => router.replace({ pathname: '/booking/rebook', params: { sourceId: booking.id, replaceStaff: '1' } })}><Text style={styles.primaryText}>Chọn nhân viên khác / Hệ thống ghép</Text></Pressable>}
           {!waiting && <Pressable style={styles.primary} onPress={() => router.replace({ pathname: '/booking/[id]', params: { id: booking.id } })}><Text style={styles.primaryText}>Xem chi tiết đơn</Text></Pressable>}
         </>}
         {!!error && <View style={styles.errorBox}><Text style={styles.error}>{error}</Text><Pressable onPress={() => setAttempt(value => value + 1)}><Text style={styles.link}>Tải lại trạng thái đơn</Text></Pressable></View>}
@@ -83,7 +84,7 @@ export function StaffResponseDecision({ booking, onPending, onUpdated }: { booki
     try {
       const next = await CustomerBookings.staffResponse(booking.id, action, booking.staffWaitRound || 1);
       onUpdated?.(next);
-      if(action === 'CANCEL') router.replace({ pathname: '/booking/new', params: { retryBookingId: next.id, mode: 'MODE_A' } });
+      if(action === 'CANCEL') router.replace({ pathname: '/booking/rebook', params: { sourceId: next.id, replaceStaff: '1' } });
       if(action === 'STOP') router.replace('/(tabs)');
     } catch(cause) { setError(cause instanceof Error ? cause.message : 'Chưa lưu được lựa chọn. Vui lòng thử lại.'); }
     finally { busy.current = false; setSaving(false); onPending?.(false); }
@@ -93,10 +94,10 @@ export function StaffResponseDecision({ booking, onPending, onUpdated }: { booki
         <View style={styles.overlay}><View style={styles.dialog}>
           <IconSymbol name="clock" size={36} color={BrandColors.primary} />
           <Text style={styles.title}>Nhân viên bạn chọn đang bận</Text>
-          <Text style={styles.subtitle}>{name} chưa phản hồi trong thời gian nhận đơn. Bạn có muốn chờ thêm 3 phút không?</Text>
+          <Text style={styles.subtitle}>{name} chưa phản hồi trong thời gian nhận đơn. Bạn có muốn chờ thêm 5 phút không?</Text>
           <Text style={styles.subtitle}>Nếu tìm nhân viên khác, đơn này sẽ được giữ trong lịch sử với lý do hết thời gian nhận đơn.</Text>
           {!!error && <Text style={styles.error}>{error}</Text>}
-          <Pressable disabled={saving} style={[styles.primary, saving && { opacity: 0.6 }]} onPress={() => void decide('EXTEND')}><Text style={styles.primaryText}>{saving ? 'Đang cập nhật...' : 'Có, chờ thêm 3 phút'}</Text></Pressable>
+          <Pressable disabled={saving} style={[styles.primary, saving && { opacity: 0.6 }]} onPress={() => void decide('EXTEND')}><Text style={styles.primaryText}>{saving ? 'Đang cập nhật...' : 'Có, chờ thêm 5 phút'}</Text></Pressable>
           <Pressable disabled={saving} style={styles.home} onPress={() => void decide('CANCEL')}><Text style={styles.link}>Không, tìm nhân viên khác</Text></Pressable>
           <Pressable accessibilityRole="button" disabled={saving} style={styles.cancel} onPress={() => void decide('STOP')}><Text style={styles.error}>Hủy đặt dịch vụ, về trang chủ</Text></Pressable>
         </View></View>

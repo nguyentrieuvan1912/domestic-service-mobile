@@ -166,36 +166,8 @@ export default function HomeScreen() {
   // Recent completed bookings for quick re-booking
   const recentCompletedBookings = bookingResource.bookings.filter(b=>b.status==='COMPLETED').slice(0,5);
 
-  // Quick Rebook Modal state
-  const [rebookModalVisible, setRebookModalVisible] = useState(false);
-  const [selectedRebookBooking, setSelectedRebookBooking] = useState<any>(null);
-  const [rebookSlot, setRebookSlot] = useState('09:00');
-  const [rebookDayText, setRebookDayText] = useState('Sáng mai (08:30 - 11:30)');
-  const [rebookKeepStaff, setRebookKeepStaff] = useState(true);
-
-  // Bundle Modal state
   const [selectedBundle, setSelectedBundle] = useState<ServiceBundle | null>(null);
-
-  const handleOpenRebook = (b: any) => {
-    setSelectedRebookBooking(b);
-    setRebookModalVisible(true);
-  };
-
-  const handleConfirmQuickRebook = () => {
-    if (!selectedRebookBooking) return;
-    setRebookModalVisible(false);
-    router.push({
-      pathname: '/booking/new',
-      params: {
-        rebook: 'true',
-        serviceId: selectedRebookBooking.serviceId,
-        packageId: selectedRebookBooking.packageId,
-        staffId: rebookKeepStaff && selectedRebookBooking.requiredStaffCount===1 ? selectedRebookBooking.staffId : undefined,
-        mode: rebookKeepStaff && selectedRebookBooking.requiredStaffCount===1 && selectedRebookBooking.staffId ? 'MODE_A' : 'MODE_B',
-        addressId: selectedRebookBooking.addressId,
-      },
-    });
-  };
+  const handleOpenRebook = (booking: { id: string }) => router.push({ pathname: '/booking/rebook', params: { sourceId: booking.id } });
 
   const handleBookBundle = (bundle: ServiceBundle) => {
     setSelectedBundle(null);
@@ -272,7 +244,7 @@ export default function HomeScreen() {
             </View><IconSymbol name="chevronRight" size={18} color={BrandColors.primary} /></View>
             <Text style={styles.upcomingServiceName}>{booking.service.name || booking.service.serviceName || 'Đơn dịch vụ'}</Text>
             <Text style={styles.upcomingTime}>{String(booking.staff?.fullName || 'Nhân viên đã chọn')} • {booking.bookingCode}</Text>
-            <Text style={styles.upcomingTime}>{booking.staffWaitState === 'EXPIRED' ? 'Nhấn để chờ thêm 3 phút hoặc tìm nhân viên khác' : 'Nhấn để xem thời gian chờ và phản hồi của nhân viên'}</Text>
+            <Text style={styles.upcomingTime}>{booking.staffWaitState === 'EXPIRED' ? 'Nhấn để chờ thêm 5 phút hoặc tìm nhân viên khác' : 'Nhấn để xem thời gian chờ và phản hồi của nhân viên'}</Text>
           </Pressable>)}
 
           {/* Address Selector Pill */}
@@ -338,7 +310,7 @@ export default function HomeScreen() {
                     <View key={b.id} style={styles.rebookCard}>
                       <View style={styles.rebookCardHeader}>
                         <View style={styles.rebookTagRow}>
-                          <Text style={styles.rebookBadge}>⭐ Đã hoàn thành 5.0★</Text>
+                          <Text style={styles.rebookBadge}>Đã hoàn thành</Text>
                           {staff && <Text style={styles.rebookStaffTag}>Thợ quen</Text>}
                         </View>
                         <Text style={styles.rebookPrice}>{formatVND(b.totalAmount)}</Text>
@@ -742,146 +714,6 @@ export default function HomeScreen() {
             </View>
           </LinearGradient>
         </Pressable>
-
-        {/* MODAL 1: QUICK RE-BOOK FOR RETURNING CUSTOMERS */}
-        <Modal
-          visible={rebookModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setRebookModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.rebookModalContent}>
-              <View style={styles.modalHandle} />
-
-              <View style={styles.modalHeaderRow}>
-                <View>
-                  <Text style={styles.modalTitle}>⚡ Đặt lại nhanh (1-Chạm)</Text>
-                  <Text style={styles.modalSubtitle}>Xác nhận nhanh không cần nhập lại thông tin</Text>
-                </View>
-                <Pressable onPress={() => setRebookModalVisible(false)} hitSlop={8}>
-                  <IconSymbol name="close" size={22} color={BrandColors.gray600} />
-                </Pressable>
-              </View>
-
-              {selectedRebookBooking && (() => {
-                const srv = getServiceById(selectedRebookBooking.serviceId);
-                const staff = selectedRebookBooking.staffId ? getStaffById(selectedRebookBooking.staffId) : undefined;
-                return (
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
-                    {/* Service Info Box */}
-                    <View style={styles.modalServiceBox}>
-                      {srv?.image && <Image source={remoteImageSource(srv.image)} style={styles.modalServiceThumb} />}
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.modalServiceName}>{srv?.name}</Text>
-                        <Text style={styles.modalServiceSub}>
-                          {selectedRebookBooking.mode === 'MODE_A' ? 'Tự chọn nhân viên' : 'Hệ thống điều phối'}
-                        </Text>
-                        <Text style={styles.modalServicePrice}>{formatVND(selectedRebookBooking.totalAmount)}</Text>
-                      </View>
-                    </View>
-
-                    {/* Staff Option */}
-                    {staff && (
-                      <View style={styles.modalOptionCard}>
-                        <Text style={styles.modalOptionHeading}>Nhân viên thực hiện</Text>
-                        <Pressable
-                          style={[styles.staffOptionRow, rebookKeepStaff && styles.staffOptionRowActive]}
-                          onPress={() => setRebookKeepStaff(!rebookKeepStaff)}>
-                          <Image source={remoteImageSource(staff.avatar)} style={styles.staffOptionAvatar} />
-                          <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <Text style={styles.staffOptionName}>{staff.fullName}</Text>
-                              <View style={styles.familiarStaffPill}>
-                                <Text style={styles.familiarStaffText}>Thợ quen</Text>
-                              </View>
-                            </View>
-                            <Text style={styles.staffOptionMeta}>⭐ {staff.rating} • Đã phục vụ bạn trước đây</Text>
-                          </View>
-                          <View style={[styles.modalRadio, rebookKeepStaff && styles.modalRadioActive]}>
-                            {rebookKeepStaff && <View style={styles.modalRadioDot} />}
-                          </View>
-                        </Pressable>
-                        {!rebookKeepStaff && (
-                          <Text style={styles.autoMatchHint}>
-                            ⚡ Hệ thống sẽ tự động tìm nhân viên 5★ gần bạn nhất tại thời điểm đặt ca.
-                          </Text>
-                        )}
-                      </View>
-                    )}
-
-                    {/* Quick Time Options */}
-                    <View style={styles.modalOptionCard}>
-                      <Text style={styles.modalOptionHeading}>Chọn thời gian làm việc mới</Text>
-                      <View style={styles.modalTimeSlotsCol}>
-                        {[
-                          { id: '1', title: 'Sáng mai (08:30 - 11:30)', time: '08:30' },
-                          { id: '2', title: 'Chiều mai (14:00 - 17:00)', time: '14:00' },
-                          { id: '3', title: 'Thứ Bảy cuối tuần (09:00 - 12:00)', time: '09:00' },
-                        ].map((slot) => {
-                          const isPicked = rebookDayText === slot.title;
-                          return (
-                            <Pressable
-                              key={slot.id}
-                              style={[styles.modalTimeSlotBtn, isPicked && styles.modalTimeSlotBtnActive]}
-                              onPress={() => {
-                                setRebookDayText(slot.title);
-                                setRebookSlot(slot.time);
-                              }}>
-                              <Text style={[styles.modalTimeSlotText, isPicked && styles.modalTimeSlotTextActive]}>
-                                🕒 {slot.title}
-                              </Text>
-                              {isPicked && <Text style={{ color: BrandColors.primary, fontWeight: '800' }}>✓</Text>}
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-
-                    {/* Address Box */}
-                    <View style={styles.modalOptionCard}>
-                      <Text style={styles.modalOptionHeading}>Địa chỉ thực hiện</Text>
-                      <View style={styles.modalAddrRow}>
-                        <IconSymbol name="location" size={18} color={BrandColors.primary} />
-                        <Text numberOfLines={2} style={styles.modalAddrText}>
-                          {(addresses.find((a) => a.id === selectedRebookBooking.addressId) || defaultAddress)?.fullAddress || 'Địa chỉ mặc định của bạn'}
-                        </Text>
-                      </View>
-                    </View>
-                  </ScrollView>
-                );
-              })()}
-
-              <View style={styles.modalBtnRow}>
-                <Pressable
-                  style={styles.modalCustomizeBtn}
-                  onPress={() => {
-                    setRebookModalVisible(false);
-                    if (selectedRebookBooking) {
-                      router.push({
-                        pathname: '/booking/new',
-                        params: {
-                          rebook: 'true',
-                          serviceId: selectedRebookBooking.serviceId,
-                          packageId: selectedRebookBooking.packageId,
-                          staffId: selectedRebookBooking.staffId,
-                          mode: selectedRebookBooking.mode,
-                          addressId: selectedRebookBooking.addressId,
-                        },
-                      });
-                    }
-                  }}>
-                  <Text style={styles.modalCustomizeText}>Tùy chỉnh thêm</Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.modalConfirmBtn}
-                  onPress={handleConfirmQuickRebook}>
-                  <Text style={styles.modalConfirmText}>⚡ Xác nhận đặt lại</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* MODAL 2: SMART SERVICE BUNDLE DETAIL */}
         <Modal

@@ -1,3 +1,4 @@
+import { BookingCommunicationBridge } from '@/components/common/BookingCommunicationBridge';
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -45,11 +46,14 @@ function AuthStack() {
           <Stack.Screen name="staff/personal-info" options={{ headerShown: false }} />
           <Stack.Screen name="service/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="catalog/index" options={{ headerShown: false }} />
+          <Stack.Screen name="booking/rebook" options={{ headerShown: false }} />
           <Stack.Screen name="booking/waiting" options={{ headerShown: false }} />
             <Stack.Screen name="booking/new" options={{ headerShown: false }} />
           <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="booking/matching" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="booking/review" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="call/[id]" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="chat/trash" options={{ headerShown: false }} />
           <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="ai/index" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
@@ -59,6 +63,7 @@ function AuthStack() {
           </Stack.Protected>
         </Stack>
         {isAuthenticated && <StaffScheduleReminder />}
+        {isAuthenticated && <BookingCommunicationBridge />}
     </>
 
   );

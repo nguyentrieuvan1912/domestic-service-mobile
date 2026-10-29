@@ -147,3 +147,35 @@ assert.equal(chat.getMessages('80001',chatActor),beforeFailedSend,'Failed POST c
 ops.connectOperationsSession(customer,'same-user-renewed-session');
 assert.equal(chat.list().length,0,'Renewing the same account session resets its old requests and cache');
 console.log('Chat smoothness: unchanged thread stability, receipt retry/dedup, committed-send confirmation despite inbox failure, late-poll protection, idempotent acknowledgement and failed-send isolation passed.');
+// Read resilience uses the real transport; mutation replay is forbidden.
+ops.connectOperationsSession(customer,'transport-resilience');
+let recoveryCalls=0;
+global.fetch=async()=>{if(++recoveryCalls===1)throw new TypeError('Network request failed');return new Response(JSON.stringify({saved:true}));};
+assert.deepEqual(await ops.operationRequest('booking','/bookings/90001'),{saved:true});
+assert.equal(recoveryCalls,2,'A transient read recovers without a manual retry');
+recoveryCalls=0;global.fetch=async()=>{recoveryCalls++;return new Response(JSON.stringify({detail:'Temporarily unavailable'}),{status:503});};
+await assert.rejects(ops.operationRequest('booking','/bookings/90001'),/Temporarily/);assert.equal(recoveryCalls,2,'Read retry is bounded');
+recoveryCalls=0;await assert.rejects(ops.operationRequest('booking','/bookings','POST',{}));assert.equal(recoveryCalls,1,'A write must never be replayed automatically');
+recoveryCalls=0;global.fetch=async()=>{recoveryCalls++;return new Response(JSON.stringify({detail:'Invalid booking'}),{status:400});};
+await assert.rejects(ops.operationRequest('booking','/bookings/90001'));assert.equal(recoveryCalls,1,'Business errors must not retry');
+let releaseBody;
+global.fetch=async()=>({ok:true,status:200,json:()=>new Promise(resolve=>releaseBody=resolve)});
+const pendingBody=ops.operationRequest('booking','/bookings/90001');await new Promise(resolve=>setImmediate(resolve));
+ops.connectOperationsSession(other,'changed-during-body');releaseBody({id:90001});
+await assert.rejects(pendingBody,/Phiên đăng nhập đã thay đổi/,'The account guard includes response body decoding');
+ops.connectOperationsSession(customer,'cancelled-read-retry');recoveryCalls=0;
+global.fetch=async()=>{recoveryCalls++;throw new TypeError('Network request failed');};
+const retryAbort=new AbortController();const abortedRetry=ops.operationRequest('booking','/bookings/90001','GET',undefined,retryAbort.signal);
+await new Promise(resolve=>setImmediate(resolve));retryAbort.abort();await assert.rejects(abortedRetry,/Đã hủy/);assert.equal(recoveryCalls,1);
+console.log('Transport resilience: transient GET recovery, bounded attempts, no mutation/business retry, account guard through body decode and cancellation during backoff passed.');
+// Deadlines must include a stalled response body, not just response headers.
+ops.connectOperationsSession(customer,'body-deadline');
+const realTimeout=global.setTimeout;let bodyAttempts=0;
+global.setTimeout=(callback,delay,...args)=>realTimeout(callback,delay===20000?10:delay===500?1:delay,...args);
+try {
+ global.fetch=async(_url,options)=>{bodyAttempts++;return{ok:true,status:200,json:()=>new Promise((_resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('Body aborted')),{once:true}))};};
+ await assert.rejects(ops.operationRequest('booking','/bookings/90001'),/Kết nối quá lâu/);
+ assert.equal(bodyAttempts,2,'Stalled GET body has one bounded retry');
+ bodyAttempts=0;await assert.rejects(ops.operationRequest('booking','/bookings','POST',{}),/Kết nối quá lâu/);assert.equal(bodyAttempts,1,'Stalled POST body must not replay a possibly committed write');
+} finally {global.setTimeout=realTimeout;}
+console.log('Response body deadlines: stalled reads terminate with one retry; stalled writes terminate without replay.');

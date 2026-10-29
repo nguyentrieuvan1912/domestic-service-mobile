@@ -58,6 +58,7 @@ export const NotificationRepository = {
     try { this.get(actor, id); }
     catch (error) { return { kind: 'FORBIDDEN', reason: error instanceof Error ? error.message : 'Không thể mở thông báo.' }; }
     const item=this.get(actor,id);
+    if (item.type === 'CALL_INCOMING' && /^\d+$/.test(String(item.data?.callId))) return { kind: 'AVAILABLE', actionLabel: 'Mở cuộc gọi', destination: { pathname: '/call/[id]', params: { id: String(item.data!.callId) } } };
     if (item.type === 'CHAT_MESSAGE' && /^\d+$/.test(String(item.data?.conversationId))) return { kind: 'AVAILABLE', actionLabel: 'Mở cuộc trò chuyện', destination: { pathname: '/chat/[id]', params: { id: String(item.data!.conversationId) } } };
     if(actor?.role==='STAFF' && item.type==='INCOME_UPDATE')return {kind:'AVAILABLE',actionLabel:'Xem ví thu nhập',destination:{pathname:'/staff/wallet'}};const target=getNotificationTarget(item);
     if(target && /^\d+$/.test(String(target.id)) && ['BOOKING','INVITATION','OPPORTUNITY'].includes(target.type)) return {kind:'AVAILABLE',actionLabel:'Xem đơn dịch vụ',destination:{pathname:actor?.role==='STAFF'?'/staff/job-detail':'/booking/[id]',params:{id:String(target.id)}}};

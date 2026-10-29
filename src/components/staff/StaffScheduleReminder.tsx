@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { useStaffActor } from '@/hooks/use-staff-actor';
 import { StaffRepository } from '@/data/connectedStaffRepository';
 import { missingRegistrationDates, weekStart } from '@/data/weeklyAvailability';
 import { displayDate } from '@/data/staffAvailabilityRules';
@@ -10,15 +9,13 @@ import { BrandColors } from '@/constants/theme';
 import type { AvailabilityActor } from '@/types/staff-availability';
 
 export function StaffScheduleReminder() {
-  const { currentUser, currentStaff } = useAuth();
-  const actor = useMemo(() => getCapabilityActor(currentUser, currentStaff), [currentUser, currentStaff]);
+  const actor = useStaffActor();
   return actor ? <Reminder key={actor.staffId} actor={actor} /> : null;
 }
 export function StaffScheduleNotice() {
-  const { currentUser, currentStaff } = useAuth();
+  const actor = useStaffActor();
   const router = useRouter();
   useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
-  const actor = getCapabilityActor(currentUser, currentStaff);
   if (!actor) return null;
   const { loaded, error } = StaffRepository.getScheduleLoadState();
   const missing = loaded ? missingRegistrationDates(StaffRepository.getScheduleSnapshot(actor.staffId).saved.registeredWeekStarts ?? []) : [];

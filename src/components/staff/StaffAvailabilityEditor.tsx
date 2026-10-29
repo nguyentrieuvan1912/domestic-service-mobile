@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRouter } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@/context/AuthContext';
-import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { useStaffActor } from '@/hooks/use-staff-actor';
 import { StaffAvailabilityRepository, availabilityDraft } from '@/data/connectedStaffRepository';
 import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
 import { administrativeSearchKey } from '@/api/administrative-units';
@@ -17,8 +16,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { StaffBottomNav } from './StaffBottomNav';
 
 export function StaffAvailabilityScreen() {
-  const router = useRouter(), { currentUser, currentStaff } = useAuth();
-  const actor = useMemo(() => getCapabilityActor(currentUser, currentStaff), [currentUser, currentStaff]);
+  const router = useRouter();
+  const actor = useStaffActor();
   if (!actor) return <SafeAreaView style={s.root}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
   return <AvailabilityEditor key={actor.userId} actor={actor} />;
 }

@@ -1,4 +1,5 @@
 export type NotificationType =
+  | 'CALL_INCOMING'
   | 'CHAT_MESSAGE'
   | 'BOOKING_CREATED'
   | 'STAFF_ASSIGNED'

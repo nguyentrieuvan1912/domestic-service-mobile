@@ -20,9 +20,10 @@ import { useChatInbox } from '@/hooks/use-chat-inbox';
 export default function ChatListScreen() {
   'use no memo'; // Repository access checks must follow each subscribed snapshot.
   const router = useRouter();
-  const { actor, conversations: inbox } = useChatInbox();
+  const { actor, conversations: inbox, error, isLoaded } = useChatInbox();
   const conversations = inbox.filter((conversation) =>
-    ChatRepository.access(conversation.id, actor, inbox).kind === 'READY');
+    ChatRepository.access(conversation.id, actor, inbox).kind === 'READY' && (actor?.role !== 'CUSTOMER' || !conversation.customerTrashedAt));
+  const trashCount = inbox.filter(item => !!item.customerTrashedAt).length;
 
   return (
     <LinearGradient
@@ -33,11 +34,16 @@ export default function ChatListScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Tin nhắn & Tư vấn</Text>
+          {actor?.role === 'CUSTOMER' && <Pressable accessibilityRole="button" accessibilityLabel={`Thùng rác tin nhắn, ${trashCount} hội thoại`} onPress={() => router.push('/chat/trash')} style={styles.trashButton}>
+            <IconSymbol name="trash" size={22} color={BrandColors.gray700} />
+            {trashCount > 0 && <Text style={styles.trashCount}>{trashCount > 99 ? '99+' : trashCount}</Text>}
+          </Pressable>}
         </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
+        {error ? <Pressable onPress={() => void ChatRepository.loadList(actor).catch(() => {})} style={{ padding: 12, marginBottom: 12 }}><Text style={{ color: BrandColors.danger }}>{error} Chạm để thử lại.</Text></Pressable> : null}
         {/* Featured AI Assistant Banner */}
         <Pressable style={styles.aiBanner} onPress={() => router.push('/ai')}>
           <View style={styles.aiIconBox}>
@@ -66,7 +72,8 @@ export default function ChatListScreen() {
 
         {/* Conversations List */}
         <View style={styles.conversationList}>
-          {conversations.length === 0 && <Text style={styles.lastMsg}>Chưa có cuộc trò chuyện cho tài khoản này.</Text>}
+          {!isLoaded && !error && <Text style={styles.lastMsg}>Đang tải hội thoại…</Text>}
+          {isLoaded && conversations.length === 0 && <Text style={styles.lastMsg}>Chưa có cuộc trò chuyện cho tài khoản này.</Text>}
           {conversations.map((conv) => {
             const unreadCount = actor?.role === 'STAFF' ? conv.unreadCountStaff : conv.unreadCountCustomer;
             const hasUnread = unreadCount > 0;
@@ -132,7 +139,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
+  trashButton: { minWidth: 44, minHeight: 44, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  trashCount: { position: 'absolute', top: -5, right: -5, borderRadius: 10, backgroundColor: '#EF4444', color: 'white', minWidth: 19, paddingHorizontal: 4, textAlign: 'center', fontSize: 10, lineHeight: 19, fontWeight: '700' },
   header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderBottomWidth: 1,

@@ -11,6 +11,7 @@ import {
   Pressable,
   Image,
   Alert,
+  ActivityIndicator,
   Modal,
 } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,11 +29,18 @@ import type { Staff } from '@/types/user';
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter(); const data = useBookingDetail(id);
-  if (!data.booking) return <SafeAreaView style={styles.container}><Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}><Text>← Quay lại</Text></Pressable><Text>{data.loading ? 'Đang tải đơn hàng...' : data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable></SafeAreaView>;
+  if (!data.booking) return <SafeAreaView style={styles.container}>
+    <View style={styles.header}><Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}><Text>← Quay lại</Text></Pressable><Text style={styles.headerTitle}>Chi tiết đơn hàng</Text></View>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 }}>
+      {data.loading && <ActivityIndicator color={BrandColors.primary} size="large" />}
+      <Text style={{ color: BrandColors.gray700, textAlign: 'center', lineHeight: 22 }}>{data.loading ? 'Đang tải đơn hàng…' : data.error}</Text>
+      {!data.loading && <><Text style={{ color: BrandColors.gray500, textAlign: 'center' }}>Ứng dụng sẽ tự kiểm tra lại kết nối.</Text><Pressable accessibilityRole="button" onPress={data.retry} style={{ padding: 14, borderRadius: 12, backgroundColor: BrandColors.primary }}><Text style={{ color: '#fff', fontWeight: '700' }}>Thử kết nối ngay</Text></Pressable></>}
+    </View>
+  </SafeAreaView>;
   if(needsStaffResponse(data.booking)) return <Redirect href={{pathname:'/booking/waiting',params:{id:data.booking.id}}} />;
-  return <BookingDetailContent initial={data.booking} staff={data.staff} invoice={data.invoice} />;
+  return <BookingDetailContent initial={data.booking} staff={data.staff} invoice={data.invoice} invoiceLoading={data.invoiceLoading} invoiceError={data.invoiceError} refreshError={data.refreshError} retry={data.retry} />;
 }
-function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedBooking; staff?: Staff; invoice?: StoredInvoice }) {
+function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoiceError, refreshError, retry }: { initial: ConnectedBooking; staff?: Staff; invoice?: StoredInvoice; invoiceLoading?: boolean; invoiceError?: string; refreshError?: string; retry: () => void }) {
   const router = useRouter(); const [booking, setBooking] = useState(initial);
   React.useEffect(() => setBooking(initial), [initial]);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -73,7 +81,7 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
         <Text style={styles.headerTitle}>Chi tiết đơn hàng</Text>
         <Pressable
           style={styles.invoiceBtn}
-          onPress={() => invoice ? setShowInvoiceModal(true) : Alert.alert('Chưa có hóa đơn', 'Hóa đơn được phát hành sau khi có kết quả cuối cùng và quyết toán đơn hàng.')}>
+          onPress={() => invoice ? setShowInvoiceModal(true) : invoiceLoading ? Alert.alert('Đang tải hóa đơn', 'Thông tin hóa đơn đang được tải từ hệ thống.') : invoiceError ? Alert.alert('Chưa tải được hóa đơn', invoiceError, [{text:'Đóng'}, {text:'Tải lại', onPress:retry}]) : Alert.alert('Chưa có hóa đơn', 'Hóa đơn được phát hành sau khi có kết quả cuối cùng và quyết toán đơn hàng.')}>
           <Text style={styles.invoiceBtnText}>🧾 Hóa đơn</Text>
         </Pressable>
       </View>
@@ -81,6 +89,7 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
+        {!!refreshError && <Pressable onPress={retry} accessibilityRole="button"><Text style={{ color: '#92400E', padding: 12 }}>Đang chờ kết nối để cập nhật đơn. Thông tin bên dưới là lần tải gần nhất. Chạm để thử ngay.</Text></Pressable>}
 
         {/* Status Card & Code */}
         <View style={styles.statusCard}>
@@ -278,15 +287,8 @@ function BookingDetailContent({ initial, staff, invoice }: { initial: ConnectedB
             style={styles.rebookBtn}
             onPress={() =>
               router.push({
-                pathname: '/booking/new',
-                params: {
-                  rebook: 'true',
-                  serviceId: booking.serviceId,
-                  packageId: booking.packageId,
-                  staffId: booking.requiredStaffCount===1?booking.staffId:undefined,
-                  addressId: booking.addressId,
-                  mode: booking.requiredStaffCount===1&&booking.staffId ? 'MODE_A' : 'MODE_B',
-                },
+                pathname: '/booking/rebook',
+                params: { sourceId: booking.id },
               })
             }>
             <Text style={styles.rebookBtnText}>
