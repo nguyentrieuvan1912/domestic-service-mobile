@@ -1,14 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { useStaffActor } from '@/hooks/use-staff-actor';
 import { StaffCapabilityRepository } from '@/data/connectedStaffRepository';
 import type { StaffCapabilitySnapshot } from '@/types/staff-capability';
 
 type CapabilityLoadState = { key: string; status: 'LOADING' | 'ERROR' | 'READY'; data?: StaffCapabilitySnapshot; error?: string };
 export function useStaffCapabilities() {
-  const { currentUser, currentStaff } = useAuth();
-  const actor = useMemo(() => getCapabilityActor(currentUser, currentStaff), [currentUser, currentStaff]);
+  const actor = useStaffActor();
   const key = actor ? actor.userId + ':' + actor.staffId : '';
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<CapabilityLoadState>({ key: '', status: 'LOADING' });

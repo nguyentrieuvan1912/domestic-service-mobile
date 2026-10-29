@@ -1,5 +1,6 @@
+import { useFocusEffect } from 'expo-router';
 import { remoteImageSource } from '@/utils/image-source';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   Alert,
   Pressable,
@@ -29,7 +30,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { MatchingModePicker, matchingModeCounts } from '@/components/staff/MatchingModePicker';
 
 export default function StaffDashboard() {
-  const { currentUser, currentStaff } = useAuth();
+  const { currentUser, currentStaff, refreshProfile } = useAuth();
+  useFocusEffect(useCallback(() => { void refreshProfile().catch(() => undefined); }, [refreshProfile]));
   const router = useRouter();
   if (!getCapabilityActor(currentUser, currentStaff)) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
   return <StaffDashboardContent key={currentUser!.id} />;

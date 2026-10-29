@@ -1,4 +1,4 @@
-import { remoteImageSource } from '@/utils/image-source';
+import AvatarEditor from '@/components/common/AvatarEditor';
 import React, { useCallback, useState } from 'react';
 import {
   View,
@@ -59,7 +59,7 @@ export default function ProfileScreen() {
         <Pressable
           style={styles.userCard}
           onPress={() => router.push('/account/personal-info')}>
-          {currentCustomer?.avatar ? <Image source={remoteImageSource(currentCustomer.avatar)} style={styles.avatar} /> : <View style={[styles.avatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' }]}><IconSymbol name="user" size={32} color={BrandColors.primary} /></View>}
+          <AvatarEditor style={styles.avatar} />
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.userName}>{currentCustomer?.fullName || 'Khách hàng'}</Text>

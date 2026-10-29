@@ -1,14 +1,12 @@
 import { AppState } from 'react-native';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
+import { useStaffActor } from '@/hooks/use-staff-actor';
 import { StaffRepository } from '@/data/connectedStaffRepository';
 import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
 
 export function useStaffMatching() {
-  const { currentUser, currentStaff } = useAuth();
-  const actor = useMemo(() => getCapabilityActor(currentUser, currentStaff), [currentUser, currentStaff]);
+  const actor = useStaffActor();
   const key = actor ? `${actor.userId}:${actor.staffId}` : '';
   const [attempt, setAttempt] = useState(0);
   const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);

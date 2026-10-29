@@ -1,3 +1,4 @@
+import { reuseSnapshot } from '@/utils/stable-snapshot';
 import { staffRating } from '@/utils/staff-profile';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { User, Customer, Staff, UserRole } from '@/types/user';
@@ -14,6 +15,7 @@ interface AuthContextType {
   completeRegistration: (session: IdentitySession) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateCustomerProfile: (profile: Pick<Customer, 'fullName' | 'phone' | 'email' | 'avatar'>) => Promise<void>;
+  updateAvatar: (avatar: string) => Promise<void>;
   updateStaffProfile: (profile: Pick<Staff, 'phone' | 'email' | 'bio'>) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -30,19 +32,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     connectOperationsSession(profile, sessionRef.current?.accessToken || null);
     setCustomerNotificationSession(profile.role === 'CUSTOMER' || profile.role === 'STAFF' ? String(profile.id) : null, sessionRef.current?.accessToken || null);
     const user: User = { ...profile, id: String(profile.id), avatar: profile.avatar, createdAt: profile.createdAt };
-    setCurrentUser(user); setCurrentRole(profile.role);
-    setCurrentCustomer(profile.role === 'CUSTOMER' ? {
+    setCurrentUser(previous => reuseSnapshot(previous, user)); setCurrentRole(profile.role);
+    setCurrentCustomer(previous => reuseSnapshot(previous, profile.role === 'CUSTOMER' ? {
       id: user.id, userId: user.id, fullName: user.fullName, phone: user.phone, email: user.email, avatar: user.avatar,
       gender: profile.gender || 'OTHER', dateOfBirth: profile.dateOfBirth || undefined,
       totalBookings: profile.totalBookings, rewardPoints: profile.rewardPoints, savedAddressCount: profile.addressCount, defaultAddressLabel: profile.defaultAddress || undefined, createdAt: user.createdAt,
-    } : null);
-    setCurrentStaff(profile.role === 'STAFF' ? {
+    } : null));
+    setCurrentStaff(previous => reuseSnapshot(previous, profile.role === 'STAFF' ? {
       id: user.id, userId: user.id, fullName: user.fullName, phone: user.phone, email: user.email, avatar: user.avatar,
       gender: profile.gender || 'OTHER', dateOfBirth: profile.dateOfBirth || '', birthYear: profile.birthYear || undefined,
       isVerified: !!profile.isVerified, idCardNumber: profile.identityCard || '', experienceYears: profile.experienceYears ?? 0, rating: staffRating(profile.rating, profile.reviewCount),
       reviewCount: profile.reviewCount, completionRate: profile.completionRate ?? 0, satisfactionRate: profile.satisfactionRate ?? 0, status: profile.staffStatus || 'OFFLINE', isOnline: profile.isOnline,
       bio: profile.bio || '', competencies: [], operatingDistricts: [], createdAt: user.createdAt,
-    } : null);
+    } : null));
   }
   function clear() { sessionRef.current = null; connectOperationsSession(null, null); setCustomerNotificationSession(null, null); setAccessToken(null); setCurrentUser(null); setCurrentCustomer(null); setCurrentStaff(null); }
   useEffect(() => {
@@ -87,6 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saved = await identityRequest<IdentityProfile>('/customer/profile', { fullName: profile.fullName, phone: profile.phone }, session.accessToken, 'PATCH');
     if (sessionRef.current === session) apply(saved);
   };
+  const updateAvatar = async (avatar: string) => {
+    const session = sessionRef.current;
+    if (!session || session.user.role === 'STAFF') throw new Error('Vui lòng liên hệ Admin để thay đổi ảnh nhân viên.');
+    const saved = await identityRequest<IdentityProfile>('/auth/avatar', { avatar }, session.accessToken, 'PATCH');
+    if (sessionRef.current === session) apply(saved);
+  };
   const updateStaffProfile = async (profile: Pick<Staff, 'phone' | 'email' | 'bio'>) => {
     const session = sessionRef.current;
     if (!session || session.user.role !== 'STAFF') throw new Error('Vui lòng đăng nhập tài khoản nhân viên.');
@@ -99,6 +107,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (session) await identityRequest('/auth/logout', {}, session.accessToken);
   };
   return <AuthContext.Provider value={{ accessToken, currentUser, currentRole, currentCustomer, currentStaff, isAuthenticated: !!currentUser, isLoading,
-    login, completeRegistration: accept, refreshProfile, updateCustomerProfile, updateStaffProfile, logout }}>{children}</AuthContext.Provider>;
+    login, completeRegistration: accept, refreshProfile, updateCustomerProfile, updateAvatar, updateStaffProfile, logout }}>{children}</AuthContext.Provider>;
 };
 export const useAuth = () => { const context = useContext(AuthContext); if (!context) throw new Error('useAuth must be used within an AuthProvider'); return context; };

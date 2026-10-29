@@ -1,7 +1,8 @@
+import { useFocusEffect } from 'expo-router';
 import { remoteImageSource } from '@/utils/image-source';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
 import { EmptyState } from '@/components/common/EmptyState';
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   Alert,
   Image,
@@ -22,7 +23,9 @@ import { useStaffCapabilities } from '@/hooks/use-staff-capabilities';
 
 
 export default function StaffProfileScreen() {
-  const { currentStaff } = useAuth(); const router = useRouter();
+  const { currentStaff, refreshProfile } = useAuth();
+  useFocusEffect(useCallback(() => { void refreshProfile().catch(() => undefined); }, [refreshProfile]));
+  const router = useRouter();
   if (!currentStaff) return <SafeAreaView style={{ flex: 1 }}><EmptyState icon="user" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} /></SafeAreaView>;
   return <StaffProfileContent key={currentStaff.id} />;
 }

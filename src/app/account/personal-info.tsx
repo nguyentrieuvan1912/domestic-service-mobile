@@ -1,6 +1,6 @@
-import { remoteImageSource } from '@/utils/image-source';
+import AvatarEditor from '@/components/common/AvatarEditor';
 import React, { useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,9 +53,9 @@ export default function PersonalInfoScreen() {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.avatarSection}>
-            {currentCustomer?.avatar ? <Image source={remoteImageSource(currentCustomer.avatar)} style={styles.avatar} /> : <View style={[styles.avatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECFDF5' }]}><IconSymbol name="user" size={36} color={BrandColors.primary} /></View>}
+            <AvatarEditor style={styles.avatar} disabled={saving} />
             <Text style={styles.avatarHint}>Ảnh đại diện</Text>
-            <Text style={styles.avatarSubHint}>Tính năng thay ảnh sẽ được bổ sung khi kết nối máy chủ.</Text>
+            <Text style={styles.avatarSubHint}>Bấm vào ảnh để chọn ảnh mới hoặc dùng ảnh mặc định.</Text>
           </View>
 
           <View style={styles.formCard}>

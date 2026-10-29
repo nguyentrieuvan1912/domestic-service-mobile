@@ -18,8 +18,11 @@ export interface ChatMessage {
 }
 
 export interface Conversation {
+  customerTrashedAt?: string | null;
+  customerDeletedThroughId?: number;
   id: string;
   bookingId: string;
+  bookingCode?: string;
   customerId: string;
   customerName: string;
   customerAvatar: string;

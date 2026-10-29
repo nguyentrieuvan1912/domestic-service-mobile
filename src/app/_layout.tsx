@@ -53,6 +53,7 @@ function AuthStack() {
           <Stack.Screen name="booking/matching" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="booking/review" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="call/[id]" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="chat/trash" options={{ headerShown: false }} />
           <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="ai/index" options={{ presentation: 'card', headerShown: false }} />
           <Stack.Screen name="notifications/index" options={{ headerShown: false }} />

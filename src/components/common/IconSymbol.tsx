@@ -6,6 +6,7 @@ import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 
 // Shared illustrated family: rounded outlines and mint accents, matching service categories.
 const SHAPES: Record<string, string> = {
+  trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
   search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
   location: '<path d="M19 9c0 5-7 12-7 12S5 14 5 9a7 7 0 1 1 14 0Z"/><circle cx="12" cy="9" r="2"/>',
   bell: '<path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4Z"/><path d="M10 20h4M12 2v2"/>',
@@ -14,6 +15,7 @@ const SHAPES: Record<string, string> = {
   back: '<path d="m15 5-7 7 7 7"/>',
   chevronRight: '<path d="m9 5 7 7-7 7"/>',
   chevronDown: '<path d="m5 9 7 7 7-7"/>',
+  chevronUp: '<path d="m19 15-7-7-7 7"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
   check: '<path d="m4 12 5 5L20 6"/>',
   plus: '<path d="M12 4v16M4 12h16"/>',
@@ -46,6 +48,14 @@ const SHAPES: Record<string, string> = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>',
   badge: '<path d="M3 3h9l10 10-9 9L3 12Z"/><circle cx="8" cy="8" r="1"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m3 7 9 7 9-7"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-4.5-4.5L7 20"/>',
+  video: '<rect x="2" y="5" width="14" height="14" rx="3"/><path d="m16 10 6-3v10l-6-3Z"/>',
+  reply: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v4.5"/>',
+  flag: '<path d="M5 4h13l-2.5 4.5L18 13H5Z"/><path d="M5 4v17"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  play: '<polygon points="8 5 19 12 8 19 8 5"/>',
+  eyeOff: '<path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.5 10.5 0 0 1 12 5c6 0 10 7 10 7a18 18 0 0 1-3.2 4.2M6.2 6.2C3.6 8.1 2 12 2 12s4 7 10 7a10.6 10.6 0 0 0 4.8-1.1"/>',
 };
 const ALIASES: Record<string, string> = {
   magnifyingGlass: 'search', notification: 'bell', voucher: 'ticket', arrowBack: 'back',
@@ -78,7 +88,7 @@ export const IconSymbol: React.FC<IconSymbolProps> = ({ name, size = 18, color, 
   const textStyle = StyleSheet.flatten(style) || {};
   const styleColor = textStyle.color;
   const ink = typeof color === 'string' ? color : typeof styleColor === 'string' ? styleColor : '#28594F';
-  const fill = ['back', 'chevronRight', 'chevronDown', 'close', 'check', 'plus', 'minus', 'share', 'send'].includes(resolved) ? 'none' : '#E0F4EC';
+  const fill = ['back', 'chevronRight', 'chevronDown', 'chevronUp', 'close', 'check', 'plus', 'minus', 'share', 'send', 'reply'].includes(resolved) ? 'none' : '#E0F4EC';
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="' + (resolved === 'star' ? ink : fill) + '" stroke="' + ink + '" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">' + (SHAPES[resolved] || SHAPES.sparkle) + '</g></svg>';
   const { fontSize, lineHeight } = textStyle;
   const layoutStyle = {
