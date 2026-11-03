@@ -29,7 +29,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   const isCompleted = booking.status === 'COMPLETED';
   const isClosed = ['CANCELLED', 'REFUNDING', 'REFUNDED', 'NO_STAFF_FOUND', 'ABSENT', 'REJECTED'].includes(booking.status);
   const hasAcceptedStaff = (booking as ConnectedBooking).assignments?.some(item => ['ACCEPTED', 'COMPLETED'].includes(item.status));
-  const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
+  const canCancel = ['PENDING', 'AWAITING_PAYMENT', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
 

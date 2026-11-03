@@ -48,6 +48,8 @@ export interface OpenOpportunity extends StaffJobOrderDetails {
   totalCustomerPaid: number;
   platformFee: number;
   netIncome: number;
+  cashCollectionAmount?: number;
+  cashReceivedAt?: string;
   incomePendingPolicy?: boolean;
   requiredCapabilities?: string[];
   // UI fixture proposal; one assignment per Staff, remaining positions rechecked at claim.
@@ -84,6 +86,8 @@ export interface AcceptedAssignment extends StaffJobOrderDetails {
   totalCustomerPaid: number;
   platformFee: number;
   netIncome: number;
+  cashCollectionAmount?: number;
+  cashReceivedAt?: string;
   incomePendingPolicy?: boolean;
   status: JobStepStatus;
   customerId?: string;

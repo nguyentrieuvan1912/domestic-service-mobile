@@ -1,3 +1,4 @@
+import { JobEvidencePanel } from '@/components/staff/JobEvidencePanel';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -40,6 +41,8 @@ function StaffJobDetailContent() {
   const [detailError, setDetailError] = useState('');
   const [detailAttempt, setDetailAttempt] = useState(0);
   const [claimBusy, setClaimBusy] = useState(false);
+  const [evidenceReady, setEvidenceReady] = useState(false);
+  useEffect(() => setEvidenceReady(false), [id]);
   const claiming = useRef(false);
 
   const [detailResult, setDetailResult] = useState<JobDetailResult>(() =>
@@ -179,7 +182,7 @@ function StaffJobDetailContent() {
     } else if (assignment.status === 'EN_ROUTE') {
       Alert.alert(
         'Đã đến nơi',
-        'Xác nhận bạn đã có mặt tại nhà khách hàng và sẵn sàng bắt đầu công việc?',
+        'Bạn đã đến nơi và gặp gia chủ. Hãy chụp lại hiện trạng TRƯỚC khi dọn dẹp và ảnh SAU khi làm xong. Trước khi hoàn thành, cần gửi ít nhất 1 ảnh trước và 1 ảnh sau để nghiệm thu; ảnh sẽ tự động được lưu vào đơn và gửi vào chat với khách hàng.',
         [
           { text: 'Chưa' },
           {
@@ -194,19 +197,20 @@ function StaffJobDetailContent() {
         ]
       );
     } else if (assignment.status === 'IN_PROGRESS') {
+      if (!evidenceReady) { Alert.alert('Chưa đủ ảnh minh chứng', 'Vui lòng gửi tối thiểu 1 ảnh TRƯỚC và 1 ảnh SAU ở phần Ảnh minh chứng & nghiệm thu. Ảnh phải được lưu vào đơn và gửi vào chat trước khi hoàn thành.'); return; }
       Alert.alert(
-        'Nghiệm thu & Hoàn thành',
-        'Xác nhận các hạng mục đã hoàn thành? Thu nhập được ghi nhận sau khi quyết toán dịch vụ.',
+        assignment.paymentMethod === 'CASH' ? 'Bạn đã thu tiền khách chưa?' : 'Nghiệm thu & Hoàn thành',
+        assignment.paymentMethod === 'CASH' ? `Xác nhận đã thu đủ ${new Intl.NumberFormat('vi-VN').format(assignment.cashCollectionAmount ?? assignment.totalCustomerPaid)}đ cho phần việc của bạn. Khi đơn hoàn tất đủ ảnh trước/sau, hệ thống tự cộng lại 80% phần tiền này vào ví nhân viên.` : 'Xác nhận các hạng mục đã hoàn thành và đã gửi đủ ảnh trước/sau? Hệ thống tự chia 80% tiền dịch vụ cho ví nhân viên khi tất cả nhân viên hoàn thành.',
         [
-          { text: 'Kiểm tra lại' },
+          { text: assignment.paymentMethod === 'CASH' ? 'Chưa thu tiền' : 'Kiểm tra lại', style: 'cancel' },
           {
-            text: 'Hoàn thành ca làm',
+            text: assignment.paymentMethod === 'CASH' ? 'Đã thu tiền · Hoàn thành' : 'Hoàn thành ca làm',
             onPress: async () => {
-              const res = await StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId);
+              const res = await StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId, assignment.paymentMethod === 'CASH');
               if (res.success) {
                 Alert.alert(
                   'Chúc mừng bạn đã hoàn thành ca! 🎉',
-                  'Trạng thái hoàn thành đã được lưu. Thu nhập sẽ hiển thị khi đơn được quyết toán.'
+                  'Đã lưu hoàn thành ca và ảnh minh chứng. Hệ thống tự ghi thu nhập vào ví khi toàn bộ nhân viên hoàn thành đơn; bạn có thể kiểm tra giao dịch trong Ví của tôi.'
                 );
               } else if (res.reason) {
                 Alert.alert('Không thể hoàn thành', res.reason);
@@ -383,11 +387,13 @@ function StaffJobDetailContent() {
                     : assignment.status === 'EN_ROUTE'
                     ? 'Hãy chú ý an toàn giao thông. Khi đến nơi, bấm "Đã đến nơi" để xác nhận gặp gia chủ.'
                     : assignment.status === 'IN_PROGRESS'
-                    ? 'Tập trung làm việc theo checklist. Sau khi gia chủ nghiệm thu, bấm hoàn thành để nhận tiền công.'
+                    ? 'Chụp và gửi ảnh trước/sau khi làm việc ở phần minh chứng bên dưới. Cần ít nhất 1 ảnh trước và 1 ảnh sau trước khi nghiệm thu và hoàn thành ca.'
                     : 'Trạng thái hoàn thành đã được lưu. Thu nhập được ghi nhận sau khi quyết toán đơn.'}
                 </Text>
               </View>
             </View>
+
+            {['EN_ROUTE','IN_PROGRESS','COMPLETED'].includes(assignment.status) && <JobEvidencePanel key={assignment.id} bookingId={assignment.id} status={assignment.status} onReadyChange={setEvidenceReady} />}
 
             {/* Action Button for Current Step */}
             {assignment.status !== 'COMPLETED' ? (
@@ -494,9 +500,9 @@ function StaffJobDetailContent() {
 
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Thanh toán đơn hàng</Text>
-          <View style={styles.financeRow}><Text style={styles.financeLabel}>Phương thức khách chọn:</Text><Text style={styles.financeValue}>{commonItem.paymentMethod === 'CASH' ? 'Tiền mặt' : commonItem.paymentMethod === 'BANK_TRANSFER_QR' ? 'Chuyển khoản QR' : commonItem.paymentMethod || 'Chưa có thông tin'}</Text></View>
+          <View style={styles.financeRow}><Text style={styles.financeLabel}>Phương thức khách chọn:</Text><Text style={styles.financeValue}>{commonItem.paymentMethod === 'CASH' ? 'Tiền mặt' : commonItem.paymentMethod === 'BANK_TRANSFER_QR' ? 'Chuyển khoản QR' : commonItem.paymentMethod === 'WALLET' ? 'Ví khách hàng' : commonItem.paymentMethod || 'Chưa có thông tin'}</Text></View>
           <View style={styles.financeRow}><Text style={styles.financeLabel}>Tổng tiền đơn:</Text><Text style={styles.financeValue}>{commonItem.totalCustomerPaid.toLocaleString('vi-VN')}đ</Text></View>
-          <Text style={styles.financeNote}>{commonItem.paymentStatus === 'PAID' ? 'Đơn đã được xác nhận thanh toán.' : commonItem.paymentMethod === 'CASH' ? isAssignment ? 'Khách thanh toán tiền mặt sau khi hoàn thành. Thực hiện các bước theo tiến trình ca làm việc.' : 'Khách thanh toán tiền mặt khi hoàn thành. Nhận ca để tiếp tục di chuyển và thực hiện công việc.' : 'Thanh toán chưa được xác nhận.'}</Text>
+          <Text style={styles.financeNote}>{commonItem.paymentStatus === 'PAID' ? 'Đơn đã được xác nhận thanh toán.' : commonItem.paymentMethod === 'CASH' ? isAssignment ? `Thu ${new Intl.NumberFormat('vi-VN').format(assignment?.cashCollectionAmount ?? 0)}đ từ khách cho phần việc của bạn và xác nhận đã thu khi hoàn thành. Hệ thống tự cộng lại 80% khi đơn hoàn tất.` : 'Khi nhận ca tiền mặt, ví phải đủ phần tiền đơn chia cho bạn và sẽ bị trừ khoản này. Thu phần tiền đó từ khách; khi hoàn thành đủ ảnh và xác nhận đã thu, hệ thống tự cộng lại 80% vào ví.' : 'Thanh toán chưa được xác nhận.'}</Text>
         </View>
 
         {assignment?.bookingStatus==='MATCHING' && <View style={styles.card}><Text>Đơn đang chờ đủ nhân viên xác nhận. Bạn có thể xem thông tin ca và chuẩn bị trước.</Text></View>}
@@ -544,19 +550,19 @@ function StaffJobDetailContent() {
             </Text>
           </View>
           <View style={styles.financeRow}>
-            <Text style={styles.financeLabel}>Phí vận hành ước tính:</Text>
+            <Text style={styles.financeLabel}>Phí nền tảng của bạn (20%):</Text>
             <Text style={styles.financeFee}>
-              {commonItem.incomePendingPolicy ? 'Chờ quyết toán' : '-'+commonItem.platformFee.toLocaleString('vi-VN')+'đ'}
+              {commonItem.incomePendingPolicy ? 'Đang cập nhật' : '-'+commonItem.platformFee.toLocaleString('vi-VN')+'đ'}
             </Text>
           </View>
           <View style={[styles.financeRow, styles.financeTotalRow]}>
             <Text style={styles.financeTotalLabel}>{isAssignment ? 'Thu nhập ca của bạn:' : 'Thu nhập ước tính / nhân viên:'}</Text>
             <Text style={styles.financeTotalAmount}>
-              {commonItem.incomePendingPolicy ? 'Chờ quyết toán' : '+'+commonItem.netIncome.toLocaleString('vi-VN')+'đ'}
+              {commonItem.incomePendingPolicy ? 'Đang cập nhật' : '+'+commonItem.netIncome.toLocaleString('vi-VN')+'đ'}
             </Text>
           </View>
           <Text style={styles.financeNote}>
-            Thu nhập chưa được ghi có khi nhận ca; xem giao dịch trong mục Thu nhập sau khi hoàn tất theo quy trình.
+            Thu nhập dự kiến bằng 80% phần tiền dịch vụ của bạn. Hệ thống tự ghi vào ví khi đơn hoàn tất đủ minh chứng; xem số tiền đã ghi có trong lịch sử ví.
           </Text>
         </View>
 

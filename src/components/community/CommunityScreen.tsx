@@ -30,6 +30,7 @@ import { CommunityThread } from './CommunityThread';
 import { CommunityMediaGallery, CommunityMediaViewer, type DisplayMedia } from './CommunityMediaGallery';
 import {
   CommunityPost,
+  createCommunityPost,
   CommunityMedia,
   REACTIONS,
   Reaction,
@@ -230,12 +231,7 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
       if (publishKey.current.body !== serialized) {
         publishKey.current = { body: serialized, key: requestKey() };
       }
-      const result = await operationRequest<{ id: number; status: string }>(
-        'identity',
-        '/community/posts',
-        'POST',
-        { ...body, requestKey: publishKey.current.key }
-      );
+      const result = await createCommunityPost({ ...body, requestKey: publishKey.current.key });
       if (!current()) return;
       revision.current++;
       setComposerOpen(false);

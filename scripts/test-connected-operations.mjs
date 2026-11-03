@@ -179,3 +179,38 @@ try {
  bodyAttempts=0;await assert.rejects(ops.operationRequest('booking','/bookings','POST',{}),/Kết nối quá lâu/);assert.equal(bodyAttempts,1,'Stalled POST body must not replay a possibly committed write');
 } finally {global.setTimeout=realTimeout;}
 console.log('Response body deadlines: stalled reads terminate with one retry; stalled writes terminate without replay.');
+// Balance history combines withdrawals and ledger by the original instant, including timezone offsets.
+ops.connectOperationsSession(employee,'wallet-history-session');
+const walletFixture={balance:{available:7000,pending:0,reserved:4000,totalEarned:15000,withdrawn:4000},incomes:[],transactions:[
+{id:2,type:'EARNING',direction:'CREDIT',bucket:'AVAILABLE',amount:2000,createdAt:'2026-10-28T16:00:00Z'},
+{id:10,type:'REWARD',direction:'CREDIT',bucket:'AVAILABLE',amount:1000,createdAt:'2026-10-29T10:00:00Z'},
+{id:11,type:'HOLD',direction:'DEBIT',bucket:'AVAILABLE',amount:4000,createdAt:'2026-10-29T15:00:00Z'}],withdrawals:[
+{id:1,amount:4000,status:'PAID',requestedAt:'2026-10-27T23:00:00+07:00'},
+{id:23,amount:4000,status:'PROCESSING',payoutStatus:'PROCESSING',requestedAt:'2026-10-29T22:00:00+07:00'}]};
+global.fetch=async url=>new Response(JSON.stringify(url.endsWith('/wallet')?walletFixture:[]));
+await staff.refreshWallet();
+assert.deepEqual(staff.getWallet(String(employee.id)).transactions.map(x=>x.id),['withdrawal-23','10','2','withdrawal-1']);
+assert.equal(staff.getWallet(String(employee.id)).balance.reserved,4000,'Pending payout must retain backend hold');
+walletFixture.withdrawals[1].status='PAID';walletFixture.balance.reserved=0;walletFixture.balance.withdrawn=8000;
+await staff.refreshWallet();
+assert.equal(staff.getWallet(String(employee.id)).transactions[0].status,'SUCCESS');
+assert.equal(staff.getWallet(String(employee.id)).balance.reserved,0,'Confirmed backend settlement must clear displayed hold');
+console.log('Wallet history: newest combined timestamp first, holds excluded, and confirmed settlement refreshed.');
+
+// Review updates must notify the profile without reloading unrelated wallet/matching data.
+ops.connectOperationsSession(employee,'live-staff-review-session');
+const reviewOne={id:88001,customerId:customer.id,rating:5,comment:'first',createdAt:'2026-10-30T02:00:00Z',tags:[]};
+const reviewTwo={...reviewOne,id:88002,rating:4,comment:'second'};
+let reviewRows=[reviewOne], reviewReads=0, releaseReview;
+global.fetch=async url=>{assert(url.endsWith('/reviews'));reviewReads++;return new Response(JSON.stringify(reviewRows));};
+await staff.refreshReviews();assert.equal(staff.getOperationalProfile(String(employee.id)).reviewCount,1);
+const unchangedReviewRevision=staff.getStoreRevision();await staff.refreshReviews();assert.equal(staff.getStoreRevision(),unchangedReviewRevision);
+reviewRows=[reviewOne,reviewTwo];await staff.refreshReviews();
+const refreshedProfile=staff.getOperationalProfile(String(employee.id));assert.equal(refreshedProfile.reviewCount,2);assert.equal(refreshedProfile.rating,4.5);
+assert.equal(staff.getStaffReviews(String(employee.id)).filter(item=>item.rating===5).length/refreshedProfile.reviewCount,0.5);
+global.fetch=async()=>{reviewReads++;await new Promise(resolve=>releaseReview=resolve);return new Response(JSON.stringify([reviewOne]));};
+const oldReviews=staff.refreshReviews().catch(error=>error);await Promise.resolve();await Promise.resolve();
+const oldCount=reviewReads;const duplicateReviews=staff.refreshReviews().catch(error=>error);await Promise.resolve();assert.equal(reviewReads,oldCount);
+ops.connectOperationsSession(other,'different-review-owner');releaseReview();await Promise.all([oldReviews,duplicateReviews]);
+ops.connectOperationsSession(employee,'fresh-review-owner');assert.equal(staff.getOperationalProfile(String(employee.id)).reviewCount,0,'A late response cannot restore another session review cache');
+console.log('Staff profile: new reviews update count/average/five-star ratio; unchanged polls stay quiet, concurrent requests deduplicate and old-session results are discarded.');

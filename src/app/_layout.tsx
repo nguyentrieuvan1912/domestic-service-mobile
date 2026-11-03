@@ -1,4 +1,5 @@
 import { BookingCommunicationBridge } from '@/components/common/BookingCommunicationBridge';
+import { BookingCancellationNotice } from '@/components/booking/BookingCancellationNotice';
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -48,6 +49,7 @@ function AuthStack() {
           <Stack.Screen name="catalog/index" options={{ headerShown: false }} />
           <Stack.Screen name="booking/rebook" options={{ headerShown: false }} />
           <Stack.Screen name="booking/waiting" options={{ headerShown: false }} />
+          <Stack.Screen name="booking/payment" options={{ headerShown: false }} />
             <Stack.Screen name="booking/new" options={{ headerShown: false }} />
           <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="booking/matching" options={{ presentation: 'card', headerShown: false }} />
@@ -59,11 +61,13 @@ function AuthStack() {
           <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
           <Stack.Screen name="notifications/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="account/addresses" options={{ headerShown: false }} />
+          <Stack.Screen name="account/wallet" options={{ headerShown: false }} />
           <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>
         {isAuthenticated && <StaffScheduleReminder />}
         {isAuthenticated && <BookingCommunicationBridge />}
+        {isAuthenticated && <BookingCancellationNotice />}
     </>
 
   );

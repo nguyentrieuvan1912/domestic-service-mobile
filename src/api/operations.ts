@@ -1,3 +1,4 @@
+import { readJsonResponse, InvalidJsonResponseError } from '../utils/http-json';
 import { API_BASE_URL } from './catalog';
 import type { IdentityProfile } from './identity';
 let session: { token: string; userId: string; profile: IdentityProfile } | null = null;
@@ -14,6 +15,7 @@ class OperationError extends Error {
   readRetried = false;
   constructor(message: string, readonly retryable = false) { super(message); }
 }
+export const canConfirmOperation = (error: unknown) => error instanceof OperationError && error.retryable;
 function retryDelay(signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     const cancel = () => { clearTimeout(timer); signal?.removeEventListener('abort', cancel); reject(new Error('Đã hủy thao tác.')); };
@@ -41,12 +43,13 @@ export async function operationRequest<T>(service: string, path: string, method 
         throw new OperationError(error?.detail || 'Chưa xử lý được yêu cầu.', [502, 503, 504].includes(response.status));
       }
       // Keep the deadline and account guard active until the complete body has arrived.
-      const result = response.status === 204 ? undefined as T : await response.json() as T;
+      const result = response.status === 204 ? undefined as T : await readJsonResponse<T>(response);
       if (active.token !== session?.token) throw new Error('Phiên đăng nhập đã thay đổi.');
       if (controller.signal.aborted) throw new Error('Đã hủy thao tác.');
       return result;
     } catch (error) {
       if (controller.signal.aborted) throw new OperationError(signal?.aborted ? 'Đã hủy thao tác.' : 'Kết nối quá lâu. Vui lòng thử lại.', !signal?.aborted);
+      if (error instanceof InvalidJsonResponseError) throw new OperationError(error.message, true);
       if (error instanceof TypeError) throw new OperationError('Không kết nối được backend. Vui lòng thử lại.', true);
       throw error;
     } finally { clearTimeout(timeout); signal?.removeEventListener('abort', abort); }

@@ -17,6 +17,6 @@ export function useChatInbox() {
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void ChatRepository.loadList(actor).catch(() => {}); });
     return () => { stop(); listener.remove(); };
   }, [actor]));
-  const unreadCount = actor ? conversations.filter(item => actor.role !== 'CUSTOMER' || !item.customerTrashedAt).reduce((sum, item) => sum + (item[actor.role === 'CUSTOMER' ? 'unreadCountCustomer' : 'unreadCountStaff'] || 0), 0) : 0;
+  const unreadCount = actor ? conversations.filter(item => !item.trashedAt && (actor.role !== 'CUSTOMER' || !item.customerTrashedAt)).reduce((sum, item) => sum + (item[actor.role === 'CUSTOMER' ? 'unreadCountCustomer' : 'unreadCountStaff'] || 0), 0) : 0;
   return { actor, conversations, unreadCount, error, isLoaded };
 }

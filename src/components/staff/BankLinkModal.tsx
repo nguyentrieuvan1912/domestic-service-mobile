@@ -18,26 +18,39 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
   const [banks, setBanks] = useState<PayoutBank[]>([]), [bin, setBin] = useState('');
   const [account, setAccount] = useState(''), [holder, setHolder] = useState(''), [search, setSearch] = useState('');
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0), [loading, setLoading] = useState(false);
+  const [automaticLookup, setAutomaticLookup] = useState<boolean | null>(null);
+  const [lookingUp, setLookingUp] = useState(false), [resolvedFor, setResolvedFor] = useState('');
   useEffect(() => {
     if (!visible) return;
-    const controller = new AbortController(); setLoading(true); setError('');
-    void operationRequest<PayoutBank[]>('finance', '/payout-banks', 'GET', undefined, controller.signal)
-      .then(rows => { if (!controller.signal.aborted) setBanks(rows); })
+    const controller = new AbortController(); setLoading(true); setError(''); setAutomaticLookup(null); setResolvedFor('');
+    void Promise.all([operationRequest<PayoutBank[]>('finance', '/payout-banks', 'GET', undefined, controller.signal), operationRequest<{ automaticNameLookup: boolean; bankLinkRequiresLookup?: boolean }>('finance', '/withdrawal-capabilities', 'GET', undefined, controller.signal)])
+      .then(([rows, rules]) => { if (!controller.signal.aborted) { setBanks(rows); setAutomaticLookup(!!rules.bankLinkRequiresLookup || rules.automaticNameLookup); } })
       .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tải được ngân hàng.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [visible, revision]);
+  useEffect(() => {
+    if (!visible || !automaticLookup || !bin || !/^\d{5,30}$/.test(account)) return;
+    const controller = new AbortController(); setHolder(''); setResolvedFor(''); setLookingUp(true); setError('');
+    const timer = setTimeout(() => {
+      void operationRequest<{ accountHolder: string }>('finance', '/staff/me/bank-accounts/lookup', 'POST', { bankCode: bin, accountNumber: account }, controller.signal)
+        .then(result => { if (!controller.signal.aborted) { setHolder(result.accountHolder); setResolvedFor(`${bin}:${account}`); } })
+        .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tra được tên chủ tài khoản.'); })
+        .finally(() => { if (!controller.signal.aborted) setLookingUp(false); });
+    }, 1200);
+    return () => { controller.abort(); clearTimeout(timer); setLookingUp(false); };
+  }, [visible, automaticLookup, bin, account, revision]);
   const searchInput = useRef<TextInput>(null);
   const selectedBank = banks.find(bank => bank.bin === bin);
   const normalize = (value: string) => value.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
   const filteredBanks = banks.filter(bank => normalize(`${bank.shortName} ${bank.name} ${bank.bin}`).includes(normalize(search.trim())));
   const [focusSearch, setFocusSearch] = useState(false);
-  const clearBank = () => { setBin(''); setSearch(''); setFocusSearch(true); };
+  const clearBank = () => { setHolder(''); setResolvedFor(''); setBin(''); setSearch(''); setFocusSearch(true); };
   useEffect(() => {
     if (visible && focusSearch && !bin) { searchInput.current?.focus(); setFocusSearch(false); }
   }, [bin, focusSearch, visible]);
   const save = async () => {
-    if (busy) return;
+    if (busy || automaticLookup === null || (automaticLookup && resolvedFor !== `${bin}:${account}`)) return;
     if (!banks.some(bank => bank.bin === bin) || !/^\d{5,30}$/.test(account.trim()) || !holder.trim()) { setError('Chọn ngân hàng, nhập đúng số tài khoản và tên chủ tài khoản theo ngân hàng.'); return; }
     setBusy(true); setError('');
     try { await onSave(bin, account.trim(), holder.trim()); setBin(''); setAccount(''); setHolder(''); setSearch(''); onClose(); }
@@ -56,17 +69,17 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
             : banks.length === 0 ? <Text style={s.note}>Chưa có ngân hàng nhận được cấu hình. Vui lòng chờ quản trị viên hoàn tất kết nối kênh chi.</Text>
             : <ScrollView nestedScrollEnabled style={s.list} keyboardShouldPersistTaps="handled">
               {!filteredBanks.length && <Text style={[s.note, { padding: 14 }]}>Không tìm thấy ngân hàng phù hợp. Thử tên hoặc mã ngân hàng khác.</Text>}
-              {filteredBanks.map(bank => <Pressable key={bank.bin} disabled={busy} onPress={() => { setBin(bank.bin); setSearch(''); Keyboard.dismiss(); }} style={s.option} accessibilityRole="radio" accessibilityState={{ checked: false }}>
+              {filteredBanks.map(bank => <Pressable key={bank.bin} disabled={busy} onPress={() => { setHolder(''); setResolvedFor(''); setBin(bank.bin); setSearch(''); Keyboard.dismiss(); }} style={s.option} accessibilityRole="radio" accessibilityState={{ checked: false }}>
                 <BankLogo bank={bank} /><View style={s.bankInfo}><Text style={s.label}>{bank.shortName}</Text><Text style={s.note}>{bank.name}</Text></View>
               </Pressable>)}
             </ScrollView>}
           <Pressable style={s.button} disabled={loading || busy} onPress={() => setRevision(v => v + 1)}><Text style={s.green}>Tải lại danh sách ngân hàng</Text></Pressable>
         </>}
-        <Text style={s.label}>2. Số tài khoản ngân hàng</Text><TextInput accessibilityLabel="Số tài khoản ngân hàng" keyboardType="number-pad" editable={!busy} maxLength={30} value={account} onChangeText={value => setAccount(value.replace(/\D/g, ''))} style={s.input} placeholder="Nhập số tài khoản nhận tiền" />
-        <Text style={s.label}>3. Tên chủ tài khoản theo ngân hàng</Text><TextInput accessibilityLabel="Tên chủ tài khoản theo ngân hàng" editable={!busy} maxLength={160} autoCapitalize="characters" value={holder} onChangeText={setHolder} style={s.input} placeholder="Nhập đúng tên hiển thị tại ngân hàng" />
-        <Text style={s.notice}>Tên này do bạn cung cấp, chưa được ngân hàng xác minh tự động. Admin sẽ đối chiếu số tài khoản và tên trước khi cho phép rút tiền.</Text>
+        <Text style={s.label}>2. Số tài khoản ngân hàng</Text><TextInput accessibilityLabel="Số tài khoản ngân hàng" keyboardType="number-pad" editable={!busy} maxLength={30} value={account} onChangeText={value => { setAccount(value.replace(/\D/g, '')); if (automaticLookup) { setHolder(''); setResolvedFor(''); } }} style={s.input} placeholder="Nhập số tài khoản nhận tiền" />
+        <Text style={s.label}>3. Tên chủ tài khoản theo ngân hàng</Text><TextInput accessibilityLabel="Tên chủ tài khoản theo ngân hàng" editable={!busy && automaticLookup === false} maxLength={160} autoCapitalize="characters" value={holder} onChangeText={setHolder} style={s.input} placeholder={automaticLookup ? (lookingUp ? 'Đang tra cứu tên người nhận…' : 'Tên sẽ hiện sau khi nhập đúng tài khoản') : 'Nhập đúng tên hiển thị tại ngân hàng'} />
+        <Text style={s.notice}>{automaticLookup ? 'Tên được tra cứu tự động và đối chiếu tại máy chủ khi lưu. Vui lòng kiểm tra đúng tài khoản nhận tiền của bạn.' : 'Chưa bật API tra tên tự động. Tên bạn nhập cần được Admin đối chiếu trước khi rút tiền.'}</Text>
         {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-        <Pressable accessibilityRole="button" disabled={busy || loading || !banks.some(bank => bank.bin === bin)} onPress={() => void save()} style={[s.submit, (busy || loading || !bin) && { opacity: 0.45 }]}><Text style={s.white}>{busy ? 'Đang lưu…' : 'Lưu và gửi xác minh'}</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={busy || loading || automaticLookup === null || (automaticLookup && resolvedFor !== `${bin}:${account}`) || !banks.some(bank => bank.bin === bin)} onPress={() => void save()} style={[s.submit, (busy || loading || !bin || (automaticLookup && resolvedFor !== `${bin}:${account}`)) && { opacity: 0.45 }]}><Text style={s.white}>{busy ? 'Đang lưu…' : automaticLookup ? 'Liên kết tài khoản' : 'Lưu và gửi xác minh'}</Text></Pressable>
       </ScrollView></KeyboardAvoidingView>
     </SafeAreaView>
   </Modal>;

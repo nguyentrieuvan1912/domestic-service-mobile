@@ -117,9 +117,10 @@ export const StaffService = {
   updateJobStatus(
     jobId: string,
     status: JobStepStatus,
-    staffId: string = activeStaffId()
+    staffId: string = activeStaffId(),
+    cashReceived = false
   ) {
-    return StaffRepository.updateJobStatus(staffId, jobId, status);
+    return StaffRepository.updateJobStatus(staffId, jobId, status, cashReceived);
   },
 
   toggleChecklistItem(jobId: string, checkId: string, staffId: string = activeStaffId()) {

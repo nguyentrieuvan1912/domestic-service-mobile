@@ -22,8 +22,8 @@ export default function ChatListScreen() {
   const router = useRouter();
   const { actor, conversations: inbox, error, isLoaded } = useChatInbox();
   const conversations = inbox.filter((conversation) =>
-    ChatRepository.access(conversation.id, actor, inbox).kind === 'READY' && (actor?.role !== 'CUSTOMER' || !conversation.customerTrashedAt));
-  const trashCount = inbox.filter(item => !!item.customerTrashedAt).length;
+    ChatRepository.access(conversation.id, actor, inbox).kind === 'READY' && !conversation.trashedAt && (actor?.role !== 'CUSTOMER' || !conversation.customerTrashedAt));
+  const trashCount = inbox.filter(item => !!item.trashedAt || actor?.role === 'CUSTOMER' && !!item.customerTrashedAt).length;
 
   return (
     <LinearGradient
@@ -34,7 +34,7 @@ export default function ChatListScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Tin nhắn & Tư vấn</Text>
-          {actor?.role === 'CUSTOMER' && <Pressable accessibilityRole="button" accessibilityLabel={`Thùng rác tin nhắn, ${trashCount} hội thoại`} onPress={() => router.push('/chat/trash')} style={styles.trashButton}>
+          {actor && <Pressable accessibilityRole="button" accessibilityLabel={`Thùng rác tin nhắn, ${trashCount} hội thoại`} onPress={() => router.push('/chat/trash')} style={styles.trashButton}>
             <IconSymbol name="trash" size={22} color={BrandColors.gray700} />
             {trashCount > 0 && <Text style={styles.trashCount}>{trashCount > 99 ? '99+' : trashCount}</Text>}
           </Pressable>}

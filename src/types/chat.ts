@@ -13,11 +13,15 @@ export interface ChatMessage {
   content: string;
   contentType: MessageContentType;
   mediaUrl?: string;
+  evidenceId?: number;
+  evidenceBookingId?: number;
+  evidenceStage?: 'BEFORE' | 'AFTER';
   isRead: boolean;
   sentAt: string;
 }
 
 export interface Conversation {
+  trashedAt?: string | null;
   customerTrashedAt?: string | null;
   customerDeletedThroughId?: number;
   id: string;

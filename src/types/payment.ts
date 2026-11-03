@@ -1,4 +1,4 @@
-export type PaymentMethod = 'VNPAY' | 'MOMO' | 'ZALOPAY' | 'CASH';
+export type PaymentMethod = 'VNPAY' | 'MOMO' | 'ZALOPAY' | 'CASH' | 'BANK_TRANSFER_QR' | 'WALLET';
 
 export type PaymentStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
 

@@ -94,10 +94,10 @@ export function StaffResponseDecision({ booking, onPending, onUpdated }: { booki
         <View style={styles.overlay}><View style={styles.dialog}>
           <IconSymbol name="clock" size={36} color={BrandColors.primary} />
           <Text style={styles.title}>Nhân viên bạn chọn đang bận</Text>
-          <Text style={styles.subtitle}>{name} chưa phản hồi trong thời gian nhận đơn. Bạn có muốn chờ thêm 5 phút không?</Text>
+          <Text style={styles.subtitle}>{booking.paymentMethod === 'CASH' ? `${name} chưa phản hồi trong thời gian nhận đơn. Bạn có muốn chờ thêm 5 phút không?` : `${name} chưa phản hồi. Tiền thanh toán được hoàn về ví; bạn có thể dùng số dư ví để đặt lại.`}</Text>
           <Text style={styles.subtitle}>Nếu tìm nhân viên khác, đơn này sẽ được giữ trong lịch sử với lý do hết thời gian nhận đơn.</Text>
           {!!error && <Text style={styles.error}>{error}</Text>}
-          <Pressable disabled={saving} style={[styles.primary, saving && { opacity: 0.6 }]} onPress={() => void decide('EXTEND')}><Text style={styles.primaryText}>{saving ? 'Đang cập nhật...' : 'Có, chờ thêm 5 phút'}</Text></Pressable>
+          <Pressable disabled={saving || booking.paymentMethod !== 'CASH'} style={[styles.primary, (saving || booking.paymentMethod !== 'CASH') && { opacity: 0.6 }]} onPress={() => void decide('EXTEND')}><Text style={styles.primaryText}>{saving ? 'Đang cập nhật...' : 'Có, chờ thêm 5 phút'}</Text></Pressable>
           <Pressable disabled={saving} style={styles.home} onPress={() => void decide('CANCEL')}><Text style={styles.link}>Không, tìm nhân viên khác</Text></Pressable>
           <Pressable accessibilityRole="button" disabled={saving} style={styles.cancel} onPress={() => void decide('STOP')}><Text style={styles.error}>Hủy đặt dịch vụ, về trang chủ</Text></Pressable>
         </View></View>
