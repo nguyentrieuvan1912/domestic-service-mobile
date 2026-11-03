@@ -1,5 +1,5 @@
-import { Alert, Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Alert, Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
 /** Discard only the in-memory wizard. Persisted bookings have their own cancellation flow. */
 export function BookingExitButton({ disabled = false, saved = false }: { disabled?: boolean; saved?: boolean }) {
@@ -21,7 +21,19 @@ export function BookingExitButton({ disabled = false, saved = false }: { disable
   </Pressable>;
 }
 const styles = StyleSheet.create({
-  button: { backgroundColor: '#FFF1F2', borderWidth: 1, borderColor: '#FECDD3', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, alignSelf: 'center' },
-  text: { color: '#BE123C', fontWeight: '700', fontSize: 12 }, disabled: { opacity: 0.45 },
-  home: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }, homeText: { color: '#047857' },
+  button: {
+    height: 38,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    borderRadius: 19,
+    paddingHorizontal: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  text: { color: '#BE123C', fontWeight: '700', fontSize: 12 },
+  disabled: { opacity: 0.45 },
+  home: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  homeText: { color: '#047857' },
 });

@@ -38,7 +38,7 @@ export default function BookingsScreen() {
   const filteredBookings = customerBookings.filter((b) => {
     switch (activeFilter) {
       case 'ACTIVE':
-        return ['PENDING', 'MATCHING', 'CONFIRMED', 'STAFF_ASSIGNED', 'ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(
+        return ['PENDING', 'AWAITING_PAYMENT', 'MATCHING', 'CONFIRMED', 'STAFF_ASSIGNED', 'ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(
           b.status
         );
       case 'COMPLETED':
@@ -63,7 +63,7 @@ export default function BookingsScreen() {
           text: 'Xác nhận hủy',
           style: 'destructive',
           onPress: async () => {
-            try { await CustomerBookings.cancel(bookingId, 'Khách hàng hủy đơn chủ động qua ứng dụng'); Alert.alert('Đã hủy đơn', `Đơn ${bookingCode} đã được hủy trên hệ thống.`); }
+            try { await CustomerBookings.cancel(bookingId, 'Khách hàng hủy đơn chủ động qua ứng dụng'); }
             catch (cause) { Alert.alert('Chưa hủy được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
           },
         },

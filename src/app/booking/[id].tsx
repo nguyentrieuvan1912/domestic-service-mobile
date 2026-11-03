@@ -49,7 +49,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
   const travel = bookingTravelStatus(booking);
   const savedSelections=Object.entries({...booking.service.configuration,...booking.service.answers}).filter(([,value]) => value != null && String(value).trim() !== '');
   const acceptedStaff=booking.assignments.filter(item => ['ACCEPTED','COMPLETED'].includes(item.status));
-  const canCancel = ['PENDING', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
+  const canCancel = ['PENDING', 'AWAITING_PAYMENT', 'MATCHING', 'CONFIRMED', 'ASSIGNED', 'ACCEPTED', 'STAFF_ASSIGNED'].includes(
     booking.status
   );
 
@@ -63,7 +63,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
           text: 'Xác nhận hủy',
           style: 'destructive',
           onPress: async () => {
-            try { setBooking(await CustomerBookings.cancel(booking.id, 'Khách hàng hủy đơn chủ động')); Alert.alert('Đã hủy', `Đơn ${booking.bookingCode} đã được hủy trên hệ thống.`); }
+            try { setBooking(await CustomerBookings.cancel(booking.id, 'Khách hàng hủy đơn chủ động')); }
             catch (error) { Alert.alert('Chưa hủy được đơn', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
           },
         },
@@ -91,6 +91,8 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
         contentContainerStyle={styles.scrollContent}>
         {!!refreshError && <Pressable onPress={retry} accessibilityRole="button"><Text style={{ color: '#92400E', padding: 12 }}>Đang chờ kết nối để cập nhật đơn. Thông tin bên dưới là lần tải gần nhất. Chạm để thử ngay.</Text></Pressable>}
 
+        {booking.status === 'AWAITING_PAYMENT' && <Pressable onPress={() => router.push({pathname:'/booking/payment',params:{id:booking.id}})} style={{padding:16,backgroundColor:'#D1FAE5',borderRadius:14}}><Text style={{color:'#047857',fontWeight:'700'}}>Tiếp tục thanh toán · {formatVND(booking.totalAmount)}</Text></Pressable>}
+        {booking.paymentStatus === 'REFUNDED' && <Text style={{padding:12,color:'#047857'}}>Đã hoàn tiền thanh toán vào ví của bạn.</Text>}
         {/* Status Card & Code */}
         <View style={styles.statusCard}>
           <View style={styles.statusTopRow}>

@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+const require = createRequire(import.meta.url), ts = require('typescript');
+const file = new URL('../src/utils/booking-payment-intent.ts', import.meta.url);
+const source = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const module = { exports: {} };
+new Function('module', 'exports', source)(module, module.exports);
+const { prepareBookingQr } = module.exports;
+const booking = { id: '91', status: 'AWAITING_PAYMENT', paymentMethod: 'BANK_TRANSFER_QR' };
+const intent = { id: 2000000000091, bookingId: 91, status: 'PENDING', qrCode: 'test-only-provider-payload', amount: 2500 };
+const calls = [];
+const request = async (...args) => { calls.push(args); return { topup: intent }; };
+assert.equal(await prepareBookingQr(booking, null, request), intent);
+assert.deepEqual(calls[0].slice(0, 4), ['finance', '/customer/bookings/91/pay', 'POST', undefined], 'Automatic creation uses the server-priced booking, without a client amount');
+calls.length = 0;
+assert.equal(await prepareBookingQr(booking, intent, request), intent);
+assert.equal(calls.length, 0, 'A persisted QR is reused when opening the payment screen');
+for (const status of ['PAID', 'EXPIRED', 'CANCELLED', 'REVIEW']) {
+  const previous = { ...intent, status };
+  assert.equal(await prepareBookingQr(booking, previous, request), previous);
+}
+assert.equal(calls.length, 0, 'Terminal or review intents are never replaced with another payable QR');
+await prepareBookingQr(booking, { ...intent, status: 'CREATING', qrCode: null }, request);
+assert.equal(calls.length, 1, 'An interrupted creation recovers through the same booking endpoint');
+calls.length = 0;
+for (const paymentMethod of ['WALLET', 'CASH']) assert.equal(await prepareBookingQr({ ...booking, paymentMethod }, null, request), null);
+for (const status of ['CANCELLED', 'MATCHING', 'NO_STAFF_FOUND', 'COMPLETED']) assert.equal(await prepareBookingQr({ ...booking, status }, null, request), null);
+assert.equal(calls.length, 0, 'Opening the screen cannot debit a wallet or initiate collection for a closed booking');
+await assert.rejects(prepareBookingQr(booking, null, async () => { throw new Error('Provider unavailable'); }), /Provider unavailable/);
+const controller = new AbortController();
+await prepareBookingQr(booking, null, request, controller.signal);
+assert.equal(calls[0][4], controller.signal);
+console.log('Auto QR checks passed: create on entry, reuse/recover one intent, no automatic wallet debit, terminal-state guard and provider errors.');

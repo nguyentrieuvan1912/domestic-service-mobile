@@ -6,11 +6,11 @@ import { operationRequest, operationSession } from '@/api/operations';
 import { PaymentQr } from './PaymentQr';
 
 type Capabilities = { topupEnabled: boolean; message: string; minimumTopup: number; maximumTopup: number };
-type Topup = { id: number; amount: number; status: string; requestKey: string; qrCode: string | null; accountNumber: string | null; accountName: string | null; bankBin: string | null; description: string; amountReceived: number; createdAt: string; expiresAt: string };
+type Topup = { id: number; bookingId?: number | null; amount: number; status: string; requestKey: string; qrCode: string | null; accountNumber: string | null; accountName: string | null; bankBin: string | null; description: string; amountReceived: number; createdAt: string; expiresAt: string };
 const labels: Record<string, string> = { CREATING: 'Đang tạo / cần khôi phục', PENDING: 'Chờ chuyển khoản', PAID: 'Đã nhận tiền', CANCELLED: 'Đã hủy liên kết', EXPIRED: 'Hết hạn liên kết', REVIEW: 'Cần đối soát số tiền' };
 const money = (n: number) => n.toLocaleString('vi-VN') + 'đ';
 
-export function StaffTopupPanel({ visible, onClose, onCredited }: { visible: boolean; onClose: () => void; onCredited: () => void }) {
+export function StaffTopupPanel({ visible, onClose, onCredited, audience = 'staff' }: { visible: boolean; onClose: () => void; onCredited: () => void; audience?: 'staff' | 'customer' }) {
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [items, setItems] = useState<Topup[]>([]);
   const [amount, setAmount] = useState('10000');
@@ -30,17 +30,18 @@ export function StaffTopupPanel({ visible, onClose, onCredited }: { visible: boo
   const current = () => mounted.current && owner.current === operationSession()?.token;
   const load = useCallback(async (signal?: AbortSignal) => {
     const sequence = ++loadSequence.current;
-    const [cap, topups] = await Promise.all([
+    const [cap, fetched] = await Promise.all([
       operationRequest<Capabilities>('finance', '/payment-capabilities', 'GET', undefined, signal),
-      operationRequest<Topup[]>('finance', '/staff/me/topups', 'GET', undefined, signal),
+      operationRequest<Topup[]>('finance', `/${audience}/me/topups`, 'GET', undefined, signal),
     ]);
+    const topups = audience === 'customer' ? fetched.filter(item => item.bookingId == null) : fetched;
     if (!current() || signal?.aborted || sequence !== loadSequence.current) return;
     setCapabilities(cap); setItems(topups); setError('');
     setSelected(old => old ? topups.find(item => item.id === old.id) || old : null);
     const newlyPaid = topups.some(item => item.status === 'PAID' && !paidIds.current.has(item.id));
     topups.filter(item => item.status === 'PAID').forEach(item => paidIds.current.add(item.id));
     if (newlyPaid) onCredited();
-  }, [onCredited]);
+  }, [onCredited, audience]);
   useEffect(() => {
     if (!visible || !selected) return;
     setNow(Date.now());
@@ -70,12 +71,12 @@ export function StaffTopupPanel({ visible, onClose, onCredited }: { visible: boo
     if (!Number.isSafeInteger(value) || value < minimum || value > maximum) { setError(`Nhập số tiền từ ${money(minimum)} đến ${money(maximum)}.`); return; }
     if (!previous && (request.current.amount !== value || items.some(item => item.requestKey === request.current.key && ['PAID', 'CANCELLED', 'EXPIRED'].includes(item.status)))) request.current = { key: 'topup-' + Date.now() + '-' + Math.random().toString(36).slice(2), amount: value };
     void execute(async () => {
-      const item = await operationRequest<Topup>('finance', '/staff/me/topups', 'POST', { amount: value, requestKey: previous?.requestKey ?? request.current.key });
+      const item = await operationRequest<Topup>('finance', `/${audience}/me/topups`, 'POST', { amount: value, requestKey: previous?.requestKey ?? request.current.key });
       if (current()) { setItems(old => [item, ...old.filter(i => i.id !== item.id)]); setSelected(item); }
     });
   };
   const check = (item: Topup) => void execute(async () => {
-    const updated = await operationRequest<Topup>('finance', '/staff/me/topups/' + item.id + '/refresh', 'POST');
+    const updated = await operationRequest<Topup>('finance', `/${audience}/me/topups/` + item.id + '/refresh', 'POST');
     if (current()) {
       setItems(old => old.map(row => row.id === updated.id ? updated : row));
       setSelected(old => old?.id === updated.id ? updated : old);

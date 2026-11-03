@@ -4,10 +4,10 @@ import type { CatalogDetail } from '@/api/catalog-types';
 export function ServiceQuantity({ value, change }: { value: number; change: (value: number) => void }) {
   return <View style={{ paddingVertical: 12, gap: 8 }}>
     <Text style={{ color: '#334155', fontWeight: '700' }}>Số lượng gói cần thực hiện</Text>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
-      <Pressable accessibilityLabel="Giảm số lượng" disabled={value <= 1} onPress={() => change(value - 1)} style={{ padding: 12, backgroundColor: '#E2E8F0', borderRadius: 10 }}><Text>−</Text></Pressable>
-      <Text style={{ fontSize: 18 }}>{value}</Text>
-      <Pressable accessibilityLabel="Tăng số lượng" disabled={value >= 100} onPress={() => change(value + 1)} style={{ padding: 12, backgroundColor: '#E2E8F0', borderRadius: 10 }}><Text>+</Text></Pressable>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', gap: 20 }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Giảm số lượng" disabled={value <= 1} onPress={() => change(value - 1)} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0', borderRadius: 12, opacity: value <= 1 ? 0.4 : 1 }}><Text style={{ fontSize: 22, lineHeight: 26, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}>−</Text></Pressable>
+      <Text style={{ fontSize: 20, lineHeight: 28, fontWeight: '700', minWidth: 44, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}>{value}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Tăng số lượng" disabled={value >= 100} onPress={() => change(value + 1)} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0', borderRadius: 12, opacity: value >= 100 ? 0.4 : 1 }}><Text style={{ fontSize: 22, lineHeight: 26, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}>+</Text></Pressable>
     </View>
     <Text style={{ color: '#64748B' }}>Số lượng nhân cho cả gói đã chọn, kể cả gói combo. Mỗi đơn tối đa 12 giờ.</Text>
   </View>;

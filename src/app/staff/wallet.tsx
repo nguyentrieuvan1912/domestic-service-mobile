@@ -48,7 +48,7 @@ function StaffWalletContent() {
   const requestKey = useRef('withdraw-' + Date.now());
   const [linkVisible, setLinkVisible] = useState(false);
   const [topupVisible, setTopupVisible] = useState(false);
-  const [withdrawalRules, setWithdrawalRules] = useState({ minimum: 50000, maximum: 1000000, configured: false, message: 'Đang kiểm tra Kênh chi…' });
+  const [withdrawalRules, setWithdrawalRules] = useState({ minimum: 50000, maximum: 1000000, configured: false, requiresAdminApproval: true, automaticNameLookup: false, message: 'Đang kiểm tra Kênh chi…' });
   useFocusEffect(useCallback(() => {
     const controller = new AbortController(); let running = false;
     const update = async () => { if (running || AppState.currentState !== 'active') return; running = true; try {
@@ -71,7 +71,7 @@ function StaffWalletContent() {
   }, [staffId]);
 
   const { balance, transactions, withdrawals = [] } = wallet;
-  const pendingWithdrawals = withdrawals.filter(item => item.status === 'PENDING');
+  const pendingWithdrawals = withdrawals.filter(item => item.status === 'PENDING' || (item.automaticRequested && item.status === 'APPROVED' && !item.payoutStatus));
   const cancelWithdrawal = async (id: number) => {
     if (cancelLock.current) return;
     cancelLock.current = true; setCancellingId(id);
@@ -101,12 +101,12 @@ function StaffWalletContent() {
     if (saving) return;
     const amountNum = Number(withdrawAmount.replace(/\D/g, ''));
     if (!Number.isSafeInteger(amountNum) || amountNum < withdrawalRules.minimum || amountNum > withdrawalRules.maximum) { Alert.alert('Lỗi', `Số tiền rút từ ${withdrawalRules.minimum.toLocaleString('vi-VN')}đ đến ${withdrawalRules.maximum.toLocaleString('vi-VN')}đ.`); return; }
-    if (!selectedBank) { Alert.alert('Chưa có tài khoản nhận', 'Liên kết ngân hàng và chờ Admin xác minh trước khi rút.'); return; }
+    if (!selectedBank) { Alert.alert('Chưa có tài khoản nhận', 'Liên kết tài khoản ngân hàng đã được xác minh trước khi rút.'); return; }
     setSaving(true);
     try {
       await StaffService.withdrawMoney(amountNum, selectedBank, '', staffId, requestKey.current);
       setIsWithdrawVisible(false); requestKey.current = 'withdraw-' + Date.now();
-      Alert.alert('Đã gửi yêu cầu rút', 'Yêu cầu đã được lưu và đang chờ Admin xử lý. Khoản tiền chưa được chuyển về ngân hàng.');
+      Alert.alert('Đã gửi yêu cầu rút', withdrawalRules.requiresAdminApproval ? 'Yêu cầu đã được lưu và đang chờ Admin xử lý. Khoản tiền chưa được chuyển về ngân hàng.' : 'Yêu cầu đã được lưu và tiền được giữ riêng. Hệ thống tự gửi lệnh payOS khi nguồn chi đủ số dư; ví sẽ cập nhật khi có kết quả chuyển tiền.');
     } catch (error) { Alert.alert('Chưa gửi được', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
@@ -124,7 +124,7 @@ function StaffWalletContent() {
             onPress={() =>
               Alert.alert(
                 'Quy định đối soát & rút tiền',
-                'Thu nhập được ghi nhận sau khi đơn kết thúc và được quyết toán. Yêu cầu rút cần tài khoản ngân hàng đã xác minh và chờ Admin xử lý.'
+                'Thu nhập được ghi nhận sau khi đơn kết thúc và được quyết toán. ' + withdrawalRules.message
               )
             }
           >
@@ -197,7 +197,7 @@ function StaffWalletContent() {
             <Text style={styles.chartTotal}>{(balance.reserved || 0).toLocaleString('vi-VN')}đ</Text>
             <Text style={styles.chartSub}>Khoản này đang được giữ riêng, chưa thể dùng để thanh toán hoặc tạo yêu cầu rút khác.</Text>
             {pendingWithdrawals.map(item => <View key={item.id} style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 12, marginTop: 12, gap: 8 }}>
-              <Text style={{ fontSize: 13, color: '#475569' }}>Yêu cầu #{item.id} · {item.amount.toLocaleString('vi-VN')}đ · Chờ Admin duyệt</Text>
+              <Text style={{ fontSize: 13, color: '#475569' }}>Yêu cầu #{item.id} · {item.amount.toLocaleString('vi-VN')}đ · {item.automaticRequested ? 'Chờ gửi lệnh tự động' : 'Chờ Admin duyệt'}</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={`Hủy yêu cầu rút số ${item.id}`} disabled={cancellingId !== null} onPress={() => Alert.alert('Hủy yêu cầu rút?', `${item.amount.toLocaleString('vi-VN')}đ sẽ được hoàn về số dư khả dụng nếu Admin chưa duyệt yêu cầu.`, [{ text: 'Giữ yêu cầu', style: 'cancel' }, { text: 'Hủy yêu cầu rút', style: 'destructive', onPress: () => void cancelWithdrawal(item.id) }])} style={{ borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFF7F7', borderRadius: 10, padding: 12, alignItems: 'center', opacity: cancellingId !== null ? 0.5 : 1 }}><Text style={{ color: '#B91C1C', fontSize: 13, fontWeight: '700' }}>{cancellingId === item.id ? 'Đang hủy…' : 'Hủy yêu cầu rút'}</Text></Pressable>
             </View>)}
             {!pendingWithdrawals.length && <Text style={[styles.chartSub, { marginTop: 8 }]}>Yêu cầu đã được duyệt hoặc đang đối soát nên không thể tự hủy.</Text>}
@@ -283,7 +283,7 @@ function StaffWalletContent() {
       </SafeAreaView>
 
       <StaffTopupPanel visible={topupVisible} onClose={() => setTopupVisible(false)} onCredited={refreshWallet} />
-      <BankLinkModal visible={linkVisible} onClose={() => setLinkVisible(false)} onSave={async (bin, account, holder) => { await StaffService.addBank(staffId, bin, account, holder); Alert.alert('Đã lưu tài khoản', 'Thông tin đã được lưu và đang chờ admin đối chiếu với ngân hàng.'); }} />
+      <BankLinkModal visible={linkVisible} onClose={() => setLinkVisible(false)} onSave={async (bin, account, holder) => { const result = await StaffService.addBank(staffId, bin, account, holder); Alert.alert('Đã lưu tài khoản', result.status === 'VERIFIED' ? 'Tài khoản đã được lưu và xác minh qua API tra tên người nhận.' : 'Thông tin đã được lưu và đang chờ admin đối chiếu với ngân hàng.'); }} />
       {/* Interactive Withdraw Modal */}
       <Modal
         visible={isWithdrawVisible}

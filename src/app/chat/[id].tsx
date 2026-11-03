@@ -1,3 +1,4 @@
+import { EvidencePhoto } from '@/components/common/EvidencePhoto';
 import { BookingCallButton } from '@/components/common/BookingCallButton';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -204,6 +205,7 @@ const MessageBubble = React.memo(function MessageBubble({ message, actor, delive
                 <View style={[styles.msgRow, isMe ? styles.msgRowRight : styles.msgRowLeft]}>
                   {!isMe && <Image source={remoteImageSource(message.senderAvatar)} style={styles.msgAvatar} />}
                   <View style={[styles.bubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+                    {message.contentType === 'IMAGE' && !!message.mediaUrl && (message.evidenceId && message.evidenceBookingId ? <EvidencePhoto bookingId={message.evidenceBookingId} evidenceId={message.evidenceId} thumbnail={message.mediaUrl} caption={message.content} /> : <Image source={remoteImageSource(message.mediaUrl)} style={{width:210,height:160,borderRadius:12,marginVertical:8}} resizeMode="cover" />)}
                     <Text style={[styles.bubbleText, isMe ? styles.bubbleTextRight : styles.bubbleTextLeft]}>{message.content}</Text>
                     <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft]}>
                       {new Date(message.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: CHAT_TIME_ZONE })}

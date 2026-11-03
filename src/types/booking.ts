@@ -2,6 +2,7 @@ export type BookingMode = 'MODE_A' | 'MODE_B'; // MODE_A: Customer invites staff
 
 export type BookingStatus =
   | 'PENDING'
+  | 'AWAITING_PAYMENT'
   | 'MATCHING'
   | 'CONFIRMED'
   | 'STAFF_ASSIGNED'

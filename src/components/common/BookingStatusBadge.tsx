@@ -14,6 +14,8 @@ export const BookingStatusBadge: React.FC<BookingStatusBadgeProps> = ({
 }) => {
   const getStatusConfig = (st: BookingStatus) => {
     switch (st) {
+      case 'AWAITING_PAYMENT':
+        return { label: 'Chờ thanh toán', bg: '#FEF3C7', text: '#D97706', dot: '#F59E0B' };
       case 'PENDING':
         return { label: 'Chờ xác nhận', bg: '#FEF3C7', text: '#D97706', dot: '#F59E0B' };
       case 'MATCHING':

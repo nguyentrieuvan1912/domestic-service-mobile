@@ -44,3 +44,30 @@ global.fetch = async () => Response.json({ detail: 'Asset not verified' }, { sta
 await assert.rejects(uploadAttachment(asset, ticket, () => {}, controller.signal), /gián đoạn/);
 await assert.rejects(uploadAttachment(asset, { ...ticket, uploadUrl: 'https://attacker.invalid/upload' }, () => {}, controller.signal), /không hợp lệ/);
 console.log('Community: media limits, server confirmation, interrupted-upload recovery, secret exclusion, provider host and threaded comment deduplication passed.');
+
+const { createCommunityPost } = require('../src/api/community.ts');
+const draft = { content: 'Kept draft', mediaIds: [], requestKey: 'stable-post-key' };
+let writes = 0, confirmations = 0;
+global.fetch = async (url, init) => {
+  if (init.method === 'POST') { writes++; return new Response('', { status: 201 }); }
+  confirmations++; assert(url.endsWith('/community/posts/requests/stable-post-key'));
+  return Response.json({ id: 73, status: 'PENDING' });
+};
+assert.deepEqual(await createCommunityPost(draft), { id: 73, status: 'PENDING' });
+assert.equal(writes, 1, 'A lost POST response must never replay the write');
+assert.equal(confirmations, 1, 'Only a persisted, scoped lookup confirms success');
+// Missing persisted confirmation must retain the original failure and the caller’s draft.
+global.fetch = async (_url, init) => init.method === 'POST' ? new Response('', { status: 201 }) : Response.json({ detail: 'Not persisted' }, { status: 404 });
+await assert.rejects(createCommunityPost(draft), /Phản hồi từ máy chủ/);
+assert.equal(draft.content, 'Kept draft');
+let businessCalls = 0;
+global.fetch = async () => { businessCalls++; return Response.json({ detail: 'Invalid content' }, { status: 400 }); };
+await assert.rejects(createCommunityPost(draft), /Invalid content/);assert.equal(businessCalls, 1);
+// Valid JSON without an ID/status is also insufficient proof of a successful save.
+global.fetch = async (_url, init) => init.method === 'POST' ? Response.json({}) : Response.json({ id: 74, status: 'PENDING' });
+assert.equal((await createCommunityPost(draft)).id, 74);
+let reads = 0;
+global.fetch = async () => ++reads === 1 ? new Response('{', { status: 200 }) : Response.json([]);
+assert.deepEqual(await operations.operationRequest('identity', '/community/posts'), []);
+assert.equal(reads, 2, 'Malformed reads retry once; mutations are never replayed');
+console.log('Community publishing: empty/truncated JSON recovery, persisted-ID confirmation, missing-save rejection, retained draft, no duplicate POST, business-error preservation and bounded read retry passed.');

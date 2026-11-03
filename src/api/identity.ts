@@ -1,3 +1,4 @@
+import { readJsonResponse } from '../utils/http-json';
 import { API_BASE_URL } from './catalog';
 import { UserRole, UserStatus, Staff } from '@/types/user';
 export interface IdentityUser { id: number; fullName: string; email: string; phone: string; role: UserRole; status: UserStatus }
@@ -28,7 +29,7 @@ export async function identityRequest<T>(path: string, body?: object, token?: st
       const error = await response.json().catch(() => null);
       throw new Error(error?.detail || 'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin.');
     }
-    return response.status === 204 ? undefined as T : await response.json() as T;
+    return response.status === 204 ? undefined as T : await readJsonResponse<T>(response);
   } catch (error) {
     if (controller.signal.aborted && !signal?.aborted) throw new Error('Kết nối quá lâu. Vui lòng thử lại.');
     throw error;

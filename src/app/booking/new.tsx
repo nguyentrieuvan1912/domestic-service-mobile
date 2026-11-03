@@ -1,4 +1,5 @@
 import { BookingExitButton } from '@/components/booking/BookingExitButton';
+import { WalletBalancePreview } from '@/components/booking/WalletBalancePreview';
 import { FavouriteDurationPopup } from '@/components/booking/FavouriteDurationPopup';
 import { favouriteDurationIssue, shorterFavouritePackage, roundedBookingMinutes } from '@/utils/favourite-staff-duration';
 import { StaffResponseWaiting } from '@/components/booking/StaffResponseWaiting';
@@ -535,9 +536,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
       if(selectedMode==='MODE_A'&&(staffLoading||staffError||!availableStaffs.find(item=>item.id===selectedStaffId)?.eligibleServices?.some(item=>item.id===service.id)))throw new Error(staffError||'Vui lòng kiểm tra lại nhân viên phù hợp trước khi đặt đơn.');
       if(!quoteReady||quoteLoading)throw new Error(quoteError || 'Đang kiểm tra lại giá và lịch. Vui lòng chờ một chút.');
       if(selectedMode==='MODE_A' && !selectedStaff) throw new Error('Vui lòng chọn nhân viên phù hợp.');
-      const body={...JSON.parse(quoteKey),mode:selectedMode,addressId:selectedAddressId,startsAt,staffId:selectedMode==='MODE_A'?selectedStaff?.id:undefined,paymentMethod:paymentMethod==='CASH'?'CASH':'BANK_TRANSFER_QR',notes:customerNote};
+      const body={...JSON.parse(quoteKey),mode:selectedMode,addressId:selectedAddressId,startsAt,staffId:selectedMode==='MODE_A'?selectedStaff?.id:undefined,paymentMethod,notes:customerNote};
       const serialized=JSON.stringify(body);if(requestRef.current?.body!==serialized)requestRef.current={body:serialized,key:'mobile-'+Date.now()+'-'+Math.random().toString(36).slice(2)};
-      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); void CustomerBookings.load().catch(()=>{});if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
+      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); void CustomerBookings.load().catch(()=>{});if(raw.status==='AWAITING_PAYMENT')router.replace({pathname:'/booking/payment',params:{id:String(raw.id)}});else if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
     } catch(e) {setSubmitError(e instanceof Error?e.message:'Chưa tạo được đơn.');} finally{setSaving(false);}
   };
   const CLEANING_DURATIONS = packages.filter(p=>p.durationMinutes*quantity<=240&&(p.defaultStaffCount||1)===1).map(p=>({packageId:p.id,hours:p.durationHours,title:p.name,area:p.maxArea || '',unitType:p.recommendedFor || '',desc:p.description,isPopular:false,price:p.price}));
@@ -734,14 +735,16 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
               Bước {stepCurrent + 1} / {stepTotal}
             </Text>
           </View>
-          <BookingExitButton disabled={saving} saved={!!createdBooking} />
-          <Pressable
-            style={styles.bellButton}
-            onPress={() => router.push('/notifications')}
-            hitSlop={8}>
-            <IconSymbol name="bell" size={18} color={BrandColors.gray700} />
-            <View style={styles.bellDot} />
-          </Pressable>
+          <View style={styles.headerRightActions}>
+            <BookingExitButton disabled={saving} saved={!!createdBooking} />
+            <Pressable
+              style={styles.bellButton}
+              onPress={() => router.push('/notifications')}
+              hitSlop={8}>
+              <IconSymbol name="bell" size={18} color={BrandColors.gray700} />
+              <View style={styles.bellDot} />
+            </Pressable>
+          </View>
         </View>
 
         {!(selectedMode==='MODE_A'&&currentStep===5) && !!(submitError || ((selectedMode==='MODE_A'?currentStep>=5:currentStep>=4)&&quoteError)) && <Text style={{color:'#B91C1C',padding:12}}>{submitError || quoteError}</Text>}
@@ -805,13 +808,15 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
               <View style={styles.brandDot} />
               <Text style={styles.brandTitle}>CleanMaster</Text>
             </View>
-            <BookingExitButton disabled={saving} />
-            <Pressable
-              style={styles.giftBadgeBtn}
-              onPress={() => Alert.alert('Ưu đãi đang có', catalog.promotions.length ? catalog.promotions.map(p=>p.code+': '+p.description).join('\n') : 'Chưa có mã ưu đãi đang hoạt động.')}>
-              <IconSymbol name="gift" size={16} color={BrandColors.primary} />
-              <Text style={styles.giftBadgeText}>Ưu đãi</Text>
-            </Pressable>
+            <View style={styles.headerRightActions}>
+              <BookingExitButton disabled={saving} />
+              <Pressable
+                style={styles.giftBadgeBtn}
+                onPress={() => Alert.alert('Ưu đãi đang có', catalog.promotions.length ? catalog.promotions.map(p=>p.code+': '+p.description).join('\n') : 'Chưa có mã ưu đãi đang hoạt động.')}>
+                <IconSymbol name="gift" size={16} color={BrandColors.primary} />
+                <Text style={styles.giftBadgeText}>Ưu đãi</Text>
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView contentContainerStyle={styles.entryContent} showsVerticalScrollIndicator={false}>
@@ -1118,7 +1123,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
                   </View>
 
                   <Text style={styles.sectionHeaderTitle}>Thời lượng dự kiến</Text>
-                  <View style={styles.skillWrap}>{[60,120,180,240].map(minutes=><Pressable key={minutes} accessibilityRole="button" accessibilityState={{selected:discoveryMinutes===minutes}} style={[styles.filterChip,discoveryMinutes===minutes&&styles.filterChipActive]} onPress={()=>setDiscoveryMinutes(minutes)}><Text style={[styles.filterChipText,discoveryMinutes===minutes&&styles.filterChipTextActive]}>{minutes/60} giờ</Text></Pressable>)}</View>
+                  <View style={styles.durationChoiceRow}>{[60,120,180,240].map(minutes=><Pressable key={minutes} accessibilityRole="button" accessibilityState={{selected:discoveryMinutes===minutes}} style={[styles.durationChoiceChip,discoveryMinutes===minutes&&styles.staffServiceChipActive]} onPress={()=>setDiscoveryMinutes(minutes)}><Text style={[styles.staffServiceChipText,discoveryMinutes===minutes&&styles.staffServiceChipTextActive]}>{minutes/60} giờ</Text></Pressable>)}</View>
                   <Text style={styles.stepSubtitleNote}>Chỉ hiện nhân viên rảnh trọn {discoveryMinutes/60} giờ từ {selectedTimeSlot}. Khi chọn gói hoặc thêm dịch vụ, hệ thống sẽ kiểm tra lại toàn bộ thời lượng thực tế.</Text>
                   {/* Matching Note */}
                   <View style={styles.matchingNoticeBox}>
@@ -1563,14 +1568,17 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={[styles.stepContent,selectionWarning?{paddingBottom:180}:undefined]} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.sectionHeaderTitle}>Dịch vụ nhân viên có thể thực hiện</Text>
-                  <View style={styles.skillWrap}>{(pickedStaff?.eligibleServices||selectedStaff.eligibleServices||[]).map(item=><Pressable key={item.id} style={[styles.filterChip,item.id===service.id&&styles.filterChipActive]} onPress={()=>chooseService(item.id)}><Text style={[styles.filterChipText,item.id===service.id&&styles.filterChipTextActive]}>{item.id===service.id?'✓ ':''}{item.name}</Text></Pressable>)}</View>
+                  <View style={styles.summaryDetailCard}>
+                    <Text style={styles.sectionHeaderTitle}>Dịch vụ nhân viên có thể thực hiện</Text>
+                    <Text style={styles.stepSubtitleNote}>Chọn 1 dịch vụ bạn muốn nhân viên thực hiện trong ca này</Text>
+                    <View style={styles.staffServiceGrid}>{(pickedStaff?.eligibleServices||selectedStaff.eligibleServices||[]).map(item=><Pressable key={item.id} style={[styles.staffServiceChip,item.id===service.id&&styles.staffServiceChipActive]} onPress={()=>chooseService(item.id)}><Text numberOfLines={1} style={[styles.staffServiceChipText,item.id===service.id&&styles.staffServiceChipTextActive]}>{item.id===service.id?'✓ ':''}{item.name}</Text></Pressable>)}</View>
+                  </View>
                   {serviceDetail?.service.priceUnit==='ITEM' && <ServiceQuantity value={unitQuantity} change={setUnitQuantity} />}
                   {questionSteps.length>0 && <View style={styles.summaryDetailCard}>
                     <Text style={styles.sectionHeaderTitle}>Yêu cầu riêng cho dịch vụ</Text>
                     <Text style={styles.stepSubtitleNote}>Chúng tôi sẽ hướng dẫn bạn chọn từng thông tin trên một màn hình riêng.</Text>
                     <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={()=>{setQuestionIndex(0);setQuestionWizardOpen(true);}}><LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}><Text style={styles.ctaPrimaryText}>{serviceAnswersIssue(serviceDetail?.requirements || [],answers)?'Bắt đầu chọn thông tin →':'Xem lại / Chỉnh sửa thông tin →'}</Text></LinearGradient></Pressable>
-                    {!serviceAnswersIssue(serviceDetail?.requirements || [],answers) && <ServiceAnswersSummary fields={serviceDetail?.requirements || []} values={answers} />}
+                    {!serviceAnswersIssue(serviceDetail?.requirements || [],answers) && <View style={{ marginTop: 12 }}><ServiceAnswersSummary fields={serviceDetail?.requirements || []} values={answers} /></View>}
                   </View>}
                   {staffLoading&&<Text style={styles.stepSubtitleNote}>Đang kiểm tra lại toàn bộ thời lượng…</Text>}
                   {/* Duration selection */}
@@ -1790,30 +1798,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
     // ---------------- STEP 7: PHƯƠNG THỨC THANH TOÁN (Mode A) ----------------
     if (currentStep === 7) {
       const paymentMethods: { id: PaymentMethod; name: string; desc: string; icon: string }[] = [
-        {
-          id: 'VNPAY',
-          name: 'VNPay (Quét mã QR)',
-          desc: 'Thanh toán trực tiếp qua ứng dụng ngân hàng',
-          icon: 'creditCard',
-        },
-        {
-          id: 'MOMO',
-          name: 'Ví MoMo',
-          desc: 'Liên kết ví điện tử MoMo siêu tốc',
-          icon: 'wallet',
-        },
-        {
-          id: 'ZALOPAY',
-          name: 'Ví ZaloPay',
-          desc: 'Thanh toán an toàn qua ZaloPay',
-          icon: 'wallet',
-        },
-        {
-          id: 'CASH',
-          name: 'Tiền mặt',
-          desc: 'Thanh toán cho nhân viên sau khi hoàn thành',
-          icon: 'cash',
-        },
+        { id: 'BANK_TRANSFER_QR', name: 'Chuyển khoản QR · payOS', desc: 'Chuyển đúng số tiền; kết nối nhân viên sau khi nhận đủ', icon: 'creditCard' },
+        { id: 'WALLET', name: 'Ví của tôi', desc: 'Thanh toán bằng số dư ví. Tiền hoàn được trả về ví', icon: 'wallet' },
+        { id: 'CASH', name: 'Tiền mặt', desc: 'Thanh toán sau khi hoàn thành dịch vụ', icon: 'cash' },
       ];
 
       return (
@@ -1826,7 +1813,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.sectionHeaderTitle}>Chọn cổng thanh toán</Text>
+                  <Text style={styles.sectionHeaderTitle}>Chọn phương thức thanh toán</Text>
 
                   {paymentMethods.map((pm) => {
                     const isSelected = pm.id === paymentMethod;
@@ -1852,6 +1839,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
                         <View style={styles.paymentInfo}>
                           <Text style={styles.paymentName}>{pm.name}</Text>
                           <Text style={styles.paymentDesc}>{pm.desc}</Text>
+                          {pm.id === 'WALLET' && <WalletBalancePreview />}
                         </View>
                         <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
                           {isSelected && <View style={styles.radioInnerDot} />}
@@ -2339,30 +2327,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
     // ---------------- STEP 5: PHƯƠNG THỨC THANH TOÁN (Mode B) ----------------
     if (currentStep === 5) {
       const paymentMethods: { id: PaymentMethod; name: string; desc: string; icon: string }[] = [
-        {
-          id: 'VNPAY',
-          name: 'VNPay (Quét mã QR)',
-          desc: 'Thanh toán trực tiếp qua ứng dụng ngân hàng',
-          icon: 'creditCard',
-        },
-        {
-          id: 'MOMO',
-          name: 'Ví MoMo',
-          desc: 'Liên kết ví điện tử MoMo siêu tốc',
-          icon: 'wallet',
-        },
-        {
-          id: 'ZALOPAY',
-          name: 'Ví ZaloPay',
-          desc: 'Thanh toán an toàn qua ZaloPay',
-          icon: 'wallet',
-        },
-        {
-          id: 'CASH',
-          name: 'Tiền mặt',
-          desc: 'Thanh toán cho nhân viên sau khi hoàn thành',
-          icon: 'cash',
-        },
+        { id: 'BANK_TRANSFER_QR', name: 'Chuyển khoản QR · payOS', desc: 'Chuyển đúng số tiền; kết nối nhân viên sau khi nhận đủ', icon: 'creditCard' },
+        { id: 'WALLET', name: 'Ví của tôi', desc: 'Thanh toán bằng số dư ví. Tiền hoàn được trả về ví', icon: 'wallet' },
+        { id: 'CASH', name: 'Tiền mặt', desc: 'Thanh toán sau khi hoàn thành dịch vụ', icon: 'cash' },
       ];
 
       return (
@@ -2375,7 +2342,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.sectionHeaderTitle}>Chọn cổng thanh toán</Text>
+                  <Text style={styles.sectionHeaderTitle}>Chọn phương thức thanh toán</Text>
 
                   {paymentMethods.map((pm) => {
                     const isSelected = pm.id === paymentMethod;
@@ -2401,6 +2368,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
                         <View style={styles.paymentInfo}>
                           <Text style={styles.paymentName}>{pm.name}</Text>
                           <Text style={styles.paymentDesc}>{pm.desc}</Text>
+                          {pm.id === 'WALLET' && <WalletBalancePreview />}
                         </View>
                         <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
                           {isSelected && <View style={styles.radioInnerDot} />}
@@ -2762,8 +2730,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: Spacing.three,
     paddingVertical: 12,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   backButton: {
     width: 38,
@@ -3541,7 +3515,56 @@ const styles = StyleSheet.create({
   skillWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
+  },
+  durationChoiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  durationChoiceChip: {
+    flex: 1,
+    minHeight: 42,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#DCE8E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffServiceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  staffServiceChip: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#DCE8E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staffServiceChipActive: {
+    backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
+  },
+  staffServiceChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: BrandColors.gray800,
+    textAlign: 'center',
+  },
+  staffServiceChipTextActive: {
+    color: BrandColors.white,
   },
   skillPillLarge: {
     flexDirection: 'row',

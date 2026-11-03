@@ -1,4 +1,5 @@
 import { operationRequest, operationSession, subscribeSession } from '@/api/operations';
+import { publishBookingCancellationNotice } from './bookingCancellationNotice';
 import type { Booking } from '@/types/booking';
 import type { Service } from '@/types/service';
 import type { Staff, CustomerAddress } from '@/types/user';
@@ -15,8 +16,8 @@ export const CustomerBookings = {
   get: (id: string) => items.find(item => item.id === id),
   async load() { const session = operationSession(); if (!session || session.profile.role !== 'CUSTOMER') { items = []; notify(); return; } const epoch = readEpoch; const data = await operationRequest<Record<string, unknown>[]>('booking', '/bookings'); if (session.token === operationSession()?.token && epoch === readEpoch) { items = data.map(bookingView); notify(); } },
   async detail(id: string, signal?: AbortSignal) { customerSession(); const epoch = readEpoch; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id, 'GET', undefined, signal)); if(epoch === readEpoch) { items = [item, ...items.filter(b => b.id !== id)]; notify(); } return item; },
-  async staffResponse(id: string, action: 'EXTEND' | 'CANCEL' | 'STOP', round: number) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/staff-response', 'POST', { action, round })); readEpoch++; items = [item, ...items.filter(b => b.id !== id)]; notify(); return item; },
-  async cancel(id: string, reason: string) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/cancel', 'POST', { reason })); readEpoch++; items = items.map(b => b.id === id ? item : b); notify(); return item; },
+  async staffResponse(id: string, action: 'EXTEND' | 'CANCEL' | 'STOP', round: number) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/staff-response', 'POST', { action, round })); readEpoch++; items = [item, ...items.filter(b => b.id !== id)]; notify(); if(action !== 'EXTEND') publishBookingCancellationNotice(item); return item; },
+  async cancel(id: string, reason: string) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/cancel', 'POST', { reason })); readEpoch++; items = items.map(b => b.id === id ? item : b); notify(); publishBookingCancellationNotice(item); return item; },
 };
 export const bookingServiceView = (b: ConnectedBooking): Service => ({ id: b.serviceId, categoryId: undefined, category: 'OTHER_SERVICES', name: b.service.name || b.service.serviceName || '', serviceName: b.service.name || b.service.serviceName || '', description: '', shortDescription: '', basePrice: b.packagePrice, price: b.packagePrice, unit: 'gói', duration: '', image: b.service.image || '', rating: 0, reviewCount: 0, isPopular: false, isActive: true, status: 'ACTIVE', highlightBadges: [], dynamicFieldType: 'GENERAL' });
 export function bookingStaffView(id: string, directory: Staff[]): Staff | undefined { return directory.find(item => item.id === id); }

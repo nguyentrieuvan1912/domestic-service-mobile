@@ -13,8 +13,8 @@ export default function ChatTrashScreen() {
   const { actor, conversations, error: loadError, isLoaded } = useChatInbox();
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  if (!actor || actor.role !== 'CUSTOMER') return <Redirect href="/(tabs)/chat" />;
-  const trashed = conversations.filter(item => !!item.customerTrashedAt);
+  if (!actor) return <Redirect href="/(tabs)/chat" />;
+  const trashed = conversations.filter(item => !!item.trashedAt || actor.role === 'CUSTOMER' && !!item.customerTrashedAt);
   const remove = async () => {
     if (!selected || busy) return;
     setBusy(true); setError('');
@@ -25,17 +25,17 @@ export default function ChatTrashScreen() {
   return <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
     <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.back()} style={s.back}><IconSymbol name="back" size={24} color="#334155" /></Pressable><Text style={s.title}>Thùng rác tin nhắn</Text></View>
     <ScrollView contentContainerStyle={s.content}>
-      <Text style={s.hint}>Cả cuộc hội thoại của đơn hàng sẽ chuyển vào đây sau 24 giờ kể từ tin nhắn cuối. Khi có tin mới, hội thoại sẽ hiện lại trong danh sách chính.</Text>
+      <Text style={s.hint}>Cuộc hội thoại tự chuyển vào thùng rác sau 24 giờ kể từ khi đơn hoàn thành và không còn hiển thị trong danh sách chat chính. Lịch sử và ảnh minh chứng của đơn vẫn được lưu để tra cứu.</Text>
       {loadError ? <Pressable style={s.button} onPress={() => void ChatRepository.loadList(actor).catch(() => {})}><Text style={s.error}>{loadError} Chạm để thử lại.</Text></Pressable> : null}
       {!isLoaded && !loadError && <View style={s.empty}><ActivityIndicator color="#059669" /><Text style={s.emptyText}>Đang tải thùng rác…</Text></View>}
       {isLoaded && trashed.length === 0 && !loadError && <View style={s.empty}><IconSymbol name="trash" size={40} color="#94A3B8" /><Text style={s.emptyText}>Thùng rác đang trống</Text></View>}
       {trashed.map(item => <View key={item.id} style={s.card}>
         <Pressable accessibilityRole="button" onPress={() => router.push(`/chat/${item.id}`)} style={s.row}>
-          <Image source={remoteImageSource(item.staffAvatar || '/api/v1/identity/default-avatar.png')} style={s.avatar} />
-          <View style={{ flex: 1, gap: 4 }}><Text style={s.name}>{item.staffName}</Text><Text style={s.service}>{item.serviceName} · Đơn {item.bookingCode || `#${item.bookingId}`}</Text><Text numberOfLines={2} style={s.preview}>{item.lastMessage || 'Chưa có tin nhắn'}</Text></View>
+          <Image source={remoteImageSource((actor.role === 'STAFF' ? item.customerAvatar : item.staffAvatar) || '/api/v1/identity/default-avatar.png')} style={s.avatar} />
+          <View style={{ flex: 1, gap: 4 }}><Text style={s.name}>{actor.role === 'STAFF' ? item.customerName : item.staffName}</Text><Text style={s.service}>{item.serviceName} · Đơn {item.bookingCode || `#${item.bookingId}`}</Text><Text numberOfLines={2} style={s.preview}>{item.lastMessage || 'Chưa có tin nhắn'}</Text></View>
           <IconSymbol name="chevronRight" size={18} color="#64748B" />
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => { setError(''); setSelected(item); }} style={[s.button, s.danger]}><IconSymbol name="trash" size={18} color="#DC2626" /><Text style={s.dangerText}>Xóa vĩnh viễn</Text></Pressable>
+        {actor.role === 'CUSTOMER' && <Pressable accessibilityRole="button" onPress={() => { setError(''); setSelected(item); }} style={[s.button, s.danger]}><IconSymbol name="trash" size={18} color="#DC2626" /><Text style={s.dangerText}>Xóa vĩnh viễn</Text></Pressable>}
       </View>)}
     </ScrollView>
     <Modal visible={!!selected} transparent animationType="fade" onRequestClose={() => { if (!busy) setSelected(null); }}>

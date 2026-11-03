@@ -145,13 +145,13 @@ export default function ProfileScreen() {
           <Pressable
             style={styles.menuItem}
             onPress={() =>
-              Alert.alert('Phương thức thanh toán', 'Bạn đang liên kết Ví MoMo và Thẻ ATM nội địa Napas.')
+              router.push('/account/wallet')
             }>
             <View style={styles.menuLeft}>
               <IconSymbol name="💳" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Phương thức thanh toán</Text>
-                <Text style={styles.menuSub}>Ví MoMo, VNPAY, Thẻ liên kết</Text>
+                <Text style={styles.menuLabel}>Ví của tôi</Text>
+                <Text style={styles.menuSub}>Số dư, nạp tiền và lịch sử giao dịch</Text>
               </View>
             </View>
             <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />

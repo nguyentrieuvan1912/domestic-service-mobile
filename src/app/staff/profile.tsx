@@ -2,9 +2,10 @@ import { useFocusEffect } from 'expo-router';
 import { remoteImageSource } from '@/utils/image-source';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
 import { EmptyState } from '@/components/common/EmptyState';
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Alert,
+  AppState,
   Image,
   Pressable,
   ScrollView,
@@ -18,6 +19,7 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { StaffRepository } from '@/data/connectedStaffRepository';
 import { StaffService } from '@/data/staffService';
 import { useStaffCapabilities } from '@/hooks/use-staff-capabilities';
 
@@ -30,14 +32,38 @@ export default function StaffProfileScreen() {
   return <StaffProfileContent key={currentStaff.id} />;
 }
 function StaffProfileContent() {
+  'use no memo'; // Mutable repository reads follow the subscribed revision.
   const router = useRouter();
   const { currentStaff, logout } = useAuth();
   const capabilityResource = useStaffCapabilities();
-  if (!capabilityResource.actor || !currentStaff) return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+  const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
+  const [reviewsError, setReviewsError] = useState('');
+  const staffKey = currentStaff?.id;
+  useFocusEffect(useCallback(() => {
+    if (!staffKey) return;
+    let active = true, inFlight = false;
+    const refresh = async () => {
+      if (!active || inFlight || AppState.currentState !== 'active') return;
+      inFlight = true;
+      try { await StaffRepository.refreshReviews(); if (active) setReviewsError(''); }
+      catch { if (active) setReviewsError('Chưa cập nhật được đánh giá mới. Hệ thống đang thử lại.'); }
+      finally { inFlight = false; }
+    };
+    void refresh();
+    const timer = setInterval(() => void refresh(), 5000);
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') void refresh(); });
+    return () => { active = false; clearInterval(timer); foreground.remove(); };
+  }, [staffKey]));
+  const performance = useMemo(() => capabilityResource.actor && staffKey ? {
+    profile: StaffService.getOperationalProfile(staffKey),
+    reviews: StaffService.getStaffReviews(staffKey),
+    completedJobs: StaffService.getCompletedJobs(staffKey),
+  } : null, [capabilityResource.actor, staffKey, revision]);
+  if (!capabilityResource.actor || !currentStaff || !performance) return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <EmptyState icon="shield" title="Vui lòng đăng nhập tài khoản nhân viên" description="Đăng nhập để xem hồ sơ và năng lực của bạn." actionText="Đăng nhập" onAction={() => router.push('/auth/login')} />
   </SafeAreaView>;
   const staffId = currentStaff.id;
-  const profile = StaffService.getOperationalProfile(staffId);
+  const { profile, reviews: staffReviews, completedJobs } = performance;
 
   const staff = currentStaff;
 
@@ -63,6 +89,7 @@ function StaffProfileContent() {
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StaffConnectionStatus />
+        {!!reviewsError && <Text accessibilityRole="alert" style={{ color: BrandColors.gray500, padding: Spacing.three }}>{reviewsError}</Text>}
         {/* Top Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Hồ sơ & Đánh giá</Text>
@@ -94,7 +121,7 @@ function StaffProfileContent() {
             <View style={styles.kpiGrid}>
               <View style={styles.kpiItem}>
                 <View style={styles.kpiStarRow}>
-                  <Text style={styles.kpiValue}>{profile.rating.toFixed(2)}</Text>
+                  <Text style={styles.kpiValue}>{profile.reviewCount ? profile.rating.toFixed(2) : '—'}</Text>
                   <Text style={styles.kpiStar}>★</Text>
                 </View>
                 <Text style={styles.kpiLabel}>{profile.reviewCount} đánh giá</Text>
@@ -106,12 +133,12 @@ function StaffProfileContent() {
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{profile.reviewCount ? Math.round(StaffService.getStaffReviews(staffId).filter(r=>r.rating===5).length/profile.reviewCount*100)+'%' : '—'}</Text>
+                <Text style={styles.kpiValue}>{profile.reviewCount ? Math.round(staffReviews.filter(r=>r.rating===5).length/profile.reviewCount*100)+'%' : '—'}</Text>
                 <Text style={styles.kpiLabel}>Hài lòng 5★</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{StaffService.getCompletedJobs(staffId).length}</Text>
+                <Text style={styles.kpiValue}>{completedJobs.length}</Text>
                 <Text style={styles.kpiLabel}>Ca thành công</Text>
               </View>
             </View>

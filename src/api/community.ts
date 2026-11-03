@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { ImagePickerAsset } from 'expo-image-picker';
-import { operationRequest } from './operations';
+import { operationRequest, canConfirmOperation } from './operations';
 export type Reaction = 'LIKE' | 'LOVE' | 'HAHA' | 'WOW' | 'SAD' | 'SUPPORT';
 export const REACTIONS: { id: Reaction; emoji: string; label: string }[] = [
   { id: 'LIKE', emoji: '👍', label: 'Thích' }, { id: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
@@ -58,4 +58,26 @@ export async function uploadAttachment(asset: ImagePickerAsset, ticket: UploadTi
 export function mergeComments(current: CommunityComment[], incoming: CommunityComment[]) {
   const items = new Map(current.map(item => [item.id, item])); incoming.forEach(item => items.set(item.id, item));
   return [...items.values()].sort((a, b) => a.id - b.id);
+}
+
+export type PublishedPost = { id: number; status: 'PENDING' | 'PUBLISHED' | 'HIDDEN' };
+function confirmedPost(value: PublishedPost): PublishedPost {
+  if (!value || !Number.isSafeInteger(value.id) || value.id <= 0 || !['PENDING', 'PUBLISHED', 'HIDDEN'].includes(value.status))
+    throw new Error('Máy chủ chưa xác nhận bài viết đã lưu. Bản nháp vẫn được giữ.');
+  return value;
+}
+export async function createCommunityPost(body: { content: string; mediaIds: number[]; requestKey: string }): Promise<PublishedPost> {
+  try {
+    const result = await operationRequest<PublishedPost>('identity', '/community/posts', 'POST', body);
+    try { return confirmedPost(result); }
+    catch (error) { return await confirmCommunityPost(body.requestKey, error); }
+  } catch (error) {
+    if (!canConfirmOperation(error)) throw error;
+    // A lost response can follow a committed POST. Confirm via a scoped read; never replay the write.
+    return confirmCommunityPost(body.requestKey, error);
+  }
+}
+async function confirmCommunityPost(key: string, originalError: unknown): Promise<PublishedPost> {
+  try { return confirmedPost(await operationRequest<PublishedPost>('identity', '/community/posts/requests/' + encodeURIComponent(key))); }
+  catch { throw originalError; }
 }
