@@ -44,10 +44,11 @@ import { retryBookingRead } from '@/utils/booking-read';
 import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
 import { RequireAddressView } from '@/components/booking/RequireAddressView';
 import { operationRequest } from '@/api/operations';
+import { loadAiBookingDraft, type AiBookingDraft } from '@/api/ai-booking-draft';
 import { ConnectedBooking, CustomerBookings, bookingView } from '@/data/connectedBookings';
 import { staffView } from '@/hooks/use-booking-detail';
 import { serviceAnswersIssue } from '@/utils/service-requirements';
-import { serviceSetupSteps } from '@/utils/service-setup';
+import { serviceSetupIssue, serviceSetupSteps } from '@/utils/service-setup';
 import { ServiceSetupWizard } from '@/components/booking/ServiceSetupWizard';
 import { ServiceRecommendation } from '@/components/booking/ServiceRecommendation';
 import { usePackageRecommendation } from '@/hooks/use-package-recommendation';
@@ -75,10 +76,30 @@ export default function NewBookingScreen() {
     mode?: BookingMode;
     staffId?: string;
     retryBookingId?: string;
+    aiConversationId?: string;
   }>();
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [retryState, setRetryState] = useState<{ key: string; booking?: ConnectedBooking; error?: string }>({ key: '' });
   const retryKey = `${currentCustomer?.id || ''}:${params.retryBookingId || ''}`;
+  const aiKey = `${currentCustomer?.id || ''}:${params.aiConversationId || ''}`;
+  const [aiState, setAiState] = useState<{ key: string; draft?: AiBookingDraft; error?: string }>({ key: '' });
+  useEffect(() => {
+    if (!params.aiConversationId || !currentCustomer) return;
+    const controller = new AbortController();
+    setAiState({ key: '' });
+    void loadAiBookingDraft(params.aiConversationId, controller.signal).then(draft => {
+      if (!draft.id || !draft.data.serviceId) throw new Error('Đơn nháp đã hết hạn hoặc chưa có dịch vụ. Bạn hãy mở lại cuộc trò chuyện.');
+      if (!controller.signal.aborted) setAiState({ key: aiKey, draft });
+    }).catch(cause => {
+      if (!controller.signal.aborted) setAiState({ key: aiKey, error: cause instanceof Error ? cause.message : 'Chưa tải được đơn nháp.' });
+    });
+    return () => controller.abort();
+  }, [aiKey, retryAttempt]);
+  const aiDraft = params.aiConversationId && aiState.key === aiKey ? aiState.draft : undefined;
+  const aiIssue = params.aiConversationId && (aiState.error ||
+    (aiDraft && (!catalog.resolveId(String(aiDraft.data.serviceId)) ||
+      !catalog.packages.some(pack => pack.serviceId === String(aiDraft.data.serviceId)))
+      ? 'Dịch vụ của đơn nháp không còn khả dụng. Bạn hãy chọn lại dịch vụ.' : ''));
   useEffect(() => {
     if (!params.retryBookingId || !currentCustomer) return;
     let active = true;
@@ -128,7 +149,8 @@ export default function NewBookingScreen() {
     );
   }
 
-  if (catalog.loading || addressResource.loading || (!!params.retryBookingId && retryState.key !== retryKey)) {
+  if (catalog.loading || addressResource.loading || (!!params.retryBookingId && retryState.key !== retryKey)
+    || (!!params.aiConversationId && aiState.key !== aiKey)) {
     return (
       <LinearGradient
         colors={BrandColors.softBgGradient}
@@ -148,7 +170,7 @@ export default function NewBookingScreen() {
     );
   }
 
-  if (catalog.error || addressResource.error || (params.retryBookingId && retryState.error) || restoreIssue) {
+  if (catalog.error || addressResource.error || (params.retryBookingId && retryState.error) || restoreIssue || aiIssue) {
     return (
       <LinearGradient
         colors={BrandColors.softBgGradient}
@@ -161,7 +183,7 @@ export default function NewBookingScreen() {
               <IconSymbol name="warning" size={38} color={BrandColors.danger} />
             </View>
             <Text style={styles.stateTitle}>Có lỗi xảy ra</Text>
-            <Text style={styles.stateSubtitle}>{catalog.error || addressResource.error || retryState.error || restoreIssue}</Text>
+            <Text style={styles.stateSubtitle}>{catalog.error || addressResource.error || retryState.error || restoreIssue || aiIssue}</Text>
             <Pressable
               style={styles.statePrimaryBtn}
               onPress={() => {
@@ -186,7 +208,7 @@ export default function NewBookingScreen() {
   if (!addressResource.addresses.length) {
     return (
       <RequireAddressView
-        mode={params.mode || (params.staffId ? 'MODE_A' : 'MODE_A')}
+        mode={aiDraft ? 'MODE_B' : params.mode || 'MODE_A'}
         currentCustomer={currentCustomer}
         onManageAddresses={() =>
           router.push({
@@ -231,9 +253,9 @@ export default function NewBookingScreen() {
     );
   }
 
-  return <ConnectedNewBooking key={retryKey} catalog={catalog} addresses={addressResource.addresses} retryBooking={retrySource} addressRefreshError={addressResource.refreshError} retryAddresses={addressResource.retry} />;
+  return <ConnectedNewBooking key={retryKey + aiKey} catalog={catalog} addresses={addressResource.addresses} retryBooking={retrySource} aiDraft={aiDraft} addressRefreshError={addressResource.refreshError} retryAddresses={addressResource.retry} />;
 }
-function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshError, retryAddresses }: { catalog: ReturnType<typeof useBookingCatalog>; addresses: CustomerAddress[]; retryBooking?: ConnectedBooking; addressRefreshError: string; retryAddresses: () => void }) {
+function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addressRefreshError, retryAddresses }: { catalog: ReturnType<typeof useBookingCatalog>; addresses: CustomerAddress[]; retryBooking?: ConnectedBooking; aiDraft?: AiBookingDraft; addressRefreshError: string; retryAddresses: () => void }) {
   const router = useRouter();
   const { currentCustomer } = useAuth();
   const retry = useMemo(() => retryBooking ? bookingRetryDraft(retryBooking) : undefined, [retryBooking]);
@@ -250,10 +272,13 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
     quantity?: string;
     answers?: string;
   }>();
+  const ai = aiDraft?.data;
+  const [reviewAiSetup, setReviewAiSetup] = useState(false);
 
   // Mode selection: null = FLOW 0, otherwise MODE_A or MODE_B
   const [selectedMode, setSelectedMode] = useState<BookingMode | null>(
-    retry || params.mode === 'MODE_A'
+    ai ? 'MODE_B'
+      : retry || params.mode === 'MODE_A'
       ? 'MODE_A'
       : params.mode === 'MODE_B'
       ? 'MODE_B'
@@ -289,7 +314,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
 
   // ================= Form States =================
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
-    retry?.serviceId || catalog.resolveId(params.serviceId) || catalog.services[0].id
+    (ai?.serviceId ? String(ai.serviceId) : undefined) || retry?.serviceId || catalog.resolveId(params.serviceId) || catalog.services[0].id
   );
   const service = catalog.services.find(s => s.id === selectedServiceId) || catalog.services[0];
   const getPackagesByServiceId = (id: string) => catalog.packages.filter(p => p.serviceId === id);
@@ -309,22 +334,30 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
 
   // Address
   const [selectedAddressId, setSelectedAddressId] = useState<string>(
-    retry?.addressId || params.addressId || addresses[0]?.id || ''
+    (ai ? addresses.find(a => a.id === String(ai.addressId))?.id || '' :
+      retry?.addressId || params.addressId || addresses[0]?.id || '')
   );
   useEffect(() => {
+    if (ai) {
+      if (selectedAddressId && !addresses.some(a => a.id === selectedAddressId)) setSelectedAddressId('');
+      return;
+    }
     if (params.addressId && addresses.some(a => a.id === params.addressId)) {
       setSelectedAddressId(params.addressId);
     } else if (!selectedAddressId && addresses.length > 0) {
       setSelectedAddressId(addresses.find(a => a.isDefault)?.id || addresses[0].id);
     }
-  }, [params.addressId, addresses]);
+  }, [ai, params.addressId, addresses]);
   const selectedAddress =
     addresses.find((a) => a.id === selectedAddressId) || addresses[0];
 
   // Date & Time (chosen right after address in Mode A)
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(retry ? new Date(retry.date+'T12:00:00+07:00').toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : CALENDAR_DAYS[1].label)
-  ; const [selectedDateIso, setSelectedDateIso] = useState(retry?.date || CALENDAR_DAYS[1].iso);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>(retry?.time || '09:00');
+  const aiTime = ai?.startsAt?.slice(11, 16);
+  const aiDay = ai?.startsAt && aiTime && TIME_SLOTS.includes(aiTime) && Date.parse(ai.startsAt + '+07:00') > Date.now()
+    ? CALENDAR_DAYS.find(day => day.iso === ai.startsAt?.slice(0, 10)) : undefined;
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(retry ? new Date(retry.date+'T12:00:00+07:00').toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : aiDay?.label || CALENDAR_DAYS[1].label)
+  ; const [selectedDateIso, setSelectedDateIso] = useState(retry?.date || aiDay?.iso || CALENDAR_DAYS[1].iso);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>(retry?.time || (aiDay ? aiTime! : ai ? '' : '09:00'));
   const [discoveryMinutes,setDiscoveryMinutes]=useState(retry?.durationMinutes || 120);
 
   // Duration in hours (2h, 3h, 4h)
@@ -344,14 +377,15 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
   // Service Package & Staff count (Mode B)
   const staffReviewResource=usePublicBookingResource<{id:number;rating:number;comment:string;createdAt:string}[]>('/staff/'+(selectedStaff?.id || '0')+'/reviews', selectedMode==='MODE_A' && currentStep===4 && !!selectedStaff?.id);
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
-    packages.find(p => p.id === (retry?.packageId || params.packageId))?.id || packages[0]?.id || ''
+    packages.find(p => p.id === (ai ? String(ai.packageId) : retry?.packageId || params.packageId))?.id || packages[0]?.id || ''
   );
   const selectedPackage =
     packages.find((p) => p.id === selectedPackageId) || packages[0];
-  const [requiredStaffCount, setRequiredStaffCount] = useState<number>(selectedPackage?.defaultStaffCount || 1);
+  const [requiredStaffCount, setRequiredStaffCount] = useState<number>(() =>
+    Math.max(selectedPackage?.defaultStaffCount || 1, Math.min(20, ai?.requiredStaffCount || 1)));
 
   // Shared local selection for both booking modes. Nothing is preselected or sent to an API.
-  const [selectedExtraKeys, setSelectedExtraKeys] = useState<string[]>(() => {if(retry)return retry.extraKeys;try{return JSON.parse(params.addOnIds || '[]').filter((id:unknown)=>typeof id==='string' && serviceAddOns.some(a=>a.id===id)).map((id:string)=>'addon:'+id);}catch{return [];} });
+  const [selectedExtraKeys, setSelectedExtraKeys] = useState<string[]>(() => {if(retry)return retry.extraKeys;try{const ids=ai?(ai.addOnIds || []).map(String):JSON.parse(params.addOnIds || '[]');return ids.filter((id:unknown)=>typeof id==='string' && serviceAddOns.some(a=>a.id===id)).map((id:string)=>'addon:'+id);}catch{return [];} });
   const extraTotals = useMemo(() => getExtraTotals(extraOptions, selectedExtraKeys), [extraOptions,selectedExtraKeys]);
   const selectedAddOnIds = extraTotals.selected.filter(e => e.kind === 'ADD_ON').map(e => e.id);
   const selectedRelatedServiceIds = extraTotals.selected.filter(e => e.kind === 'SERVICE').map(e => e.id);
@@ -381,8 +415,8 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
   };
 
   // Promotion / Voucher (integrated directly in Order Summary)
-  const [promoInput, setPromoInput] = useState<string>(retry?.promotionCode || '');
-  const [selectedPromoCode, setSelectedPromoCode] = useState<string>(retry?.promotionCode || '');
+  const [promoInput, setPromoInput] = useState<string>(ai?.promotionCode || retry?.promotionCode || '');
+  const [selectedPromoCode, setSelectedPromoCode] = useState<string>(ai?.promotionCode || retry?.promotionCode || '');
   const [promoFeedback,setPromoFeedback]=useState(''),[promotionFailures,setPromotionFailures]=useState<Record<string,string>>({});
   const [quoteLoading,setQuoteLoading]=useState(false),[pricingAttempt,setPricingAttempt]=useState(0);
   const pricingGeneration=useRef(0),quoteAbort=useRef<AbortController|null>(null);
@@ -411,7 +445,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
   const [createdBooking, setCreatedBooking] = useState<ConnectedBooking | null>(null);
   const modeBAcceptedStaff = createdBooking?.assignments.filter(item => ['ACCEPTED','COMPLETED'].includes(item.status)) || [];
   const isModeBStaffAccepted=!!createdBooking && ['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(createdBooking.status) && modeBAcceptedStaff.length >= createdBooking.requiredStaffCount;
-  const [answers, setAnswers] = useState<Record<string, unknown>>(() => {if(retry)return retry.answers;try {const data=JSON.parse(params.answers || '{}');return data && typeof data==='object' && !Array.isArray(data)?data:{};}catch{return {};}});
+  const [answers, setAnswers] = useState<Record<string, unknown>>(() => {if(ai)return ai.answers || {};if(retry)return retry.answers;try {const data=JSON.parse(params.answers || '{}');return data && typeof data==='object' && !Array.isArray(data)?data:{};}catch{return {};}});
   const [quote, setQuote] = useState<{ baseAmount:number; addOnAmount:number; discountAmount:number; totalAmount:number; durationMinutes:number } | null>(null);
   const [quoteResolvedKey, setQuoteResolvedKey] = useState('');
   const [timingNotice, setTimingNotice] = useState<BookingTimingNotice | null>(null);
@@ -421,9 +455,20 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
   let configuration:Record<string,unknown>=retry?.configuration || {};if(!retry)try{const parsed=JSON.parse(params.customConfig || '{}');if(parsed && typeof parsed==='object' && !Array.isArray(parsed))configuration=parsed;}catch{}
   const configuredServiceId=retry?.serviceId || catalog.resolveId(params.serviceId);
   const serviceDetail=catalog.details.find(d=>String(d.service.id)===service.id);
-  const setupSteps=useMemo(()=>serviceDetail?serviceSetupSteps(serviceDetail):[],[serviceDetail]);
+  const setupSteps=useMemo(()=>{
+    if (!serviceDetail) return [];
+    const all = serviceSetupSteps(serviceDetail);
+    if (!ai || reviewAiSetup) return all;
+    const initial = { answers: ai.answers || {}, packageId: String(ai.packageId), quantity: ai.quantity || 1, staffCount: ai.requiredStaffCount || 0 };
+    return all.filter(step => {
+      if (step.kind === 'QUESTION' && !step.field.required && initial.answers[step.field.fieldKey] == null) return false;
+      const supplied = step.kind === 'QUESTION' ? initial.answers[step.field.fieldKey] != null
+        : step.kind === 'PACKAGE' ? !!ai.packageId : step.kind === 'QUANTITY' ? !!ai.quantity : !!ai.requiredStaffCount;
+      return !supplied || !!serviceSetupIssue(step, serviceDetail, initial);
+    });
+  },[serviceDetail,ai,reviewAiSetup]);
   const questionSteps=useMemo(()=>serviceDetail?serviceSetupSteps(serviceDetail,true):[],[serviceDetail]);
-  const [unitQuantity,setUnitQuantity]=useState(() => Math.max(1, Math.min(100, Math.trunc(Number(params.quantity || retry?.quantity || configuration.acQuantity || 1) || 1))));
+  const [unitQuantity,setUnitQuantity]=useState(() => Math.max(1, Math.min(100, Math.trunc(Number(ai?.quantity || params.quantity || retry?.quantity || configuration.acQuantity || 1) || 1))));
   const quantity=serviceDetail?.service.priceUnit==='ITEM'?unitQuantity:1;
   const quoteBody = { quantity,configuration:service.id===configuredServiceId?{...configuration,...('acQuantity' in configuration?{acQuantity:quantity}:{})}:{},serviceId:service.id, packageId:actualPackage?.id, requiredStaffCount: selectedMode === 'MODE_A' ? 1 : requiredStaffCount, addOnIds:selectedAddOnIds, relatedServiceIds:selectedRelatedServiceIds, promotionCode:selectedPromoCode, answers };
   const quoteKey = JSON.stringify(quoteBody);
@@ -454,10 +499,10 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
   const appliedMeasurement=useRef('');
   useEffect(()=>{
     const option=recommendation.data?.options[0];
-    if(option&&bookingActivity.active&&appliedMeasurement.current!==recommendation.measurementKey){
+    if(!ai&&option&&bookingActivity.active&&appliedMeasurement.current!==recommendation.measurementKey){
       appliedMeasurement.current=recommendation.measurementKey;applyRecommendedOption(option);
     }
-  },[recommendation.data,recommendation.measurementKey,bookingActivity.active,applyRecommendedOption]);
+  },[ai,recommendation.data,recommendation.measurementKey,bookingActivity.active,applyRecommendedOption]);
   useEffect(()=>{
     if(selectedMode!=='MODE_B'||!serviceDetail)return;
     const minimum=minimumStaffForArea(serviceDetail,selectedPackageId,answers,quantity);
@@ -650,9 +695,9 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
     setQuote(null);setQuoteResolvedKey('');setQuoteError('');setQuoteLoading(false);
     setSubmitError('');setTimingNotice(null);setIsCopied(false);
     if(sections.has('payment'))setPaymentMethod('CASH');
-    if(sections.has('summary')){setSelectedPromoCode('');setPromoInput('');setPromoFeedback('');setPromotionFailures({});setCustomerNote('');}
+    if(sections.has('summary')){setSelectedPromoCode(ai?.promotionCode || '');setPromoInput(ai?.promotionCode || '');setPromoFeedback('');setPromotionFailures({});setCustomerNote('');}
     if(sections.has('answers'))setAnswers({});
-    if(sections.has('extras'))setSelectedExtraKeys([]);
+    if(sections.has('extras'))setSelectedExtraKeys((ai?.addOnIds || []).map(id=>'addon:'+id));
     if(sections.has('package')){
       const preferred=destination>=4?selectedStaff?.eligibleServices?.find(item=>serviceFilters.includes(item.id))?.id||selectedStaff?.eligibleServices?.[0]?.id:destination>=2?serviceFilters[0]:undefined;
       const serviceId=selectedMode==='MODE_A'?preferred||catalog.services[0].id:service.id;
@@ -661,8 +706,8 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
     if(sections.has('staff')){setSelectedStaffId('');setPickedStaff(undefined);}
     if(sections.has('staffFilters')){setStarFilter('ALL');setAgeFilter('ALL');setAvailableStaffs([]);setStaffError('');setStaffLoading(false);}
     if(sections.has('preferences'))setServiceFilters([]);
-    if(sections.has('time')){const days=calendarDays();setSelectedDateStr(days[1].label);setSelectedDateIso(days[1].iso);setSelectedTimeSlot('09:00');setDiscoveryMinutes(120);}
-    if(sections.has('address'))setSelectedAddressId(addresses.find(a=>a.isDefault)?.id||addresses[0]?.id||'');
+    if(sections.has('time')){const days=calendarDays();setSelectedDateStr((aiDay||days[1]).label);setSelectedDateIso((aiDay||days[1]).iso);setSelectedTimeSlot(aiDay ? aiTime! : ai ? '' : '09:00');setDiscoveryMinutes(120);}
+    if(sections.has('address'))setSelectedAddressId(ai ? addresses.find(a=>a.id===String(ai.addressId))?.id || '' : addresses.find(a=>a.isDefault)?.id||addresses[0]?.id||'');
   };
 
   // Back navigation
@@ -676,7 +721,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
     if (currentStep > 0) {
       triggerStepTransition(currentStep - 1);
     } else {
-      if (!params.mode && !params.serviceId && !params.staffId) {
+      if (!ai && !params.mode && !params.serviceId && !params.staffId) {
         resetLaterSteps(-1);setSelectedMode(null);
       } else {
         goBack();
@@ -719,7 +764,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
 
   // Header with visual step progress bar
   const renderHeader = (title: string, stepCurrent: number, stepTotal: number) => {
-    if(selectedMode==='MODE_B') { stepCurrent=setupSteps.length+stepCurrent-1;stepTotal=setupSteps.length+5; }
+    if(selectedMode==='MODE_B') { const setupCount=Math.max(1,setupSteps.length);stepCurrent=setupCount+stepCurrent-1;stepTotal=setupCount+5; }
     const progressPercent = `${Math.round(((stepCurrent + 1) / stepTotal) * 100)}%`;
     return (
       <View style={styles.headerWrapper}>
@@ -1961,13 +2006,39 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
   // =========================================================================
   if (selectedMode === 'MODE_B') {
     // ---------------- STEP 0: GÓI DIỆN TÍCH & SỐ LƯỢNG NHÂN VIÊN (Mode B) ----------------
+    if (currentStep === 0 && ai && serviceDetail && !setupSteps.length) {
+      return (
+        <LinearGradient colors={BrandColors.softBgGradient} style={styles.gradientContainer}>
+          <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+            {renderHeader('Thông tin từ đơn nháp', 0, 6)}
+            <ScrollView contentContainerStyle={styles.stepContent}>
+              <Text style={styles.sectionHeaderTitle}>{service.name}</Text>
+              <Text style={styles.stateSubtitle}>{selectedPackage?.name} · {quantity} gói · {requiredStaffCount} nhân viên</Text>
+              <ServiceAnswersSummary fields={serviceDetail.requirements} values={answers} />
+              <Pressable accessibilityRole="button" style={styles.stateBackBtn}
+                onPress={() => { setReviewAiSetup(true); setServiceSetupIndex(0); }}>
+                <Text style={styles.stateBackBtnText}>Chỉnh sửa thông tin</Text>
+              </Pressable>
+            </ScrollView>
+            <View style={styles.bottomBar}>
+              <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={() => triggerStepTransition(1)}>
+                <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
+                  <Text style={styles.ctaPrimaryText}>Tiếp tục</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
+      );
+    }
     if (currentStep === 0 && serviceDetail) {
       return <ServiceSetupWizard detail={serviceDetail} steps={setupSteps} index={serviceSetupIndex} totalSteps={setupSteps.length+5}
         recommendation={recommendation} applyRecommendation={applyRecommendedOption}
         answers={answers} packageId={selectedPackageId} quantity={unitQuantity} staffCount={requiredStaffCount}
         setAnswers={setAnswers} setQuantity={setUnitQuantity} setStaffCount={setRequiredStaffCount}
         setPackage={id=>{setSelectedPackageId(id);const pack=packages.find(item=>item.id===id);setRequiredStaffCount(count=>Math.max(count,pack?.defaultStaffCount || 1));}}
-        setIndex={setServiceSetupIndex} back={handleBack} complete={()=>triggerStepTransition(1)} nextSection="Dịch vụ bổ sung" />;
+        setIndex={setServiceSetupIndex} back={handleBack} complete={()=>triggerStepTransition(1)} nextSection="Dịch vụ bổ sung"
+        reviewAll={ai && !reviewAiSetup ? () => { setReviewAiSetup(true); setServiceSetupIndex(0); } : undefined} />;
     }
 
     // ---------------- STEP 1: DỊCH VỤ BỔ SUNG (ADD-ON) (Mode B) ----------------
@@ -2088,7 +2159,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
                 <View style={styles.bottomBar}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
-                    onPress={() => triggerStepTransition(3)}>
+                    onPress={() => selectedAddressId ? triggerStepTransition(3) : Alert.alert('Chọn địa chỉ', 'Bạn hãy chọn địa chỉ làm việc để tiếp tục.')}>
                     <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Chọn ngày & giờ)</Text>
                     </LinearGradient>
@@ -2190,7 +2261,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, addressRefreshE
                   <View style={styles.timeEstCard}>
                     <IconSymbol name="clock" size={18} color={BrandColors.primary} />
                     <Text style={styles.timeEstText}>
-                      Thời lượng ước tính: {selectedPackage.durationHours} giờ
+                      Thời lượng ước tính: {timePickerMinutes} phút
                     </Text>
                   </View>
                 </ScrollView>

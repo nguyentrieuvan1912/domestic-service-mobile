@@ -1,3 +1,4 @@
+import { BookingComplaintPanel } from '@/components/booking/BookingComplaintPanel';
 import { needsStaffResponse } from '@/utils/staff-response';
 import { bookingTravelStatus } from '@/utils/booking-travel-status';
 import { remoteImageSource } from '@/utils/image-source';
@@ -265,6 +266,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
         />
 
         {/* Action Buttons */}
+        <BookingComplaintPanel key={booking.id} booking={booking} />
         <View style={styles.bottomActions}>
           {isCompleted && (
             <Pressable

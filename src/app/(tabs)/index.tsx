@@ -118,7 +118,7 @@ export default function HomeScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsCategoriesExpanded((prev) => !prev);
   };
-  const bannerScrollRef = useRef<ScrollView>(null);
+  const bannerScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const activeIndexRef = useRef(0);
   const isInteractingRef = useRef(false);
 

@@ -2,19 +2,35 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const sdkRoots = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT,
-  process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Android', 'Sdk')].filter(Boolean);
+const sdkRoots = [
+  process.env.ANDROID_HOME,
+  process.env.ANDROID_SDK_ROOT,
+  process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Android', 'Sdk'),
+].filter(Boolean);
 const executable = process.platform === 'win32' ? 'adb.exe' : 'adb';
 const adb = sdkRoots.map(root => join(root, 'platform-tools', executable)).find(existsSync) || executable;
-const run = args => execFileSync(adb, args, { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const run = args => execFileSync(adb, args, { encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+const getDevices = () =>
+  run(['devices'])
+    .split(/\r?\n/)
+    .map(line => line.trim().split(/\s+/))
+    .filter(([serial, state]) => serial.startsWith('emulator-') && state === 'device')
+    .map(([serial]) => serial);
 
 try {
-  const devices = run(['devices']).split(/\r?\n/).map(line => line.trim().split(/\s+/))
-    .filter(([serial, state]) => serial.startsWith('emulator-') && state === 'device').map(([serial]) => serial);
+  let devices = getDevices();
+  if (!devices.length) {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    devices = getDevices();
+  }
   if (!devices.length) throw new Error('Chưa có máy ảo Android đang chạy. Bật máy ảo rồi chạy lại lệnh này.');
   for (const serial of devices) {
     run(['-s', serial, 'reverse', 'tcp:8090', 'tcp:8090']);
-    if (!run(['-s', serial, 'reverse', '--list']).includes('tcp:8090 tcp:8090')) throw new Error(`Chưa nối được cổng cho ${serial}.`);
+    run(['-s', serial, 'reverse', 'tcp:8080', 'tcp:8080']);
+    if (!run(['-s', serial, 'reverse', '--list']).includes('tcp:8090 tcp:8090')) {
+      throw new Error(`Chưa nối được cổng cho ${serial}.`);
+    }
     console.log(`${serial}: đã nối Expo qua localhost:8090.`);
   }
   const response = await fetch('http://127.0.0.1:8090/status', { signal: AbortSignal.timeout(3000) }).catch(() => null);

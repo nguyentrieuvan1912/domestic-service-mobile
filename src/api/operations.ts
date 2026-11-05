@@ -34,7 +34,9 @@ export async function operationRequest<T>(service: string, path: string, method 
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, { once: true });
     if (signal?.aborted) controller.abort();
-    const timeout = setTimeout(abort, 20000);
+    const isAiMessage = service === 'ai-assistant' && method === 'POST'
+      && /^\/conversations\/\d+\/messages$/.test(path);
+    const timeout = setTimeout(abort, isAiMessage ? 180000 : 20000);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/${service}${path}`, { method, headers: { Authorization: `Bearer ${active.token}`, 'Content-Type': 'application/json' }, signal: controller.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       if (!response.ok) {

@@ -1,3 +1,4 @@
+import { StaffDisciplineHistory } from '@/components/staff/StaffDisciplineHistory';
 import { BankLinkModal } from '@/components/staff/BankLinkModal';
 import { operationRequest } from '@/api/operations';
 import { useFocusEffect } from 'expo-router';
@@ -279,6 +280,7 @@ function StaffWalletContent() {
               })}
             </View>
           </View>
+          <StaffDisciplineHistory key={staffId} />
         </ScrollView>
       </SafeAreaView>
 

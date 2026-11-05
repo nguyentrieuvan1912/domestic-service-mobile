@@ -29,7 +29,7 @@ function AuthStack() {
   return (
     <>
         <StatusBar style="dark" />
-        <Stack initialRouteName="auth/login" screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="auth/login" options={{ headerShown: false }} />
           <Stack.Screen name="auth/register" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />

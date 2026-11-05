@@ -1,5 +1,5 @@
 import { BookingExitButton } from '@/components/booking/BookingExitButton';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CatalogDetail } from '@/api/catalog-types';
@@ -17,6 +17,7 @@ interface Props {
   setPackage: (id: string) => void; setQuantity: (quantity: number) => void; setStaffCount: (count: number) => void;
   setIndex: (index: number) => void; back: () => void; complete: () => void;
   nextSection?: string;
+  reviewAll?: () => void;
   recommendation?: ReturnType<typeof usePackageRecommendation>; applyRecommendation?: (option: PackageSuggestion) => void;
 }
 
@@ -24,7 +25,7 @@ export function ServiceSetupWizard(props: Props) {
   const { detail, steps, index, answers, packageId, quantity, staffCount }=props;
   const step=steps[Math.min(index,steps.length-1)];
   const [error,setError]=useState<{key: string;message: string}>();
-  const scroll=useRef<ScrollView>(null);
+  const scroll=useRef<ComponentRef<typeof ScrollView>>(null);
   const pack=detail.packages.find(item=>String(item.id)===packageId);
   const minimumStaff=minimumStaffForArea(detail,packageId,answers,quantity);
   const last=index===steps.length-1;
@@ -45,6 +46,9 @@ export function ServiceSetupWizard(props: Props) {
     <View accessibilityLabel={`Bước ${index+1} trên ${props.totalSteps || steps.length}`} style={styles.progressTrack}><View style={[styles.progressFill,{width:`${(index+1)/(props.totalSteps || steps.length)*100}%`}]} /></View>
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <ScrollView key={step.key} ref={scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {props.reviewAll && <Pressable accessibilityRole="button" onPress={props.reviewAll}>
+          <Text style={styles.eyebrow}>Xem và chỉnh sửa thông tin đã điền từ AI</Text>
+        </Pressable>}
         <Text style={styles.eyebrow}>{step.kind==='QUESTION' ? step.field.required ? 'THÔNG TIN CẦN CHỌN' : 'THÔNG TIN THÊM · CÓ THỂ BỎ QUA' : 'LỰA CHỌN CHO LỊCH ĐẶT'}</Text>
         <Text accessibilityRole="header" style={styles.title}>{step.title}</Text>
         {props.recommendation&&props.applyRecommendation&&(step.kind==='PACKAGE'||step.kind==='STAFF')&&<ServiceRecommendation resource={props.recommendation} packageId={packageId} staffCount={staffCount} quantity={quantity} apply={props.applyRecommendation}/>}
