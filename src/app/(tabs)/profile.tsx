@@ -8,6 +8,7 @@ import {
   Pressable,
   Image,
   Alert,
+  AppState,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,11 +19,36 @@ import { Badge, formatVND } from '@/components/common/Badge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
 import { Redirect, useFocusEffect } from 'expo-router';
+import { operationRequest } from '@/api/operations';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { currentCustomer, logout, isLoading, refreshProfile } = useAuth();
+  const { currentCustomer, accessToken, logout, isLoading, refreshProfile } = useAuth();
   const [profileError, setProfileError] = useState('');
+  const [statistics, setStatistics] = useState<{ owner: string; count: number | null; error: string }>({ owner: '', count: null, error: '' });
+  const [statisticsAttempt, setStatisticsAttempt] = useState(0);
+  useFocusEffect(useCallback(() => {
+    if (!currentCustomer || !accessToken) return;
+    const owner = currentCustomer.id;
+    const controller = new AbortController();
+    let inFlight = false;
+    setStatistics({ owner, count: null, error: '' });
+    const load = async () => {
+      if (inFlight || controller.signal.aborted || AppState.currentState === 'background') return;
+      inFlight = true;
+      try {
+        const result = await operationRequest<{ completedBookings: number }>('booking', '/customer/statistics', 'GET', undefined, controller.signal);
+        if (!Number.isSafeInteger(result.completedBookings) || result.completedBookings < 0) throw new Error('Số đơn hoàn tất trả về chưa hợp lệ.');
+        if (!controller.signal.aborted) setStatistics({ owner, count: result.completedBookings, error: '' });
+      } catch (cause) {
+        if (!controller.signal.aborted) setStatistics({ owner, count: null, error: cause instanceof Error ? cause.message : 'Chưa tải được số đơn hoàn tất.' });
+      } finally { inFlight = false; }
+    };
+    void load();
+    const timer = setInterval(() => { void load(); }, 15000);
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') void load(); });
+    return () => { controller.abort(); clearInterval(timer); listener.remove(); };
+  }, [currentCustomer?.id, accessToken, statisticsAttempt]));
   useFocusEffect(useCallback(() => {
     let active = true;
     void refreshProfile().then(() => { if (active) setProfileError(''); }).catch(error => { if (active) setProfileError(error.message); });
@@ -75,14 +101,9 @@ export default function ProfileScreen() {
           <Pressable
             style={styles.statBox}
             onPress={() => router.push('/(tabs)/bookings')}>
-            <Text style={styles.statNum}>{'—'}</Text>
+            <Text style={styles.statNum}>{statistics.owner === currentCustomer.id && statistics.count !== null ? statistics.count : statistics.error ? '—' : '…'}</Text>
             <Text style={styles.statLabel}>Đơn hoàn tất</Text>
           </Pressable>
-
-          <View style={styles.statBox}>
-            <Text style={styles.statNum}>{currentCustomer?.rewardPoints ?? 0}</Text>
-            <Text style={styles.statLabel}>Điểm thưởng</Text>
-          </View>
 
           <Pressable
             style={styles.statBox}
@@ -91,6 +112,12 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Địa chỉ lưu</Text>
           </Pressable>
         </View>
+
+        {statistics.owner === currentCustomer.id && !!statistics.error && (
+          <Pressable accessibilityRole="button" onPress={() => setStatisticsAttempt(value => value + 1)} style={{ marginBottom: 12 }}>
+            <Text style={{ color: BrandColors.danger }}>Chưa tải được số đơn hoàn tất. Chạm để thử lại.</Text>
+          </Pressable>
+        )}
 
         {/* SECTION 1: QUẢN LÝ DỊCH VỤ & TIỆN ÍCH */}
         <View style={styles.menuGroup}>

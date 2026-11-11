@@ -52,7 +52,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
           <Image source={remoteImageSource(service.image)} style={styles.serviceImage} />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <IconSymbol name="🏡" style={{ fontSize: 20 }} />
+            <IconSymbol name="home" size={20} color={BrandColors.gray500} />
           </View>
         )}
         <View style={styles.serviceInfo}>
@@ -69,7 +69,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             </View>
           ) : (
             <Text style={styles.matchingNote}>
-              {isClosed ? 'Đã dừng điều phối' : booking.status === 'MATCHING' ? '⚡ Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
+              {isClosed ? 'Đã dừng điều phối' : booking.status === 'MATCHING' ? 'Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
             </Text>
           )}
         </View>
@@ -97,7 +97,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                 e.stopPropagation();
                 onReview();
               }}>
-              <Text style={styles.reviewButtonText}>⭐ Đánh giá</Text>
+              <Text style={styles.reviewButtonText}>Đánh giá</Text>
             </Pressable>
           )}
 
@@ -119,13 +119,13 @@ export const BookingCard: React.FC<BookingCardProps> = ({
                 e.stopPropagation();
                 onRebook();
               }}>
-              <Text style={styles.rebookButtonText}>🔄 Đặt lại</Text>
+              <Text style={styles.rebookButtonText}>Đặt lại</Text>
             </Pressable>
           )}
 
           <Pressable style={styles.detailButton} onPress={onPress}>
             <Text style={styles.detailButtonText}>Chi tiết</Text>
-            <IconSymbol name="chevronRight" size={14} color={BrandColors.primary} />
+            <IconSymbol name="chevronRight" size={13} color={BrandColors.primaryDark} />
           </Pressable>
         </View>
       </View>
@@ -245,55 +245,61 @@ const styles = StyleSheet.create({
   actionsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   reviewButton: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: BorderRadius.md,
+    borderRadius: 6,
   },
   reviewButtonText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#D97706',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
   },
   cancelButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: BorderRadius.md,
+    borderRadius: 6,
   },
   cancelButtonText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: BrandColors.danger,
   },
   rebookButton: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: '#CBD5E1',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: BorderRadius.md,
+    borderRadius: 6,
   },
   rebookButtonText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#047857',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
   },
   detailButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: BorderRadius.md,
+    borderRadius: 6,
     backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
     gap: 2,
   },
   detailButtonText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: BrandColors.primary,
+    color: BrandColors.primaryDark,
   },
 });

@@ -77,17 +77,18 @@ export default function NewBookingScreen() {
     staffId?: string;
     retryBookingId?: string;
     aiConversationId?: string;
+    aiDraftId?: string;
   }>();
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [retryState, setRetryState] = useState<{ key: string; booking?: ConnectedBooking; error?: string }>({ key: '' });
   const retryKey = `${currentCustomer?.id || ''}:${params.retryBookingId || ''}`;
-  const aiKey = `${currentCustomer?.id || ''}:${params.aiConversationId || ''}`;
+  const aiKey = `${currentCustomer?.id || ''}:${params.aiConversationId || ''}:${params.aiDraftId || ''}`;
   const [aiState, setAiState] = useState<{ key: string; draft?: AiBookingDraft; error?: string }>({ key: '' });
   useEffect(() => {
     if (!params.aiConversationId || !currentCustomer) return;
     const controller = new AbortController();
     setAiState({ key: '' });
-    void loadAiBookingDraft(params.aiConversationId, controller.signal).then(draft => {
+    void loadAiBookingDraft(params.aiConversationId, controller.signal, params.aiDraftId).then(draft => {
       if (!draft.id || !draft.data.serviceId) throw new Error('Đơn nháp đã hết hạn hoặc chưa có dịch vụ. Bạn hãy mở lại cuộc trò chuyện.');
       if (!controller.signal.aborted) setAiState({ key: aiKey, draft });
     }).catch(cause => {

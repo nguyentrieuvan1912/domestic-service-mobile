@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +24,8 @@ import { CatalogState } from '@/components/common/CatalogState';
 import { CustomerAddress } from '@/types/user';
 import { useAdministrativeUnits } from '@/hooks/use-administrative-units';
 import { WardSelect } from '@/components/common/WardSelect';
+import { administrativeSearchKey } from '@/api/administrative-units';
+import { AddressLocationError, addressFields, currentAddressLocation } from '@/utils/address-location';
 
 export default function AddressManagementScreen() {
   const router = useRouter();
@@ -60,6 +63,50 @@ export default function AddressManagementScreen() {
   const [ward, setWard] = useState('');
   const [legacyAddress, setLegacyAddress] = useState('');
   const [note, setNote] = useState('');
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationNotice, setLocationNotice] = useState('');
+  const locationRequest = useRef(0);
+  useEffect(() => () => { locationRequest.current++; }, [currentCustomer?.id]);
+
+  const cancelLocation = () => {
+    locationRequest.current++;
+    setLocating(false);
+  };
+  const closeModal = () => { cancelLocation(); setModalVisible(false); };
+  const editLocation = () => {
+    cancelLocation();
+    setCoordinates(null);
+    setLocationNotice('');
+  };
+  const locate = async () => {
+    if (locating || saving) return;
+    const request = ++locationRequest.current;
+    setLocating(true);
+    setLocationNotice('');
+    try {
+      const position = await currentAddressLocation();
+      if (request !== locationRequest.current) return;
+      const region = administrativeSearchKey(position.address?.region || '');
+      const country = position.address?.isoCountryCode;
+      if ((country && country !== 'VN') || (region && !/ho chi minh|binh duong|ba ria.*vung tau/.test(region))) {
+        setLocationNotice('Vị trí hiện tại nằm ngoài khu vực TP. Hồ Chí Minh đang hỗ trợ. Bạn có thể nhập địa chỉ phục vụ bên dưới.');
+        return;
+      }
+      const fields = position.address ? addressFields(position.address, administrative.units) : null;
+      setCoordinates({ latitude: position.latitude, longitude: position.longitude });
+      setStreetAddress(fields?.street || '');
+      setWard(fields?.ward || '');
+      setLegacyAddress('');
+      setLocationNotice(fields?.street && fields.ward
+        ? 'Đã điền địa chỉ từ vị trí hiện tại. Bạn kiểm tra và bổ sung số nhà, số phòng trước khi lưu nhé.'
+        : 'Đã lấy vị trí. Bạn kiểm tra số nhà, tên đường và chọn phường/xã hiện hành bên dưới trước khi lưu nhé.');
+    } catch (cause) {
+      if (request === locationRequest.current) setLocationNotice(cause instanceof AddressLocationError ? cause.message : 'Chưa lấy được vị trí. Bạn có thể thử lại hoặc nhập địa chỉ bên dưới.');
+    } finally {
+      if (request === locationRequest.current) setLocating(false);
+    }
+  };
 
   // Delete modal state
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -73,6 +120,7 @@ export default function AddressManagementScreen() {
     setStreetAddress('');
     setWard(''); setLegacyAddress('');
     setNote('');
+    cancelLocation(); setCoordinates(null); setLocationNotice('');
     setModalVisible(true);
   };
 
@@ -85,6 +133,8 @@ export default function AddressManagementScreen() {
     setWard(administrative.units.some(unit => unit.name === addr.ward) ? addr.ward : '');
     setLegacyAddress(addr.district || !administrative.units.some(unit => unit.name === addr.ward) ? addr.fullAddress : '');
     setNote(addr.note || '');
+    cancelLocation(); setLocationNotice('');
+    setCoordinates(addr.latitude != null && addr.longitude != null ? { latitude: addr.latitude, longitude: addr.longitude } : null);
     setModalVisible(true);
   };
 
@@ -104,7 +154,7 @@ export default function AddressManagementScreen() {
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || locating) return;
     if (!streetAddress.trim() || !recipientName.trim() || !recipientPhone.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ người nhận, điện thoại và địa chỉ.');
       return;
@@ -119,9 +169,10 @@ export default function AddressManagementScreen() {
         title: title.trim(), recipientName: recipientName.trim(), recipientPhone: recipientPhone.trim(),
         streetAddress: streetAddress.trim(), district: '', note: note.trim(),
         ward: selectedWard.name, city: 'TP. Hồ Chí Minh', isDefault: previous?.isDefault || isFirst,
+        latitude: coordinates?.latitude ?? null, longitude: coordinates?.longitude ?? null,
       });
 
-      setModalVisible(false);
+      closeModal();
       const newId = saved?.id ? String(saved.id) : undefined;
       if (newId) {
         setSelectedAddressId(newId);
@@ -263,19 +314,26 @@ export default function AddressManagementScreen() {
         visible={modalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}>
+        onRequestClose={closeModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {editingAddressId ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}
               </Text>
-              <Pressable onPress={() => setModalVisible(false)}>
+              <Pressable onPress={closeModal}>
                 <IconSymbol name="close" size={20} color={BrandColors.gray800} />
               </Pressable>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              <Pressable accessibilityRole="button" disabled={locating || saving || administrative.loading}
+                style={[styles.locationBtn, (locating || saving) && { opacity: 0.6 }]} onPress={() => { void locate(); }}>
+                {locating ? <ActivityIndicator size="small" color={BrandColors.primaryDark} />
+                  : <IconSymbol name="location" size={20} color={BrandColors.primaryDark} />}
+                <Text style={styles.locationBtnText}>{locating ? 'Đang lấy vị trí…' : 'Lấy vị trí hiện tại'}</Text>
+              </Pressable>
+              {!!locationNotice && <Text accessibilityLiveRegion="polite" style={styles.locationNotice}>{locationNotice}</Text>}
               <Text style={styles.fieldLabel}>Tên gợi nhớ (Ví dụ: Nhà riêng, Cơ quan)</Text>
               <TextInput
                 style={styles.input}
@@ -303,14 +361,14 @@ export default function AddressManagementScreen() {
               <TextInput
                 style={styles.input}
                 value={streetAddress}
-                onChangeText={setStreetAddress}
+                onChangeText={value => { editLocation(); setStreetAddress(value); }}
                 placeholder="Số 123 Nguyễn Thị Minh Khai"
               />
 
               <Text style={styles.fieldLabel}>Phường / Xã (TP. Hồ Chí Minh)</Text>
               <WardSelect
                 value={ward}
-                onChange={setWard}
+                onChange={value => { editLocation(); setWard(value); }}
                 units={administrative.units}
                 loading={administrative.loading}
                 error={administrative.error}
@@ -325,7 +383,7 @@ export default function AddressManagementScreen() {
                 placeholder="Tòa Landmark 2, tầng 15..."
               />
 
-              <Pressable style={styles.saveBtn} disabled={saving} onPress={handleSave}>
+              <Pressable style={styles.saveBtn} disabled={saving || locating} onPress={handleSave}>
                 <Text style={styles.saveBtnText}>{saving ? 'Đang lưu...' : 'Lưu địa chỉ'}</Text>
               </Pressable>
             </ScrollView>
@@ -349,6 +407,9 @@ export default function AddressManagementScreen() {
 }
 
 const styles = StyleSheet.create({
+  locationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 12, backgroundColor: '#ECFDF5', marginBottom: 8 },
+  locationBtnText: { color: BrandColors.primaryDark, fontWeight: '700', fontSize: 14 },
+  locationNotice: { color: BrandColors.gray600, fontSize: 13, lineHeight: 19, marginBottom: 12 },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',

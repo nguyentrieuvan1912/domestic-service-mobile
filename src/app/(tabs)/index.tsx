@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  type LayoutChangeEvent,
   Modal,
   Alert,
   AppState,
@@ -23,12 +24,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
-import { Badge, formatVND } from '@/components/common/Badge';
+import { formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
 import { Staff } from '@/types/user';
 import { ServiceCategoryCard } from '@/components/common/ServiceCategoryCard';
 import { BookingStatusBadge } from '@/components/common/BookingStatusBadge';
 import { PromotionCard } from '@/components/common/PromotionCard';
+import { HomeBlogRow } from '@/components/blog/HomeBlogRow';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -113,6 +115,24 @@ export default function HomeScreen() {
 
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(true);
+  const [blogVisible, setBlogVisible] = useState(false);
+  const blogViewport = useRef({ top: 0, height: 0, rowTop: 0, rowHeight: 0, visible: false });
+
+  const updateBlogVisibility = () => {
+    const viewport = blogViewport.current;
+    const overlap = Math.min(viewport.top + viewport.height, viewport.rowTop + viewport.rowHeight)
+      - Math.max(viewport.top, viewport.rowTop);
+    const visible = viewport.rowHeight > 0 && overlap >= Math.min(96, viewport.rowHeight);
+    if (visible !== viewport.visible) {
+      viewport.visible = visible;
+      setBlogVisible(visible);
+    }
+  };
+  const handleBlogLayout = ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+    blogViewport.current.rowTop = layout.y;
+    blogViewport.current.rowHeight = layout.height;
+    updateBlogVisibility();
+  };
 
   const handleToggleCategories = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -159,9 +179,7 @@ export default function HomeScreen() {
       ['CONFIRMED', 'STAFF_ASSIGNED', 'IN_PROGRESS', 'MATCHING'].includes(b.status)
   );
 
-  // Popular and Recommended Services
   const popularServices = services.slice(0, 6);
-  const recommendedServices = services.slice(6, 10);
 
   // Recent completed bookings for quick re-booking
   const recentCompletedBookings = bookingResource.bookings.filter(b=>b.status==='COMPLETED').slice(0,5);
@@ -205,6 +223,15 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={64}
+          onLayout={({ nativeEvent }) => {
+            blogViewport.current.height = nativeEvent.layout.height;
+            updateBlogVisibility();
+          }}
+          onScroll={({ nativeEvent }) => {
+            blogViewport.current.top = nativeEvent.contentOffset.y;
+            updateBlogVisibility();
+          }}
           contentContainerStyle={styles.scrollContent}>
           {/* TOP HEADER: User Greeting, Address, Notifications */}
           <View style={styles.topHeader}>
@@ -633,44 +660,7 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
 
-          {/* RECOMMENDED SERVICES FOR HOME */}
-          <View style={[styles.sectionHeaderRow, { marginTop: Spacing.four }]}>
-            <View>
-              <Text style={styles.sectionTitle}>Gợi ý cho gia đình bạn</Text>
-              <Text style={styles.sectionSubtitle}>Dịch vụ tiện ích nâng tầm chất lượng sống</Text>
-            </View>
-          </View>
-
-          <View style={{ paddingHorizontal: Spacing.three }}>
-            {recommendedServices.map((service) => (
-              <Pressable
-                key={service.id}
-                style={styles.recItem}
-                onPress={() =>
-                  router.push({
-                    pathname: '/service/[id]',
-                    params: { id: service.id },
-                  })
-                }>
-                <Image source={remoteImageSource(service.image)} style={styles.recThumb} />
-                <View style={styles.recContent}>
-                  <Text numberOfLines={1} style={styles.recTitle}>
-                    {service.name}
-                  </Text>
-                  <Text numberOfLines={2} style={styles.recDesc}>
-                    {service.shortDescription || service.description}
-                  </Text>
-                  <View style={styles.recFooter}>
-                    <Text style={styles.recPrice}>
-                      {formatVND(service.basePrice)}
-                      <Text style={styles.popularUnit}>/{service.unit}</Text>
-                    </Text>
-                    <RatingStars rating={service.rating} size={11} />
-                  </View>
-                </View>
-              </Pressable>
-            ))}
-          </View>
+          <HomeBlogRow visible={blogVisible && !selectedBundle} onLayout={handleBlogLayout} />
 
           {/* PROMOTIONS & VOUCHERS */}
           <View style={[styles.sectionHeaderRow, { marginTop: Spacing.four }]}>
@@ -1197,46 +1187,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 11,
     fontWeight: '700',
-  },
-  recItem: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: BorderRadius.xl,
-    padding: 10,
-    marginBottom: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
-  },
-  recThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: '#E2E8F0',
-  },
-  recContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  recTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: BrandColors.gray900,
-  },
-  recDesc: {
-    fontSize: 11,
-    color: BrandColors.gray500,
-    lineHeight: 15,
-  },
-  recFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recPrice: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: BrandColors.primary,
   },
   floatingAIBtn: {
     position: 'absolute',

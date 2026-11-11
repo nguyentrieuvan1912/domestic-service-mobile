@@ -11,7 +11,7 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.domesticservice.cleanmaster",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Cho phép dùng micro để gọi cho khách hàng hoặc nhân viên trong đơn hàng.",
+        "NSMicrophoneUsageDescription": "Cho phép dùng micro để nói với trợ lý AI hoặc gọi trong đơn hàng.",
         "NSCameraUsageDescription": "Cho phép dùng camera khi bạn bật video trong cuộc gọi."
       }
     },
@@ -31,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-location", {
+        "locationWhenInUsePermission": "Cho phép CleanMaster lấy vị trí hiện tại để điền địa chỉ khi bạn yêu cầu.",
+        "isIosBackgroundLocationEnabled": false,
+        "isAndroidBackgroundLocationEnabled": false,
+        "isAndroidForegroundServiceEnabled": false
+      }],
       [
         "expo-splash-screen",
         {
@@ -40,6 +46,10 @@
         }
       ],
       "expo-video",
+      ["expo-audio", {
+        "microphonePermission": "Cho phép dùng micro để nói với trợ lý AI hoặc gọi trong đơn hàng.",
+        "recordAudioAndroid": true
+      }],
       "expo-image",
       "expo-web-browser",
       "expo-secure-store",

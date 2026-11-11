@@ -1,5 +1,6 @@
 import { BookingCommunicationBridge } from '@/components/common/BookingCommunicationBridge';
 import { BookingCancellationNotice } from '@/components/booking/BookingCancellationNotice';
+import { SystemAlertHost } from '@/components/common/SystemAlertHost';
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,7 +14,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 export default function RootLayout() {
-  return <SafeAreaProvider><AuthProvider><AuthStack /></AuthProvider></SafeAreaProvider>;
+  return <SafeAreaProvider><AuthProvider><AuthStack /><SystemAlertHost /></AuthProvider></SafeAreaProvider>;
 }
 
 function AuthStack() {
@@ -58,6 +59,7 @@ function AuthStack() {
           <Stack.Screen name="chat/trash" options={{ headerShown: false }} />
           <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="ai/index" options={{ presentation: 'card', headerShown: false }} />
+          <Stack.Screen name="blog/[slug]" />
           <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
           <Stack.Screen name="notifications/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="account/addresses" options={{ headerShown: false }} />

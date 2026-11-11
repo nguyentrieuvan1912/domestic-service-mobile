@@ -30,24 +30,24 @@ export function SmartExtras({ options, selectedKeys, onToggle, onClear, warning 
           <Text style={styles.kind}>{extra.kind === 'ADD_ON' ? 'Bổ sung' : 'Dịch vụ liên quan'}</Text>
           <Text style={styles.name}>{extra.name}</Text>
           {extra.kind === 'SERVICE' && <Text style={styles.scope}>{extra.scope}</Text>}
-          <Text style={styles.reason}>{extra.reason}</Text>
+          <Text style={styles.reason} numberOfLines={2}>{extra.reason}</Text>
           <Text style={styles.price}>+{formatVND(extra.price)}
             <Text style={styles.duration}>{extra.minutes > 0 ? ` · ${extra.minutes} phút${extra.kind === 'SERVICE' ? ' dự kiến' : ''}` : ' · Không thêm thời gian'}</Text>
           </Text>
           {blocked && <Text style={styles.blocked}>Đã có hạng mục tương tự. Bỏ mục đã chọn nếu muốn đổi.</Text>}
           {isSelected && !!warning && <Text accessibilityRole="alert" style={styles.warning}>{warning}</Text>}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${isSelected ? 'Bỏ' : 'Thêm'} ${extra.name}`}
-            accessibilityState={{ disabled: blocked, selected: isSelected }}
-            disabled={blocked}
-            onPress={() => { if(onToggle(extra.key) === false) setShowAll(false); }}
-            style={[styles.addButton, isSelected && styles.removeButton, blocked && styles.disabledButton]}>
-            <Text style={[styles.addText, isSelected && styles.removeText]}>
-              {isSelected ? '✓ Đã thêm · Bỏ' : blocked ? 'Trùng hạng mục' : '+ Thêm'}
-            </Text>
-          </Pressable>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${isSelected ? 'Bỏ' : 'Thêm'} ${extra.name}`}
+          accessibilityState={{ disabled: blocked, selected: isSelected }}
+          disabled={blocked}
+          onPress={() => { if(onToggle(extra.key) === false) setShowAll(false); }}
+          style={[styles.addButton, isSelected && styles.removeButton, blocked && styles.disabledButton]}>
+          <Text style={[styles.addText, isSelected && styles.removeText]}>
+            {isSelected ? '✓ Đã thêm' : blocked ? 'Trùng mục' : '+ Thêm'}
+          </Text>
+        </Pressable>
       </View>
     );
   };
@@ -149,17 +149,17 @@ const styles = StyleSheet.create({
   title: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: BrandColors.gray900 },
   previewBadge: { maxWidth: '100%', fontSize: 10, color: BrandColors.primaryDark, backgroundColor: BrandColors.primaryLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BorderRadius.full },
   subtitle: { fontSize: 13, color: BrandColors.gray600, marginBottom: 16 },
-  card: { flexDirection: 'row', gap: 12, padding: 12, backgroundColor: BrandColors.white, borderRadius: BorderRadius.xl, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: BrandColors.white, borderRadius: BorderRadius.xl, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 10 },
   selectedCard: { borderColor: BrandColors.primary, backgroundColor: BrandColors.primaryLight },
-  image: { flexShrink: 0, width: 60, height: 60, borderRadius: BorderRadius.md, backgroundColor: BrandColors.gray100 },
+  image: { flexShrink: 0, width: 64, height: 64, borderRadius: BorderRadius.md, backgroundColor: BrandColors.gray100 },
   info: { flex: 1, minWidth: 0 },
-  kind: { fontSize: 10, fontWeight: '600', color: BrandColors.primaryDark, marginBottom: 3 },
+  kind: { fontSize: 10, fontWeight: '600', color: BrandColors.primaryDark, marginBottom: 2 },
   name: { fontSize: 13, fontWeight: '700', color: BrandColors.gray900 },
-  scope: { fontSize: 11, color: BrandColors.gray600, marginTop: 4 },
-  reason: { fontSize: 12, color: BrandColors.gray600, lineHeight: 17, marginTop: 4 },
-  price: { fontSize: 13, fontWeight: '700', color: BrandColors.primaryDark, marginTop: 6 },
+  scope: { fontSize: 11, color: BrandColors.gray600, marginTop: 2 },
+  reason: { fontSize: 12, color: BrandColors.gray600, lineHeight: 16, marginTop: 2 },
+  price: { fontSize: 13, fontWeight: '700', color: BrandColors.primaryDark, marginTop: 4 },
   duration: { fontSize: 11, fontWeight: '400', color: BrandColors.gray600 },
-  addButton: { maxWidth: '100%', alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: BrandColors.primary, borderRadius: BorderRadius.lg, marginTop: 8 },
+  addButton: { flexShrink: 0, alignSelf: 'center', minHeight: 38, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, backgroundColor: BrandColors.primary, borderRadius: BorderRadius.lg },
   addText: { textAlign: 'center', fontSize: 12, fontWeight: '700', color: BrandColors.white },
   removeButton: { backgroundColor: BrandColors.white, borderWidth: 1, borderColor: BrandColors.primary },
   removeText: { color: BrandColors.primaryDark },

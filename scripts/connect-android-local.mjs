@@ -25,17 +25,27 @@ try {
     devices = getDevices();
   }
   if (!devices.length) throw new Error('Chưa có máy ảo Android đang chạy. Bật máy ảo rồi chạy lại lệnh này.');
+  const shouldRestart = process.argv.includes('--restart');
+  const response = await fetch('http://127.0.0.1:8090/status', { signal: AbortSignal.timeout(3000) }).catch(() => null);
   for (const serial of devices) {
     run(['-s', serial, 'reverse', 'tcp:8090', 'tcp:8090']);
     run(['-s', serial, 'reverse', 'tcp:8080', 'tcp:8080']);
     if (!run(['-s', serial, 'reverse', '--list']).includes('tcp:8090 tcp:8090')) {
       throw new Error(`Chưa nối được cổng cho ${serial}.`);
     }
-    console.log(`${serial}: đã nối Expo qua localhost:8090.`);
+    console.log(`${serial}: đã nối Expo (8090) và API (8080) qua localhost.`);
+    if (response?.ok) {
+      if (shouldRestart) {
+        run(['-s', serial, 'shell', 'am', 'force-stop', 'host.exp.exponent']);
+      }
+      run(['-s', serial, 'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'exp://127.0.0.1:8090', 'host.exp.exponent']);
+      console.log(`${serial}: đã mở exp://127.0.0.1:8090 trong Expo Go.`);
+    }
   }
-  const response = await fetch('http://127.0.0.1:8090/status', { signal: AbortSignal.timeout(3000) }).catch(() => null);
-  if (!response?.ok) console.log('Expo chưa chạy ở cổng 8090. Chạy npm start nếu chưa có dev server.');
-  console.log('Trong Expo Go trên mỗi máy ảo, mở exp://127.0.0.1:8090 thay cho địa chỉ IP Wi-Fi.');
+  if (!response?.ok) {
+    console.log('Expo chưa chạy ở cổng 8090. Chạy npm start nếu chưa có dev server.');
+    console.log('Trong Expo Go trên mỗi máy ảo, mở exp://127.0.0.1:8090 thay cho địa chỉ IP Wi-Fi.');
+  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Không kết nối được ADB.');
   process.exitCode = 1;

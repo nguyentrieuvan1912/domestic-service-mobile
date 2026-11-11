@@ -24,8 +24,8 @@ export interface CustomerAddress {
   district: string; // e.g. "Bình Thạnh"
   city: string; // e.g. "TP. Hồ Chí Minh"
   fullAddress: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   isDefault: boolean;
   note?: string;
 }

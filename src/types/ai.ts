@@ -6,6 +6,12 @@ export interface AISuggestion {
   title: string;
   subtitle?: string;
   price?: number;
+  serviceId?: string;
+  quantity?: number;
+  requiredStaffCount?: number;
+  answers?: Record<string, unknown>;
+  sourceHash?: string;
+  embeddingModel?: string;
 }
 
 export interface AIMessage {

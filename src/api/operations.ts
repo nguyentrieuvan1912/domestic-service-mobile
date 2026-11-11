@@ -36,9 +36,15 @@ export async function operationRequest<T>(service: string, path: string, method 
     if (signal?.aborted) controller.abort();
     const isAiMessage = service === 'ai-assistant' && method === 'POST'
       && /^\/conversations\/\d+\/messages$/.test(path);
-    const timeout = setTimeout(abort, isAiMessage ? 180000 : 20000);
+    const isVoice = service === 'ai-assistant' && method === 'POST' && path === '/voice/transcriptions';
+    const multipart = body instanceof FormData;
+    const timeout = setTimeout(abort, isAiMessage ? 180000 : isVoice ? 65000 : 20000);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/${service}${path}`, { method, headers: { Authorization: `Bearer ${active.token}`, 'Content-Type': 'application/json' }, signal: controller.signal, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      const response = await fetch(`${API_BASE_URL}/api/v1/${service}${path}`, {
+        method, signal: controller.signal,
+        headers: { Authorization: `Bearer ${active.token}`, ...(multipart ? {} : { 'Content-Type': 'application/json' }) },
+        ...(body === undefined ? {} : { body: multipart ? body : JSON.stringify(body) }),
+      });
       if (!response.ok) {
         if (response.status === 401 && session?.token === active.token) { connectOperationsSession(null, null); invalidated?.(); }
         const error = await response.json().catch(() => null);
