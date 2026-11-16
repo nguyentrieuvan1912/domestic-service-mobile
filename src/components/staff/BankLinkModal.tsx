@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,7 +40,7 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
     }, 1200);
     return () => { controller.abort(); clearTimeout(timer); setLookingUp(false); };
   }, [visible, automaticLookup, bin, account, revision]);
-  const searchInput = useRef<TextInput>(null);
+  const searchInput = useRef<ComponentRef<typeof TextInput>>(null);
   const selectedBank = banks.find(bank => bank.bin === bin);
   const normalize = (value: string) => value.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
   const filteredBanks = banks.filter(bank => normalize(`${bank.shortName} ${bank.name} ${bank.bin}`).includes(normalize(search.trim())));

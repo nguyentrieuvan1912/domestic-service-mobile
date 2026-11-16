@@ -1,6 +1,6 @@
 import { ServiceQuestions } from '@/components/booking/ServiceQuestions';
 import { serviceAnswersIssue } from '@/utils/service-requirements';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -49,7 +49,7 @@ function RebookContent({ source, detail, address, replaceStaff }: { source: Conn
   const form = useQuickRebook(source, replaceStaff, detail.requirements);
   const [extrasOpen, setExtrasOpen] = useState(false), [customOpen, setCustomOpen] = useState(false), [saving, setSaving] = useState(false), [error, setError] = useState('');
   const busy = useRef(false);
-  const scroll = useRef<ScrollView>(null), repairOffset = useRef(0);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null), repairOffset = useRef(0);
   const [promoInput, setPromoInput] = useState(form.promotionCode);
   const [promoFeedback, setPromoFeedback] = useState('');
   const applyPromo = () => {

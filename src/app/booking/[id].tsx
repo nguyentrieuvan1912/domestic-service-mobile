@@ -1,3 +1,4 @@
+import { BookingComplaintPanel } from '@/components/booking/BookingComplaintPanel';
 import { needsStaffResponse } from '@/utils/staff-response';
 import { bookingTravelStatus } from '@/utils/booking-travel-status';
 import { remoteImageSource } from '@/utils/image-source';
@@ -265,6 +266,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
         />
 
         {/* Action Buttons */}
+        <BookingComplaintPanel key={booking.id} booking={booking} />
         <View style={styles.bottomActions}>
           {isCompleted && (
             <Pressable
@@ -275,7 +277,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
                   params: { bookingId: booking.id },
                 })
               }>
-              <Text style={styles.rateBtnText}>⭐ Đánh giá nhân viên</Text>
+              <Text style={styles.rateBtnText}>Đánh giá nhân viên</Text>
             </Pressable>
           )}
 
@@ -294,7 +296,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
               })
             }>
             <Text style={styles.rebookBtnText}>
-              {booking.staffId && staff ? `🔄 Đặt lại với ${staff.fullName}` : '🔄 Đặt lại dịch vụ này'}
+              {booking.staffId && staff ? `Đặt lại với ${staff.fullName}` : 'Đặt lại dịch vụ này'}
             </Text>
           </Pressable>
         </View>
