@@ -231,8 +231,7 @@ const styles = StyleSheet.create({
   deliveryNotice: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.one, fontSize: 12, color: BrandColors.gray600 },
 
   safeArea: {
-    flex: 1,
-    backgroundColor: BrandColors.white,
+    flex: 1
   },
   header: {
     flexDirection: 'row',

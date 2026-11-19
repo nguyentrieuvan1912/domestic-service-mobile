@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState, useEffect } from 'react';
 import {
@@ -33,6 +34,7 @@ export default function StaffJobsScreen() {
   return <StaffJobsContent key={currentUser!.id} />;
 }
 function StaffJobsContent() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; source?: string }>();
   const { currentStaff } = useAuth();
@@ -107,7 +109,7 @@ function StaffJobsContent() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header */}
         <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -209,7 +211,7 @@ function StaffJobsContent() {
         {/* List of Shifts */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: styles.scrollContent.paddingBottom + bottomTabHeight }]}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         >
           {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort, mode: matchMode, serviceId: selectedService, date: selectedDate }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); setSelectedService(''); setSelectedDate(''); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
@@ -335,7 +337,7 @@ function StaffJobsContent() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   safeArea: { flex: 1 },
 
   header: {

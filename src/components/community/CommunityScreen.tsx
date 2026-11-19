@@ -1,3 +1,5 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
+import { useAppTheme } from '@/context/ThemeContext';
 import { remoteImageSource } from '@/utils/image-source';
 import { useFocusEffect } from 'expo-router';
 import { identityRequest } from '@/api/identity';
@@ -20,7 +22,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
@@ -75,6 +76,8 @@ export default function CommunityScreen({ staffNavigation = false }: { staffNavi
 }
 
 function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
+  const { colors } = useAppTheme();
   const { currentUser, accessToken } = useAuth();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [error, setError] = useState('');
@@ -282,16 +285,12 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
   const hasDraft = !!draft.trim() || media.length > 0;
 
   return (
-    <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
-      style={styles.gradient}
-    >
+    <View style={styles.gradient}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <FlatList
           data={posts}
           keyExtractor={post => String(post.id)}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           initialNumToRender={5}
@@ -366,11 +365,11 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
               <View style={styles.emptyIconWrap}>
                 <IconSymbol name="users" size={30} color={BrandColors.primary} />
               </View>
-              <Text style={styles.emptyTitle}>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
                 {loading ? 'Đang tải cộng đồng…' : 'Chưa có bài viết để hiển thị'}
               </Text>
               {!loading && (
-                <Text style={styles.emptySubtitle}>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                   Hãy mở đầu cuộc trò chuyện bằng cách chia sẻ mẹo chăm sóc nhà cửa hoặc câu hỏi của bạn.
                 </Text>
               )}
@@ -772,7 +771,7 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
         </Modal>
       </SafeAreaView>
       {staffNavigation && <StaffBottomNav activeTab="community" />}
-    </LinearGradient>
+    </View>
   );
 }
 

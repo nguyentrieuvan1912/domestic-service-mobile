@@ -1,10 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/common/IconSymbol';
-import { BrandColors } from '@/constants/theme';
-import { useAppTheme } from '@/context/ThemeContext';
+import { BottomTabLabel, FloatingTabSurface, TabImageIcon, useBottomTabSpacing } from '@/components/common/TabImageIcon';
 
 export type StaffTabKey = 'home' | 'jobs' | 'community' | 'wallet' | 'profile';
 
@@ -22,14 +19,7 @@ const TABS: { key: StaffTabKey; label: string; icon: string; route: string }[] =
 
 export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { colors } = useAppTheme();
-
-  const tabBottomPadding = Platform.select({
-    ios: Math.min(insets.bottom, 16),
-    web: 6,
-    default: Math.min(insets.bottom, 6),
-  });
+  const spacing = useBottomTabSpacing();
 
   const handleTabPress = (tab: (typeof TABS)[0]) => {
     if (tab.key === activeTab) return;
@@ -37,47 +27,23 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => 
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingBottom: tabBottomPadding,
-          backgroundColor: colors.tabBarBg,
-          borderTopColor: colors.tabBarBorder,
-        },
-      ]}
-    >
+    <View pointerEvents="box-none" style={[styles.container, spacing]}>
+      <FloatingTabSurface inset={spacing.paddingHorizontal} bottom={spacing.paddingBottom} />
       <View style={styles.tabBar}>
         {TABS.map((tab) => {
           const isActive = tab.key === activeTab;
           return (
             <Pressable
               key={tab.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
               onPress={() => handleTabPress(tab)}
               style={styles.tabItem}
-              android_ripple={{ color: colors.border, borderless: true }}
+              android_ripple={{ color: 'rgba(255, 255, 255, 0.14)' }}
             >
-              <View
-                style={[
-                  styles.iconWrapper,
-                  isActive && { backgroundColor: colors.accentBg },
-                ]}
-              >
-                <IconSymbol
-                  name={tab.icon}
-                  size={20}
-                  color={isActive ? colors.accentText : colors.textMuted}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: colors.textMuted },
-                  isActive && [styles.tabLabelActive, { color: colors.accentText }],
-                ]}
-              >
-                {tab.label}
-              </Text>
+              <TabImageIcon name={tab.icon} focused={isActive} />
+              <BottomTabLabel label={tab.label} focused={isActive} />
             </Pressable>
           );
         })}
@@ -87,43 +53,16 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => 
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 8,
-  },
+  container: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 5 },
   tabBar: {
     flexDirection: 'row',
-    height: 56,
-    alignItems: 'center',
+    flex: 1,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  iconWrapper: {
-    paddingHorizontal: 12,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  iconWrapperActive: {
-    backgroundColor: '#ECFDF5',
-  },
-  tabLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: BrandColors.gray500,
-    marginTop: 2,
-  },
-  tabLabelActive: {
-    color: '#047857',
-    fontWeight: '700',
+    padding: 5,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
 });

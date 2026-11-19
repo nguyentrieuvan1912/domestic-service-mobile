@@ -50,7 +50,7 @@ export default function ChatTrashScreen() {
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' }, header: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }, back: { padding: 8 }, title: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }, back: { padding: 8 }, title: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
   content: { padding: 20, gap: 16 }, hint: { color: '#64748B', lineHeight: 22, fontSize: 14 }, card: { backgroundColor: 'white', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: 16, gap: 16 }, row: { flexDirection: 'row', alignItems: 'center', gap: 12 }, avatar: { width: 48, height: 48, borderRadius: 24 }, name: { fontSize: 15, color: '#0F172A', fontWeight: '700' }, service: { fontSize: 12, color: '#059669' }, preview: { color: '#475569', fontSize: 14 },
   button: { minHeight: 46, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, padding: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, backgroundColor: 'white' }, danger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }, dangerText: { color: '#DC2626', fontWeight: '700', fontSize: 14 }, error: { color: '#DC2626' }, empty: { alignItems: 'center', paddingVertical: 64, gap: 16 }, emptyText: { color: '#64748B', fontSize: 16 }, scrim: { flex: 1, backgroundColor: '#0007', justifyContent: 'center', padding: 24 }, dialog: { padding: 24, borderRadius: 20, backgroundColor: 'white', gap: 16 },
 });

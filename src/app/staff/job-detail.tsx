@@ -577,13 +577,12 @@ function StaffJobDetailContent() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   centerContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#FFFFFF',
     gap: 12,
   },
   notFoundContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },

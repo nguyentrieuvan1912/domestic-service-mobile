@@ -1,7 +1,8 @@
 import { BookingExitButton } from '@/components/booking/BookingExitButton';
 import { useRef, useState, type ComponentRef } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import type { CatalogDetail } from '@/api/catalog-types';
 import { BrandColors } from '@/constants/theme';
 import { ServiceQuantity } from './ServiceQuestions';
@@ -44,7 +45,7 @@ export function ServiceSetupWizard(props: Props) {
       <BookingExitButton />
     </View>
     <View accessibilityLabel={`Bước ${index+1} trên ${props.totalSteps || steps.length}`} style={styles.progressTrack}><View style={[styles.progressFill,{width:`${(index+1)/(props.totalSteps || steps.length)*100}%`}]} /></View>
-    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
+    <KeyboardSafeLayout>
       <ScrollView key={step.key} ref={scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {props.reviewAll && <Pressable accessibilityRole="button" onPress={props.reviewAll}>
           <Text style={styles.eyebrow}>Xem và chỉnh sửa thông tin đã điền từ AI</Text>
@@ -104,12 +105,12 @@ export function ServiceSetupWizard(props: Props) {
         <Text style={styles.nextLabel}>Tiếp theo: {nextTitle}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Tiếp tục" onPress={next} style={styles.next}><Text style={styles.nextText}>{step.kind==='QUESTION'&&!step.field.required&&!String(answers[step.field.fieldKey] ?? '').trim()?'Bỏ qua & Tiếp tục':'Tiếp tục'}  →</Text></Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardSafeLayout>
   </SafeAreaView>;
 }
 
 const styles=StyleSheet.create({
-  screen:{flex:1,backgroundColor:'#F5FAF7'},header:{padding:16,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFF'},back:{width:44,height:44,borderRadius:14,backgroundColor:'#F1F5F9',alignItems:'center',justifyContent:'center'},backText:{fontSize:32,color:'#0F172A'},serviceName:{fontSize:16,fontWeight:'700',color:'#0F172A'},progressText:{fontSize:12,color:'#64748B'},progressTrack:{height:4,backgroundColor:'#DCEDE4'},progressFill:{height:4,backgroundColor:BrandColors.primary},
+  screen:{flex:1},header:{padding:16,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#FFF'},back:{width:44,height:44,borderRadius:14,backgroundColor:'#F1F5F9',alignItems:'center',justifyContent:'center'},backText:{fontSize:32,color:'#0F172A'},serviceName:{fontSize:16,fontWeight:'700',color:'#0F172A'},progressText:{fontSize:12,color:'#64748B'},progressTrack:{height:4,backgroundColor:'#DCEDE4'},progressFill:{height:4,backgroundColor:BrandColors.primary},
   content:{padding:22,gap:16,paddingBottom:28},eyebrow:{fontSize:11,fontWeight:'700',letterSpacing:1,color:'#047857'},title:{fontSize:27,lineHeight:35,fontWeight:'800',color:'#0F172A'},description:{fontSize:14,lineHeight:22,color:'#64748B'},hint:{fontSize:14,lineHeight:22,color:'#047857',backgroundColor:'#E8F5EE',padding:14,borderRadius:12},
   option:{minHeight:72,padding:18,borderRadius:18,borderWidth:1.5,borderColor:'#D6E2DB',backgroundColor:'#FFF',flexDirection:'row',alignItems:'center',gap:12},selected:{borderColor:BrandColors.primary,backgroundColor:'#E9F8F0'},optionText:{fontSize:17,fontWeight:'700',color:'#1E293B',flexShrink:1},selectedText:{color:'#047857'},indicator:{fontSize:24,color:'#94A3B8',marginLeft:'auto'},inputCard:{backgroundColor:'#FFF',borderRadius:18,padding:18,gap:14},inputLabel:{fontSize:13,fontWeight:'700',color:'#475569'},input:{borderWidth:1.5,borderColor:'#A9C9B8',borderRadius:14,padding:16,fontSize:18,color:'#0F172A',minHeight:60,backgroundColor:'#FCFFFD'},multiline:{minHeight:150,textAlignVertical:'top'},package:{backgroundColor:'#FFF',borderRadius:18,borderWidth:1.5,borderColor:'#D6E2DB',padding:18,gap:10},price:{fontSize:20,fontWeight:'800',color:'#047857'},counter:{flexDirection:'row',alignItems:'center',justifyContent:'center',width:'100%',gap:20,paddingVertical:12},counterButton:{height:52,width:52,borderRadius:16,backgroundColor:'#E9F8F0',alignItems:'center',justifyContent:'center'},counterSign:{fontSize:26,lineHeight:30,textAlign:'center',textAlignVertical:'center',includeFontPadding:false,color:'#047857'},counterValue:{fontSize:24,lineHeight:32,minWidth:100,textAlign:'center',textAlignVertical:'center',includeFontPadding:false,fontWeight:'800',color:'#0F172A'},error:{fontSize:14,color:'#B91C1C',backgroundColor:'#FEF2F2',padding:14,borderRadius:12},footer:{backgroundColor:'#FFF',paddingHorizontal:20,paddingTop:12,paddingBottom:14,gap:10,borderTopWidth:1,borderTopColor:'#E2E8F0'},nextLabel:{fontSize:12,color:'#64748B',textAlign:'center'},next:{minHeight:56,borderRadius:16,backgroundColor:BrandColors.primary,alignItems:'center',justifyContent:'center'},nextText:{fontSize:17,fontWeight:'800',color:'#FFF'},
 });

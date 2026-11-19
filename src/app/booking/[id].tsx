@@ -95,8 +95,12 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
         {booking.status === 'AWAITING_PAYMENT' && <View style={{ padding: 16, backgroundColor: '#FEF3C7', borderRadius: 14, gap: 8 }}>
           <Text style={{ color: '#92400E', fontWeight: '700' }}>Đơn đang chờ thanh toán</Text>
           <Text style={{ color: '#92400E' }}>Tiếp tục thanh toán để hoàn tất đặt dịch vụ.</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/booking/payment', params: { id: booking.id } })}>
-            <Text style={{ color: '#047857', fontWeight: '700', paddingVertical: 6 }}>Tiếp tục thanh toán · {formatVND(booking.totalAmount)}</Text>
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.continuePaymentButton, pressed && styles.continuePaymentPressed]}
+            onPress={() => router.push({ pathname: '/booking/payment', params: { id: booking.id } })}>
+            <Text style={styles.continuePaymentText}>Tiếp tục thanh toán · {formatVND(booking.totalAmount)}</Text>
+            <IconSymbol name="chevronRight" size={16} color="#047857" />
           </Pressable>
         </View>}
         {booking.paymentStatus === 'REFUNDED' && <Text style={{padding:12,color:'#047857'}}>Đã hoàn tiền thanh toán vào ví của bạn.</Text>}
@@ -114,8 +118,9 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
 
           {booking.status === 'MATCHING' && (
             <View style={styles.matchingNotice}>
+              <IconSymbol name="search" size={15} color="#9A3412" />
               <Text style={styles.matchingNoticeText}>
-                ⚡ Đang tìm nhân viên phù hợp gần bạn theo năng lực, khu vực và lịch làm việc...
+                Đang tìm nhân viên phù hợp gần bạn theo năng lực, khu vực và lịch làm việc...
               </Text>
             </View>
           )}
@@ -377,8 +382,7 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+    flex: 1
   },
   header: {
     flexDirection: 'row',
@@ -418,6 +422,22 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: 12,
   },
+  continuePaymentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    minHeight: 46,
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#047857',
+    borderRadius: 10,
+  },
+  continuePaymentPressed: { backgroundColor: '#D1FAE5' },
+  continuePaymentText: { flexShrink: 1, color: '#047857', fontWeight: '700' },
   statusCard: {
     backgroundColor: '#FFF',
     borderRadius: BorderRadius.xl,
@@ -441,14 +461,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   matchingNotice: {
-    backgroundColor: '#EDE9FE',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    backgroundColor: '#FFEDD5',
     padding: 10,
     borderRadius: BorderRadius.md,
     marginTop: 10,
   },
   matchingNoticeText: {
+    flex: 1,
     fontSize: 12,
-    color: '#7C3AED',
+    color: '#9A3412',
     fontWeight: '600',
   },
   cancelNotice: {

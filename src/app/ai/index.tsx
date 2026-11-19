@@ -8,13 +8,12 @@ import {
   Pressable,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { AIChatBubble } from '@/components/common/AIChatBubble';
@@ -27,54 +26,6 @@ import { useAiChatVoice } from '@/hooks/useAiChatVoice';
 import { AIMessage, AISuggestion } from '@/types/ai';
 
 type StoredMessage = Omit<AIMessage, 'id' | 'conversationId'> & { id: number; conversationId: number };
-
-function AndroidChatKeyboardLayout({ children }: React.PropsWithChildren) {
-  const { bottom } = useSafeAreaInsets();
-  const controllerHeight = useKeyboardState(state => state.isVisible ? state.height : 0);
-  const [systemHeight, setSystemHeight] = useState(() => Keyboard.metrics()?.height ?? 0);
-  const [layoutHeight, setLayoutHeight] = useState(0);
-  const restingHeight = useRef(0);
-  const keyboardHeight = Math.max(controllerHeight, systemHeight);
-
-  useEffect(() => {
-    const shown = Keyboard.addListener('keyboardDidShow', event => setSystemHeight(event.endCoordinates.height));
-    const hidden = Keyboard.addListener('keyboardDidHide', () => setSystemHeight(0));
-    return () => {
-      shown.remove();
-      hidden.remove();
-    };
-  }, []);
-
-  const resizedHeight = Math.max(0, restingHeight.current - layoutHeight);
-  const overlap = Math.max(0, keyboardHeight - bottom - resizedHeight);
-  return (
-    <View
-      style={styles.keyboardLayout}
-      onLayout={event => {
-        const height = event.nativeEvent.layout.height;
-        if (!keyboardHeight && !Keyboard.isVisible()) restingHeight.current = height;
-        setLayoutHeight(height);
-      }}>
-      {children}
-      {overlap > 0 && <View style={{ height: overlap, flexShrink: 0 }} />}
-    </View>
-  );
-}
-
-function ChatKeyboardLayout({ children }: React.PropsWithChildren) {
-  if (Platform.OS === 'android') {
-    return (
-      <KeyboardProvider>
-        <AndroidChatKeyboardLayout>{children}</AndroidChatKeyboardLayout>
-      </KeyboardProvider>
-    );
-  }
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardLayout}>
-      {children}
-    </KeyboardAvoidingView>
-  );
-}
 
 const QUICK_PROMPTS = [
   'Tôi muốn vệ sinh 3 máy lạnh vào chiều thứ bảy',
@@ -142,7 +93,7 @@ export default function AIAssistantScreen() {
   const { currentCustomer } = useAuth();
   const voice = useAiChatVoice(currentCustomer ? String(currentCustomer.id) : undefined, setVoiceDraft);
   const composerBusy = isTyping || voice.busy;
-  const dictatedText = voice.busy ? voice.preview : voiceDraft;
+  const dictatedText = voice.busy ? '' : voiceDraft;
   const composerText = dictatedText ? [inputText.trim(), dictatedText.trim()].filter(Boolean).join(' ').slice(0, 4000) : inputText;
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [draftPanel, setDraftPanel] = useState<{ conversation: string; customer: string; value: AiDraftPanel } | null>(null);
@@ -201,11 +152,12 @@ export default function AIAssistantScreen() {
     draftRequest.current?.abort();
     setDraftLoadError('');
     setDraftPanel(previous => {
-      const drafts = previous?.conversation === conversation && previous.customer === customer ? previous.value.drafts : [];
+      const current = previous?.conversation === conversation && previous.customer === customer ? previous.value : null;
       const visibleDraft = saved?.id && saved.data.serviceId ? saved : null;
       return { conversation, customer, value: {
-        drafts: visibleDraft ? [visibleDraft, ...drafts.filter(draft => draft.id !== visibleDraft.id)] : drafts,
+        drafts: visibleDraft ? [visibleDraft] : current?.drafts ?? [],
         expandedDraftId: visibleDraft?.id ?? null,
+        switchPending: !saved && (current?.switchPending ?? false),
       } };
     });
     setDraftLoadAttempt(attempt => attempt + 1);
@@ -265,11 +217,28 @@ export default function AIAssistantScreen() {
       draftRequest.current?.abort();
       try {
         const previous = await loadAiBookingDraft(conversationId);
+        const serviceId = Number(sug.serviceId);
+        const currentService = previous.data.serviceId;
+        const switching = currentService != null && currentService !== serviceId;
+        if (switching) {
+          const detail = await operationRequest<{ service: { name: string } }>('catalog', '/services/' + serviceId);
+          const currentName = previous.choices?.service?.name || 'dịch vụ hiện tại';
+          const confirmed = await new Promise<boolean>(resolve => Alert.alert(
+            'Đổi dịch vụ?',
+            `Bạn đang đặt ${currentName}. Bạn có muốn chuyển sang ${detail.service.name} không? Nếu đồng ý, đơn nháp ${currentName} sẽ được bỏ.`,
+            [
+              { text: 'Giữ đơn cũ', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Đổi dịch vụ', onPress: () => resolve(true) },
+            ],
+            { cancelable: true, onDismiss: () => resolve(false) },
+          ));
+          if (!confirmed) return;
+        }
         const updated = await operationRequest<AiBookingDraft>('ai-assistant',
           '/conversations/' + conversationId + '/booking-draft', 'PATCH', {
-            draftId: previous.id, version: previous.version,
+            draftId: previous.id, version: previous.version, confirmServiceSwitch: switching,
             changes: {
-              serviceId: Number(sug.serviceId), packageId: Number(sug.referenceId), mode: 'B',
+              serviceId, packageId: Number(sug.referenceId), mode: 'B',
               quantity: sug.quantity || 1, requiredStaffCount: sug.requiredStaffCount || 1,
               ...(sug.answers ? { answers: sug.answers } : {}),
             },
@@ -348,7 +317,7 @@ export default function AIAssistantScreen() {
         </Pressable>
       </View>
 
-      <ChatKeyboardLayout>
+      <KeyboardSafeLayout>
         {/* MESSAGES SCROLL VIEW */}
         <ScrollView
           ref={scrollViewRef}
@@ -397,7 +366,7 @@ export default function AIAssistantScreen() {
 
           {conversationId && panel && panel.drafts.length > 0 && (
             <View style={styles.draftList}>
-              <Text style={styles.draftLabel}>ĐƠN NHÁP · {panel.drafts.length}</Text>
+              <Text style={styles.draftLabel}>ĐƠN NHÁP</Text>
               {panel.drafts.map(draft => (
                 <DraftCard key={draft.id} draft={draft} expanded={!pendingMessage && panel.expandedDraftId === draft.id}
                   onToggle={() => setDraftPanel(previous => previous && ({ ...previous, value: {
@@ -410,12 +379,24 @@ export default function AIAssistantScreen() {
                   } })}
                 />
               ))}
+              {panel.switchPending && !pendingMessage && (
+                <View style={styles.switchActions}>
+                  <Pressable accessibilityRole="button" disabled={composerBusy || selectingSuggestion}
+                    style={styles.switchCancel} onPress={() => void sendMessage('Giữ dịch vụ hiện tại')}>
+                    <Text style={styles.draftLabel}>Giữ đơn cũ</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" disabled={composerBusy || selectingSuggestion}
+                    style={styles.draftConfirm} onPress={() => void sendMessage('Xác nhận đổi dịch vụ')}>
+                    <Text style={styles.draftConfirmText}>Đổi dịch vụ</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
 
         {/* QUICK PROMPTS CHIPS */}
-        <View style={styles.quickPromptsWrapper}>
+        {!voice.busy && <View style={styles.quickPromptsWrapper}>
           <ScrollView
             horizontal
             keyboardShouldPersistTaps="handled"
@@ -431,7 +412,7 @@ export default function AIAssistantScreen() {
               </Pressable>
             ))}
           </ScrollView>
-        </View>
+        </View>}
 
         {(voice.busy || voice.notice) && (
           <View style={styles.voiceBanner}>
@@ -477,7 +458,7 @@ export default function AIAssistantScreen() {
             value={composerText}
             editable={!composerBusy}
             onChangeText={text => { voice.clearNotice(); replaceInput(text); }}
-            placeholder="Hỏi về dịch vụ, giá tiền, chọn thợ..."
+            placeholder={voice.busy ? '' : 'Hỏi về dịch vụ, giá tiền, chọn thợ...'}
             placeholderTextColor={BrandColors.gray400}
             multiline
             rows={Platform.OS === 'web' ? 1 : undefined}
@@ -496,7 +477,7 @@ export default function AIAssistantScreen() {
             <IconSymbol name="➤" style={styles.sendIcon} />
           </Pressable>
         </View>
-      </ChatKeyboardLayout>
+      </KeyboardSafeLayout>
 
       {/* Clear conversation modal */}
       <ConfirmModal
@@ -533,11 +514,11 @@ const styles = StyleSheet.create({
   draftText: { color: '#475569', fontSize: 13, lineHeight: 19 },
   draftConfirm: { alignItems: 'center', padding: 12, backgroundColor: '#047857', borderRadius: 10, marginTop: 5 },
   draftConfirmText: { color: '#fff', fontWeight: '700' },
-  keyboardLayout: { flex: 1 },
+  switchActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 },
+  switchCancel: { padding: 12 },
   messageScroll: { flex: 1, minHeight: 0 },
   container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+    flex: 1
   },
   header: {
     flexDirection: 'row',

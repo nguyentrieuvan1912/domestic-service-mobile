@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/common/IconSymbol';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
@@ -8,8 +8,7 @@ import { BrandLogo } from '@/components/common/BrandLogo';
 const STAFF_SCOOTER = require('../../../assets/images/staff-welcome/cleanmaster-staff-scooter.png');
 
 /** A premium, staff-only transition shown after a successful staff sign-in. */
-export function StaffWelcomeOverlay({ onComplete }: { onComplete?: () => void }) {
-  const [visible, setVisible] = useState(true);
+export function StaffWelcomeOverlay({ onComplete }: { onComplete: () => void }) {
   const riderOpacity = useSharedValue(0);
   const riderX = useSharedValue(-430);
   const riderY = useSharedValue(12);
@@ -39,10 +38,7 @@ export function StaffWelcomeOverlay({ onComplete }: { onComplete?: () => void })
     copyOpacity.value = withDelay(2310, withTiming(1, { duration: 280 }));
     copyY.value = withDelay(2310, withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) }));
 
-    const timeout = setTimeout(() => {
-      setVisible(false);
-      onComplete?.();
-    }, 3500);
+    const timeout = setTimeout(onComplete, 3500);
     return () => clearTimeout(timeout);
   }, [cardOpacity, cardScale, copyOpacity, copyY, onComplete, riderOpacity, riderX, riderY, sceneWash, trailOpacity]);
 
@@ -55,7 +51,6 @@ export function StaffWelcomeOverlay({ onComplete }: { onComplete?: () => void })
   const cardStyle = useAnimatedStyle(() => ({ opacity: cardOpacity.value, transform: [{ scale: cardScale.value }] }));
   const copyStyle = useAnimatedStyle(() => ({ opacity: copyOpacity.value, transform: [{ translateY: copyY.value }] }));
 
-  if (!visible) return null;
 
   return <View pointerEvents="none" style={styles.overlay}>
     <View style={styles.softWaveOne} /><View style={styles.softWaveTwo} />

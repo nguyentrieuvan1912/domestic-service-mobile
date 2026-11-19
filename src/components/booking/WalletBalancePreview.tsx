@@ -6,13 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandColors } from '@/constants/theme';
 
-/** The balance control belongs inside the wallet option on both payment-selection steps. */
+/** Shows the available balance inside the selected wallet option. */
 export function WalletBalancePreview() {
   const { accessToken } = useAuth();
   return <WalletBalanceContent key={accessToken} />;
 }
 function WalletBalanceContent() {
-  const [visible, setVisible] = useState(false), [balance, setBalance] = useState<number | null>(null);
+  const [visible, setVisible] = useState(true), [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false), [error, setError] = useState('');
   useFocusEffect(useCallback(() => {
     if (!visible) return;

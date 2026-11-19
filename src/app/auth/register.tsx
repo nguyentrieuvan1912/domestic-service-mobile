@@ -77,8 +77,7 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   safeArea: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+    flex: 1
   },
   topNav: {
     flexDirection: 'row',

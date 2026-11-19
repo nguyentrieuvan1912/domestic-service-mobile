@@ -1,14 +1,15 @@
 import { BookingCommunicationBridge } from '@/components/common/BookingCommunicationBridge';
 import { BookingCancellationNotice } from '@/components/booking/BookingCancellationNotice';
 import { SystemAlertHost } from '@/components/common/SystemAlertHost';
-import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import React, { useCallback, useEffect } from 'react';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider, useAppTheme } from '@/context/ThemeContext';
 import { StaffScheduleReminder } from '@/components/staff/StaffScheduleReminder';
+import { AppBackground } from '@/components/common/AppBackground';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* ignore */
@@ -30,6 +31,23 @@ export default function RootLayout() {
 function AuthStack() {
   const { isAuthenticated, isLoading } = useAuth();
   const { isDark, colors } = useAppTheme();
+  const gradient = colors.backgroundGradient;
+  // The navigator calls this callback while building descriptors for a changing set of routes.
+  const renderScreenLayout = useCallback(({ children }: React.PropsWithChildren) => (
+    <AppBackground gradient={gradient}>{children}</AppBackground>
+  ), [gradient]);
+  const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...baseNavigationTheme,
+    colors: {
+      ...baseNavigationTheme.colors,
+      background: colors.background,
+      card: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      primary: colors.primary,
+    },
+  };
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync().catch(() => {
       /* ignore */
@@ -39,9 +57,11 @@ function AuthStack() {
   if (isLoading) return null;
 
   return (
-    <>
+    <NavigationThemeProvider value={navigationTheme}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack
+          screenLayout={renderScreenLayout}
+          screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="auth/login" options={{ headerShown: false }} />
           <Stack.Screen name="auth/register" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -82,7 +102,7 @@ function AuthStack() {
         {isAuthenticated && <StaffScheduleReminder />}
         {isAuthenticated && <BookingCommunicationBridge />}
         {isAuthenticated && <BookingCancellationNotice />}
-    </>
+    </NavigationThemeProvider>
 
   );
 }

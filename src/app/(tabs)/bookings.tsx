@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import React, { useState } from 'react';
 import {
   View,
@@ -9,7 +10,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/context/ThemeContext';
 import { BookingCard } from '@/components/common/BookingCard';
@@ -30,6 +30,7 @@ const FILTER_TABS: { id: TabFilter; label: string }[] = [
 ];
 
 export default function BookingsScreen() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
   const { colors } = useAppTheme();
   const { currentCustomer } = useAuth();
@@ -74,10 +75,7 @@ export default function BookingsScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={colors.gradient}
-      locations={colors.gradientLocations}
-      style={styles.gradientContainer}>
+    <View style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {!!(loading || error) && <CatalogState loading={loading} error={error} onRetry={retry} />}
         {/* Header */}
@@ -113,7 +111,7 @@ export default function BookingsScreen() {
         {/* Bookings List */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}>
+          contentContainerStyle={[styles.listContent, { paddingBottom: Spacing.three + bottomTabHeight }]}>
           {filteredBookings.length === 0 ? (
             <EmptyState
               icon="📅"
@@ -144,7 +142,7 @@ export default function BookingsScreen() {
           <View style={{ height: 60 }} />
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

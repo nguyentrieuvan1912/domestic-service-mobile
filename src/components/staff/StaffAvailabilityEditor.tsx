@@ -27,6 +27,8 @@ function DayButton({ label, time, checked, rest, disabled, onPress }: {
   label: string; time?: string; checked?: boolean; rest?: boolean; disabled: boolean; onPress: () => void;
 }) {
   const filled = checked ? (rest ? s.restSelected : s.workSelected) : undefined;
+  const selectedText = checked ? (rest ? s.restStatusText : s.buttonWhite) : undefined;
+  const marker = checked ? (rest ? '× ' : '✓ ') : '';
   return <Pressable
     accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
     accessibilityLabel={time ? label + ', ' + time : label}
@@ -34,9 +36,15 @@ function DayButton({ label, time, checked, rest, disabled, onPress }: {
     disabled={disabled}
     style={({ pressed }) => [s.dayButton, filled, (pressed || disabled) && s.disabled]}
     onPress={onPress}>
-    <Text style={[s.dayButtonLabel, checked && s.buttonWhite]}>{checked ? '✓ ' : ''}{label}</Text>
-    {!!time && <Text style={[s.dayButtonTime, checked && s.buttonWhite]}>{time}</Text>}
+    <Text style={[s.dayButtonLabel, selectedText]}>{marker}{label}</Text>
+    {!!time && <Text style={[s.dayButtonTime, selectedText]}>{time}</Text>}
   </Pressable>;
+}
+
+function WorkPeriods({ intervals }: Pick<AvailabilityDay, 'intervals'>) {
+  return intervals.map(period => <View key={period.startsAt} style={s.period}>
+    <Text style={s.periodTime}>{displayTime(period.startsAt)}–{displayTime(period.endsAt)}</Text>
+  </View>);
 }
 
 function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
@@ -54,6 +62,7 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
   const today = localDate(now);
   const modalDay = draft?.days.find(day => day.date === modalDate);
   const modalSlots = modalDay ? selectedSlots(modalDay) : [];
+  const closeTimePicker = () => setModalDate('');
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(timer); }, []);
   useEffect(() => {
     const controller = new AbortController(); setLoading(true);
@@ -131,7 +140,7 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
               checked={slots.length > 0 && slots.every(time => daySlots.includes(time))} disabled={saving || !slots.length}
               onPress={() => updateDay(day, selectedSlots(toggleShift(day, preset.start, preset.end, Date.now())))} />;
           }) : [];
-          return <View key={day.date} style={[s.card, s.dayCard, expired && s.past, !confirmed && s.unregisteredCard, resting && s.restCard]}>
+          return <View key={day.date} style={[s.card, s.dayCard, expired && s.past, (!confirmed || resting) && s.darkCardBorder, resting && s.restCard]}>
             <View style={s.row}>
               <Text style={[s.heading, s.grow]}>{displayDate(day.date)}{day.date === today ? ' • Hôm nay' : ''}</Text>
               <View style={[s.dayStatus, resting ? s.restStatus : confirmed && !expired && s.workStatus]}>
@@ -139,9 +148,7 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
               </View>
             </View>
             <View style={s.wrap}>
-              {day.intervals.length ? day.intervals.map(period => <View key={period.startsAt} style={s.period}>
-                <Text style={s.status}>{displayTime(period.startsAt)}–{displayTime(period.endsAt)}</Text>
-              </View>) : <Text style={s.body}>{resting
+              {day.intervals.length ? <WorkPeriods intervals={day.intervals} /> : <Text style={s.body}>{resting
                 ? (editing ? 'Đã chọn nghỉ ngày này.' : 'Đã xác nhận nghỉ trong ngày này.')
                 : 'Chưa có khung giờ làm việc.'}</Text>}
             </View>
@@ -181,12 +188,28 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
         }}><Text style={s.white}>{registered ? 'Thay đổi lịch' : 'Đăng ký cả tuần'}</Text></Pressable>}
       </View>
     </>}
-  </SafeAreaView><StaffBottomNav activeTab="profile" />
-    <Modal visible={!!modalDay} transparent animationType="slide" onRequestClose={() => setModalDate('')}>
+  </SafeAreaView>
+    <View style={modalDay && s.hiddenNav} pointerEvents={modalDay ? 'none' : 'auto'}
+      accessibilityElementsHidden={!!modalDay} importantForAccessibility={modalDay ? 'no-hide-descendants' : 'auto'}>
+      <StaffBottomNav activeTab="profile" />
+    </View>
+    <Modal visible={!!modalDay} transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={closeTimePicker}>
       <View style={s.scrim}>
-        <SafeAreaView edges={['bottom']} style={s.modal}>
-          <Text style={s.title}>{modalDay ? displayDate(modalDay.date) : ''} • Chọn ca ít nhất 1 tiếng</Text>
-          <Text style={s.sub}>Mỗi ô chọn một giờ làm việc. Ca đã bắt đầu được khóa. Bấm Xác nhận ở màn hình tuần để lưu.</Text>
+        <SafeAreaView edges={['bottom']} style={[s.modal, s.timeSheet]}>
+          <View style={s.row}>
+            <Text style={[s.title, s.grow]}>{modalDay ? displayDate(modalDay.date) : ''} • Chọn giờ chi tiết</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Đóng bảng chọn giờ"
+              style={s.closeTimePicker} onPress={closeTimePicker}>
+              <IconSymbol name="close" size={22} color={BrandColors.gray800} />
+            </Pressable>
+          </View>
+          {modalDay && <View style={s.timeSummary}>
+            <Text style={s.heading}>Giờ làm đã chọn</Text>
+            {modalDay.intervals.length ? <ScrollView horizontal style={s.periodScroll} contentContainerStyle={s.periodRow}>
+              <WorkPeriods intervals={modalDay.intervals} />
+            </ScrollView> : <Text style={s.sub}>Chưa chọn giờ làm.</Text>}
+          </View>}
+          <Text style={s.sub}>Mỗi ô chọn một giờ. Giờ đã bắt đầu được khóa. Xác nhận ở màn hình tuần để lưu.</Text>
           {modalDay && <ScrollView>
             <View style={s.wrap}>
               {HOUR_STARTS.map(time => {
@@ -204,7 +227,7 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
               })}
             </View>
           </ScrollView>}
-          <Pressable style={s.primary} onPress={() => setModalDate('')}><Text style={s.white}>Xong</Text></Pressable>
+          <Pressable accessibilityRole="button" style={s.primary} onPress={closeTimePicker}><Text style={s.white}>Xong</Text></Pressable>
         </SafeAreaView>
       </View>
     </Modal>
@@ -212,25 +235,33 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
   </View>;
 }
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F2F6F4' }, screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff' },
+  root: { flex: 1 }, screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff' },
   title: { fontSize: 18, fontWeight: '700', color: BrandColors.gray900 }, heading: { fontSize: 15, fontWeight: '700', color: BrandColors.gray900 }, body: { fontSize: 14, lineHeight: 21, color: BrandColors.gray700 }, sub: { fontSize: 12, lineHeight: 19, color: BrandColors.gray500 },
   content: { padding: 12, gap: 14 }, card: { backgroundColor: '#fff', borderRadius: 16, padding: 14, gap: 10 }, row: { flexDirection: 'row', gap: 8, alignItems: 'center' }, wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, grow: { flex: 1 },
   dayCard: { borderWidth: 1, borderColor: BrandColors.gray300 },
-  unregisteredCard: { borderColor: BrandColors.gray900 },
+  darkCardBorder: { borderColor: BrandColors.gray900 },
   dayStatus: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: BrandColors.gray100 },
   dayStatusText: { color: BrandColors.gray700, fontSize: 12, fontWeight: '600' },
-  workStatus: { backgroundColor: BrandColors.primaryLight },
-  restCard: { backgroundColor: '#FFF7F7' },
-  restStatus: { backgroundColor: '#FBDCDC' }, restStatusText: { color: '#991B1B' },
+  workStatus: { backgroundColor: BrandColors.primaryLight, borderWidth: 1, borderColor: '#8AB6A5' },
+  restCard: { backgroundColor: '#FFF1F1' },
+  restStatus: { backgroundColor: '#FCE2E2', borderWidth: 1, borderColor: '#DB9C9C' }, restStatusText: { color: '#991B1B' },
   buttonRow: { flexDirection: 'row', gap: 8 },
   dayButton: { flex: 1, minWidth: 0, minHeight: 50, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: BrandColors.gray300, borderRadius: 10, backgroundColor: '#fff' },
   dayButtonLabel: { color: '#075F45', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   dayButtonTime: { color: '#48665C', fontSize: 11, textAlign: 'center' },
   workSelected: { backgroundColor: '#087653', borderColor: '#087653' },
-  restSelected: { backgroundColor: '#B91C1C', borderColor: '#B91C1C' },
+  restSelected: { backgroundColor: '#FCE2E2', borderColor: '#DB9C9C' },
   buttonWhite: { color: '#fff' },
   chip: { padding: 10, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 10, backgroundColor: '#fff' }, week: { flex: 1, padding: 12, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 12, backgroundColor: '#fff' }, selected: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary },
-  period: { backgroundColor: BrandColors.primaryLight, borderRadius: 8, padding: 8 }, status: { color: BrandColors.primaryDark, fontWeight: '600', fontSize: 13 }, link: { color: BrandColors.primaryDark, fontWeight: '600', textAlign: 'center', fontSize: 13 }, white: { color: '#fff', fontWeight: '700', textAlign: 'center', fontSize: 14 },
+  period: { backgroundColor: BrandColors.primaryLight, borderColor: BrandColors.black, borderWidth: 1, borderRadius: 8, padding: 8 },
+  periodTime: { color: BrandColors.black, fontWeight: '600', fontSize: 13 },
+  hiddenNav: { opacity: 0 },
+  timeSheet: { maxHeight: '90%' },
+  closeTimePicker: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 },
+  timeSummary: { backgroundColor: BrandColors.gray50, borderRadius: 10, padding: 10, gap: 6 },
+  periodScroll: { flexGrow: 0 },
+  periodRow: { gap: 8 },
+  status: { color: BrandColors.primaryDark, fontWeight: '600', fontSize: 13 }, link: { color: BrandColors.primaryDark, fontWeight: '600', textAlign: 'center', fontSize: 13 }, white: { color: '#fff', fontWeight: '700', textAlign: 'center', fontSize: 14 },
   primary: { backgroundColor: BrandColors.primary, padding: 14, borderRadius: 12 }, footer: { backgroundColor: '#fff', padding: 12, gap: 8 }, error: { color: BrandColors.danger, lineHeight: 20 }, past: { backgroundColor: BrandColors.gray100 }, disabled: { opacity: 0.45 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }, scrim: { flex: 1, backgroundColor: '#0007', justifyContent: 'flex-end' }, modal: { backgroundColor: '#fff', padding: 16, gap: 12, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' }, slot: { width: '30%', padding: 12, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 10 },
 });

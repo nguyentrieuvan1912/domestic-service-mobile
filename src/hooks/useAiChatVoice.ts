@@ -8,10 +8,7 @@ import { useAiVoiceStream } from './useAiVoiceStream';
 
 type Phase = 'starting' | 'recording' | 'stopping' | 'transcribing' | 'refining' | 'canceling';
 type LiveCapture = {
-  chunks: Int16Array[]; rate: number; samples: number; voiced: number;
-  firstVoice: number | null; lastVoice: number;
-  lastPreview: number; previewVoiced: number; lastMeter: number; lastText: string; lastTextEnd: number;
-  pending?: Promise<void>;
+  chunks: Int16Array[]; rate: number; samples: number; lastMeter: number;
 };
 type Attempt = {
   phase: Phase; controller: AbortController; uri: string | null; requestingPermission: boolean;
@@ -19,28 +16,10 @@ type Attempt = {
 };
 const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, numberOfChannels: 1, isMeteringEnabled: true };
 
-function speechEnd(live: LiveCapture) {
-  return Math.min(live.samples, live.lastVoice + Math.round(live.rate * 0.3));
-}
-
-function transcribeSpeech(live: LiveCapture, end: number, signal: AbortSignal) {
-  const start = Math.max(0, (live.firstVoice ?? 0) - Math.round(live.rate * 0.3));
-  const speech: Int16Array[] = [];
-  let offset = 0;
-  for (const chunk of live.chunks) {
-    const next = offset + chunk.length;
-    if (next > start) speech.push(chunk.subarray(Math.max(0, start - offset), end - offset));
-    if (next >= end) break;
-    offset = next;
-  }
-  return transcribePcm(speech, live.rate, signal);
-}
-
 export function useAiChatVoice(customerId: string | undefined, onTranscript: (text: string) => void) {
   const attempt = useRef<Attempt | null>(null);
   const [phase, setPhase] = useState<Phase | null>(null);
   const [notice, setNotice] = useState('');
-  const [preview, setPreview] = useState('');
   const [level, setLevel] = useState(0);
   const [refinement, setRefinement] = useState<{ text: string; original: string; showOriginal: boolean } | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
@@ -71,30 +50,10 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
     let squared = 0;
     for (const sample of pcm) squared += sample * sample;
     const rms = Math.sqrt(squared / Math.max(1, pcm.length)) / 32768;
-    if (rms >= 0.003) {
-      live.firstVoice ??= live.samples - pcm.length;
-      live.lastVoice = live.samples;
-      live.voiced += pcm.length;
-    }
     if (live.samples - live.lastMeter >= live.rate * 0.1) {
       live.lastMeter = live.samples;
       setLevel(Math.max(0, Math.min(1, (20 * Math.log10(Math.max(rms, 0.00001)) + 54) / 42)));
     }
-    const secondsSincePreview = (live.samples - live.lastPreview) / live.rate;
-    const paused = live.samples - live.lastVoice >= live.rate * 0.35;
-    const previewDue = secondsSincePreview >= 3 || (paused && secondsSincePreview >= 1.25);
-    if (active.phase !== 'recording' || live.pending || !previewDue || live.voiced - live.previewVoiced < live.rate * 0.25) return;
-    live.lastPreview = live.samples;
-    live.previewVoiced = live.voiced;
-    const end = speechEnd(live);
-    live.pending = transcribeSpeech(live, end, active.controller.signal).then(({ text }) => {
-      if (attempt.current === active && !active.controller.signal.aborted) {
-        live.lastText = text;
-        live.lastTextEnd = end;
-        if (active.phase === 'recording') setPreview(text);
-      }
-    }).catch(() => { /* The final pass reports errors and uses the full recording. */ })
-      .finally(() => { live.pending = undefined; });
   });
 
   const finish = useCallback(async (uri: string | null, failed = false) => {
@@ -111,24 +70,16 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
       await resetAudioMode();
       if (failed || (!active.live && !uri)) throw new Error('Chưa thu được âm thanh. Bạn thử lại nhé.');
       const live = active.live;
-      if (live && (!live.rate || live.voiced < live.rate * 0.25)) {
-        throw new Error('Chưa nhận được giọng nói. Hãy kiểm tra micro rồi thử lại.');
+      if (live && !live.samples) {
+        throw new Error('Chưa thu được âm thanh. Bạn thử lại nhé.');
       }
-      await live?.pending;
       if (active.controller.signal.aborted) return;
-      let text: string;
-      if (!live) {
-        text = (await transcribeVoice(uri!, active.controller.signal)).text;
-      } else if (live.lastText && live.lastTextEnd >= live.lastVoice) {
-        // Extra silence after the last recognized sample does not need another request.
-        text = live.lastText;
-      } else {
-        text = (await transcribeSpeech(live, speechEnd(live), active.controller.signal)).text;
-      }
+      const signal = active.controller.signal;
+      const transcript = live ? await transcribePcm(live.chunks, live.rate, signal) : await transcribeVoice(uri!, signal);
+      let text = transcript.text;
       if (active.controller.signal.aborted) return;
       active.phase = 'refining';
       setPhase('refining');
-      setPreview(text);
       let corrected = false;
       const original = text;
       try {
@@ -151,7 +102,6 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
       if (attempt.current === active) {
         attempt.current = null;
         setPhase(null);
-        setPreview('');
       }
     }
   }, [resetAudioMode]);
@@ -183,7 +133,6 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
     if (attempt.current === active) {
       attempt.current = null;
       setPhase(null);
-      setPreview('');
     }
   }, [recorder, resetAudioMode, stream]);
 
@@ -210,7 +159,6 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
     setPhase('starting');
     setNotice('');
     setRefinement(null);
-    setPreview('');
     setLevel(0);
     Keyboard.dismiss();
     let prepared = false;
@@ -231,10 +179,7 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
       }
       if (Platform.OS === 'ios') await setAudioModeAsync({ allowsRecording: true });
       if (stream) {
-        active.live = {
-          chunks: [], rate: 0, samples: 0, voiced: 0, firstVoice: null, lastVoice: 0,
-          lastPreview: 0, previewVoiced: 0, lastMeter: 0, lastText: '', lastTextEnd: 0,
-        };
+        active.live = { chunks: [], rate: 0, samples: 0, lastMeter: 0 };
         await stream.start();
         prepared = true;
         if (active.controller.signal.aborted) return;
@@ -326,7 +271,7 @@ export function useAiChatVoice(customerId: string | undefined, onTranscript: (te
   }
 
   return { phase, busy: phase !== null, isBusy: () => attempt.current !== null,
-    notice, preview, level, clearNotice: () => { setNotice(''); setRefinement(null); }, startRecording, stopRecording, cancelRecording,
+    notice, level, clearNotice: () => { setNotice(''); setRefinement(null); }, startRecording, stopRecording, cancelRecording,
     canCompare: refinement !== null, showingOriginal: refinement?.showOriginal ?? false,
     toggleOriginal: () => {
       if (!refinement || attempt.current) return;

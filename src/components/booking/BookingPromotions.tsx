@@ -1,5 +1,5 @@
 import { VoucherTicket } from '@/components/common/VoucherTicket';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { BrandColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
@@ -8,7 +8,7 @@ import type { Promotion } from '@/types/service';
 import { promotionIssue } from '@/utils/promotion-eligibility';
 
 type Props = {
-  promotions: Promotion[]; services: readonly { id: string; name: string }[]; serviceId: string; amount: number;
+  promotions: Promotion[]; services: readonly { id: string; name: string }[]; serviceId: string; amount: number | undefined;
   input: string; changeInput: (value: string) => void; selectedCode: string; applied: boolean; busy: boolean;
   feedback: string; failures: Record<string, string>; apply: (code: string) => void; clear: () => void;
 };
@@ -17,20 +17,31 @@ export function BookingPromotions(props: Props) {
   const ticketWidth = Math.min(340, Math.max(270, width - 64));
   const [detail, setDetail] = useState<Promotion | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const lastAppliedCode = useRef('');
   useEffect(() => {
-    if (props.applied && !props.busy) setExpanded(false);
+    if (!props.selectedCode) lastAppliedCode.current = '';
+    if (props.applied && !props.busy && lastAppliedCode.current !== props.selectedCode) {
+      lastAppliedCode.current = props.selectedCode;
+      setExpanded(false);
+    }
   }, [props.applied, props.busy, props.selectedCode]);
-  const reason = (p: Promotion) => promotionIssue(p, props.serviceId, props.amount) || props.failures[p.code] || '';
+  const reason = (p: Promotion) => promotionIssue(p, props.serviceId, props.amount)
+    || props.failures[p.code.toUpperCase()]
+    || (props.amount === undefined ? 'Cần báo giá hiện tại để kiểm tra mã.' : '');
+  const tickets = props.promotions.map(promotion => ({ promotion, issue: reason(promotion) }))
+    .sort((left, right) => Number(!!left.issue) - Number(!!right.issue));
+  const canApplyDetail = detail && props.amount !== undefined && !props.busy && !promotionIssue(detail, props.serviceId, props.amount);
   return <View style={styles.section}>
     <View style={styles.row}><IconSymbol name="ticket" size={20} color={BrandColors.primary} /><Text style={styles.heading}>Ưu đãi / Mã giảm giá</Text></View>
     {props.applied && <View style={styles.selected}><View style={styles.selectedLabel}><IconSymbol name="ticket" size={18} color={BrandColors.primaryDark} /><Text style={styles.success}>Đang áp dụng {props.selectedCode}</Text></View><Pressable accessibilityRole="button" onPress={props.clear} hitSlop={8}><Text style={styles.link}>Bỏ mã</Text></Pressable></View>}
     {!expanded && <Pressable accessibilityRole="button" accessibilityState={{ expanded: false }} onPress={() => setExpanded(true)} style={styles.open}><Text style={styles.link}>{props.applied ? 'Thay đổi mã giảm giá' : 'Áp dụng mã giảm giá'}</Text><IconSymbol name="chevronDown" size={18} color={BrandColors.primaryDark} /></Pressable>}
+    {!expanded && !!props.feedback && <Text accessibilityRole="alert" style={styles.error}>{props.feedback}</Text>}
     {expanded && <>
     <View style={styles.row}><TextInput accessibilityLabel="Nhập mã ưu đãi" placeholder="Nhập mã ưu đãi..." value={props.input} onChangeText={props.changeInput} autoCapitalize="characters" style={styles.input} /><Pressable accessibilityRole="button" disabled={props.busy} onPress={() => props.apply(props.input)} style={styles.apply}><Text style={styles.white}>{props.busy ? 'Đang kiểm tra…' : 'Áp dụng'}</Text></Pressable></View>
     {!!props.feedback && <Text accessibilityRole="alert" style={styles.error}>{props.feedback}</Text>}
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.list}>
-      {props.promotions.map(p => {
-        const issue = reason(p), selected = props.applied && props.selectedCode === p.code;
+      {tickets.map(({ promotion: p, issue }) => {
+        const selected = props.applied && props.selectedCode === p.code.toUpperCase();
         return <View key={p.id} style={{ width: ticketWidth }}>
           <VoucherTicket promotion={p} selected={selected} busy={props.busy} issue={issue}
             onDetail={() => setDetail(p)} onPress={() => issue ? setDetail(p) : selected ? props.clear() : props.apply(p.code)} />
@@ -53,7 +64,7 @@ export function BookingPromotions(props: Props) {
             <Text style={styles.detail}>Mỗi đơn áp dụng một mã. Phạm vi dịch vụ xét theo dịch vụ chính của đơn.</Text>
           </>}
         </ScrollView>
-        <Pressable accessibilityRole="button" style={styles.apply} onPress={() => { if (detail && !promotionIssue(detail,props.serviceId,props.amount)) props.apply(detail.code); setDetail(null); }}><Text style={styles.white}>{detail && !promotionIssue(detail,props.serviceId,props.amount) ? reason(detail) ? 'Kiểm tra và thử lại' : 'Áp dụng mã này' : 'Đã hiểu'}</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.apply} onPress={() => { if (canApplyDetail) props.apply(detail.code); setDetail(null); }}><Text style={styles.white}>{canApplyDetail ? reason(detail) ? 'Kiểm tra và thử lại' : 'Áp dụng mã này' : 'Đã hiểu'}</Text></Pressable>
       </View></View>
     </Modal>
   </View>;

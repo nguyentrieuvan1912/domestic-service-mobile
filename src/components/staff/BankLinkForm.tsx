@@ -1,5 +1,6 @@
+import { useAppTheme } from '@/context/ThemeContext';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { operationRequest } from '@/api/operations';
@@ -14,23 +15,23 @@ function BankLogo({ bank }: { bank: PayoutBank }) {
       : <Text style={s.logoFallback}>{bank.shortName.slice(0, 3).toUpperCase()}</Text>}
   </View>;
 }
-export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; onClose: () => void; onSave: (bin: string, account: string, holder: string) => Promise<void> }) {
+export function BankLinkForm({ onClose, onSave }: { onClose: () => void; onSave: (bin: string, account: string, holder: string) => Promise<void> }) {
+  const { colors } = useAppTheme();
   const [banks, setBanks] = useState<PayoutBank[]>([]), [bin, setBin] = useState('');
   const [account, setAccount] = useState(''), [holder, setHolder] = useState(''), [search, setSearch] = useState('');
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0), [loading, setLoading] = useState(false);
   const [automaticLookup, setAutomaticLookup] = useState<boolean | null>(null);
   const [lookingUp, setLookingUp] = useState(false), [resolvedFor, setResolvedFor] = useState('');
   useEffect(() => {
-    if (!visible) return;
     const controller = new AbortController(); setLoading(true); setError(''); setAutomaticLookup(null); setResolvedFor('');
     void Promise.all([operationRequest<PayoutBank[]>('finance', '/payout-banks', 'GET', undefined, controller.signal), operationRequest<{ automaticNameLookup: boolean; bankLinkRequiresLookup?: boolean }>('finance', '/withdrawal-capabilities', 'GET', undefined, controller.signal)])
       .then(([rows, rules]) => { if (!controller.signal.aborted) { setBanks(rows); setAutomaticLookup(!!rules.bankLinkRequiresLookup || rules.automaticNameLookup); } })
       .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Chưa tải được ngân hàng.'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [visible, revision]);
+  }, [revision]);
   useEffect(() => {
-    if (!visible || !automaticLookup || !bin || !/^\d{5,30}$/.test(account)) return;
+    if (!automaticLookup || !bin || !/^\d{5,30}$/.test(account)) return;
     const controller = new AbortController(); setHolder(''); setResolvedFor(''); setLookingUp(true); setError('');
     const timer = setTimeout(() => {
       void operationRequest<{ accountHolder: string }>('finance', '/staff/me/bank-accounts/lookup', 'POST', { bankCode: bin, accountNumber: account }, controller.signal)
@@ -39,7 +40,7 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
         .finally(() => { if (!controller.signal.aborted) setLookingUp(false); });
     }, 1200);
     return () => { controller.abort(); clearTimeout(timer); setLookingUp(false); };
-  }, [visible, automaticLookup, bin, account, revision]);
+  }, [automaticLookup, bin, account, revision]);
   const searchInput = useRef<ComponentRef<typeof TextInput>>(null);
   const selectedBank = banks.find(bank => bank.bin === bin);
   const normalize = (value: string) => value.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
@@ -47,8 +48,8 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
   const [focusSearch, setFocusSearch] = useState(false);
   const clearBank = () => { setHolder(''); setResolvedFor(''); setBin(''); setSearch(''); setFocusSearch(true); };
   useEffect(() => {
-    if (visible && focusSearch && !bin) { searchInput.current?.focus(); setFocusSearch(false); }
-  }, [bin, focusSearch, visible]);
+    if (focusSearch && !bin) { searchInput.current?.focus(); setFocusSearch(false); }
+  }, [bin, focusSearch]);
   const save = async () => {
     if (busy || automaticLookup === null || (automaticLookup && resolvedFor !== `${bin}:${account}`)) return;
     if (!banks.some(bank => bank.bin === bin) || !/^\d{5,30}$/.test(account.trim()) || !holder.trim()) { setError('Chọn ngân hàng, nhập đúng số tài khoản và tên chủ tài khoản theo ngân hàng.'); return; }
@@ -57,10 +58,9 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Chưa lưu được tài khoản.'); }
     finally { setBusy(false); }
   };
-  return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => { if (!busy) onClose(); }}>
-    <SafeAreaView style={s.screen}><View style={s.header}><Text style={s.title}>Tài khoản nhận tiền</Text><Pressable disabled={busy} onPress={onClose} style={s.button}><Text style={s.green}>Đóng</Text></Pressable></View>
+  return <SafeAreaView style={s.screen}><View style={s.header}><Text style={s.title}>Tài khoản nhận tiền</Text><Pressable disabled={busy} onPress={onClose} style={s.button}><Text style={s.green}>Đóng</Text></Pressable></View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
-        <Text style={s.label}>1. Chọn ngân hàng được hỗ trợ</Text>
+        <Text style={[s.label, { color: colors.text }]}>1. Chọn ngân hàng được hỗ trợ</Text>
         {selectedBank ? <Pressable accessibilityRole="button" accessibilityLabel={`Đã chọn ${selectedBank.shortName}. Bấm để bỏ chọn và tìm ngân hàng khác`} disabled={busy} onPress={clearBank} style={s.selectedSearch}>
           <BankLogo bank={selectedBank} /><View style={s.bankInfo}><Text style={s.label}>{selectedBank.shortName}</Text><Text style={s.note}>{selectedBank.name}</Text></View><Text style={s.clear}>×</Text>
         </Pressable> : <>
@@ -75,13 +75,12 @@ export function BankLinkModal({ visible, onClose, onSave }: { visible: boolean; 
             </ScrollView>}
           <Pressable style={s.button} disabled={loading || busy} onPress={() => setRevision(v => v + 1)}><Text style={s.green}>Tải lại danh sách ngân hàng</Text></Pressable>
         </>}
-        <Text style={s.label}>2. Số tài khoản ngân hàng</Text><TextInput accessibilityLabel="Số tài khoản ngân hàng" keyboardType="number-pad" editable={!busy} maxLength={30} value={account} onChangeText={value => { setAccount(value.replace(/\D/g, '')); if (automaticLookup) { setHolder(''); setResolvedFor(''); } }} style={s.input} placeholder="Nhập số tài khoản nhận tiền" />
-        <Text style={s.label}>3. Tên chủ tài khoản theo ngân hàng</Text><TextInput accessibilityLabel="Tên chủ tài khoản theo ngân hàng" editable={!busy && automaticLookup === false} maxLength={160} autoCapitalize="characters" value={holder} onChangeText={setHolder} style={s.input} placeholder={automaticLookup ? (lookingUp ? 'Đang tra cứu tên người nhận…' : 'Tên sẽ hiện sau khi nhập đúng tài khoản') : 'Nhập đúng tên hiển thị tại ngân hàng'} />
+        <Text style={[s.label, { color: colors.text }]}>2. Số tài khoản ngân hàng</Text><TextInput accessibilityLabel="Số tài khoản ngân hàng" keyboardType="number-pad" editable={!busy} maxLength={30} value={account} onChangeText={value => { setAccount(value.replace(/\D/g, '')); if (automaticLookup) { setHolder(''); setResolvedFor(''); } }} style={s.input} placeholder="Nhập số tài khoản nhận tiền" />
+        <Text style={[s.label, { color: colors.text }]}>3. Tên chủ tài khoản theo ngân hàng</Text><TextInput accessibilityLabel="Tên chủ tài khoản theo ngân hàng" editable={!busy && automaticLookup === false} maxLength={160} autoCapitalize="characters" value={holder} onChangeText={setHolder} style={s.input} placeholder={automaticLookup ? (lookingUp ? 'Đang tra cứu tên người nhận…' : 'Tên sẽ hiện sau khi nhập đúng tài khoản') : 'Nhập đúng tên hiển thị tại ngân hàng'} />
         <Text style={s.notice}>{automaticLookup ? 'Tên được tra cứu tự động và đối chiếu tại máy chủ khi lưu. Vui lòng kiểm tra đúng tài khoản nhận tiền của bạn.' : 'Chưa bật API tra tên tự động. Tên bạn nhập cần được Admin đối chiếu trước khi rút tiền.'}</Text>
-        {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+        {!!error && <Text accessibilityRole="alert" style={[s.error, { color: colors.dangerText }]}>{error}</Text>}
         <Pressable accessibilityRole="button" disabled={busy || loading || automaticLookup === null || (automaticLookup && resolvedFor !== `${bin}:${account}`) || !banks.some(bank => bank.bin === bin)} onPress={() => void save()} style={[s.submit, (busy || loading || !bin || (automaticLookup && resolvedFor !== `${bin}:${account}`)) && { opacity: 0.45 }]}><Text style={s.white}>{busy ? 'Đang lưu…' : automaticLookup ? 'Liên kết tài khoản' : 'Lưu và gửi xác minh'}</Text></Pressable>
       </ScrollView></KeyboardAvoidingView>
-    </SafeAreaView>
-  </Modal>;
+    </SafeAreaView>;
 }
-const s = StyleSheet.create({ screen: { flex: 1, backgroundColor: '#F4F9F6' }, header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: '#fff' }, title: { flex: 1, fontSize: 20, fontWeight: '700', color: '#163A2C' }, content: { padding: 20, gap: 14, width: '100%', maxWidth: 540, alignSelf: 'center' }, label: { fontSize: 14, fontWeight: '700', color: '#163A2C' }, input: { borderWidth: 1, borderColor: '#B9D3C4', borderRadius: 12, backgroundColor: '#fff', color: '#163A2C', padding: 14, fontSize: 15 }, list: { maxHeight: 220, borderRadius: 12, borderWidth: 1, borderColor: '#D2E5D9', backgroundColor: '#fff' }, logoBox: { width: 56, height: 44, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E7F0EB', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, logo: { width: 48, height: 36 }, logoFallback: { fontSize: 11, color: '#64748B', fontWeight: '700' }, bankInfo: { flex: 1, minWidth: 0, gap: 4 }, option: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: '#E7F0EB' }, selectedSearch: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderWidth: 1, borderColor: '#8BCAB0', borderRadius: 12, backgroundColor: '#fff' }, clear: { fontSize: 26, color: '#64748B', paddingHorizontal: 6 }, note: { color: '#64748B', fontSize: 12, lineHeight: 19 }, notice: { color: '#875B00', backgroundColor: '#FFF5D8', padding: 14, borderRadius: 12, lineHeight: 21 }, error: { color: '#B91C1C', lineHeight: 20 }, button: { padding: 12, minHeight: 44 }, green: { color: '#047857', fontWeight: '700' }, submit: { padding: 16, backgroundColor: '#047857', borderRadius: 12 }, white: { color: '#fff', fontWeight: '700', textAlign: 'center' } });
+const s = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: '#fff' }, title: { flex: 1, fontSize: 20, fontWeight: '700', color: '#163A2C' }, content: { padding: 20, gap: 14, width: '100%', maxWidth: 540, alignSelf: 'center' }, label: { fontSize: 14, fontWeight: '700', color: '#163A2C' }, input: { borderWidth: 1, borderColor: '#B9D3C4', borderRadius: 12, backgroundColor: '#fff', color: '#163A2C', padding: 14, fontSize: 15 }, list: { maxHeight: 220, borderRadius: 12, borderWidth: 1, borderColor: '#D2E5D9', backgroundColor: '#fff' }, logoBox: { width: 56, height: 44, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E7F0EB', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, logo: { width: 48, height: 36 }, logoFallback: { fontSize: 11, color: '#64748B', fontWeight: '700' }, bankInfo: { flex: 1, minWidth: 0, gap: 4 }, option: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12, borderBottomWidth: 1, borderBottomColor: '#E7F0EB' }, selectedSearch: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderWidth: 1, borderColor: '#8BCAB0', borderRadius: 12, backgroundColor: '#fff' }, clear: { fontSize: 26, color: '#64748B', paddingHorizontal: 6 }, note: { color: '#64748B', fontSize: 12, lineHeight: 19 }, notice: { color: '#875B00', backgroundColor: '#FFF5D8', padding: 14, borderRadius: 12, lineHeight: 21 }, error: { color: '#B91C1C', lineHeight: 20 }, button: { padding: 12, minHeight: 44 }, green: { color: '#047857', fontWeight: '700' }, submit: { padding: 16, backgroundColor: '#047857', borderRadius: 12 }, white: { color: '#fff', fontWeight: '700', textAlign: 'center' } });

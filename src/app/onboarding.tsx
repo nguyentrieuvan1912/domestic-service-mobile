@@ -1,3 +1,4 @@
+import { useAppTheme } from '@/context/ThemeContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -55,6 +56,7 @@ const SLIDES = [
 ];
 
 export default function OnboardingScreen() {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [activeSlide, setActiveSlide] = useState(0);
@@ -75,10 +77,10 @@ export default function OnboardingScreen() {
       <View style={styles.topBar}>
         <View style={styles.logoRow}>
           <BrandLogo size={29} />
-          <Text style={styles.logoText}>CleanMaster</Text>
+          <Text style={[styles.logoText, { color: colors.text }]}>CleanMaster</Text>
         </View>
         <Pressable onPress={handleComplete}>
-          <Text style={styles.skipText}>Bỏ qua</Text>
+          <Text style={[styles.skipText, { color: colors.accentText }]}>Bỏ qua</Text>
         </Pressable>
       </View>
 
@@ -100,8 +102,8 @@ export default function OnboardingScreen() {
               <Text style={styles.badgeText}>{slide.badge}</Text>
             </View>
 
-            <Text style={styles.slideTitle}>{slide.title}</Text>
-            <Text style={styles.slideDesc}>{slide.desc}</Text>
+            <Text style={[styles.slideTitle, { color: colors.text }]}>{slide.title}</Text>
+            <Text style={[styles.slideDesc, { color: colors.textSecondary }]}>{slide.desc}</Text>
           </View>
         ))}
       </ScrollView>
@@ -134,8 +136,7 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFF',
+    flex: 1
   },
   topBar: {
     flexDirection: 'row',

@@ -1,14 +1,14 @@
+import { useAppTheme } from '@/context/ThemeContext';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { BorderRadius, BrandColors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { StaffWelcomeOverlay } from '@/components/common/StaffWelcomeOverlay';
 import { WelcomeSweepOverlay } from '@/components/common/WelcomeSweepOverlay';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { clearRememberedLogin, loadRememberedLogin, LoginRole } from '@/utils/remembered-login';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ROLE_CONTENT: Record<LoginRole, { title: string; description: string; icon: string }> = {
@@ -17,6 +17,7 @@ const ROLE_CONTENT: Record<LoginRole, { title: string; description: string; icon
 };
 
 export default function LoginScreen() {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { login } = useAuth();
   const [role, setRole] = useState<LoginRole>('CUSTOMER');
@@ -64,30 +65,37 @@ export default function LoginScreen() {
     finally { setRestoringLogin(false); }
   };
 
-  const goToRoleFlow = () => {
+  const goToRoleFlow = useCallback(() => {
     if (role === 'STAFF') router.replace('/staff' as never);
     else router.replace('/(tabs)');
-  };
+  }, [role, router]);
 
   const handleLogin = async () => {
     if (busy) return;
     setErrorMessage('');
     if (!account.trim() || !password) { setErrorMessage('Vui lòng nhập email/số điện thoại và mật khẩu.'); return; }
+    Keyboard.dismiss();
     setIsLoading(true);
     try { await login(account.trim(), password, role, rememberMe); setShowWelcome(true); }
     catch (error) { setErrorMessage(error instanceof Error ? error.message : 'Không thể đăng nhập.'); }
     finally { setIsLoading(false); }
   };
 
+  if (showWelcome) {
+    return <View style={styles.gradient}>
+      {role === 'STAFF' ? <StaffWelcomeOverlay onComplete={goToRoleFlow} /> : <WelcomeSweepOverlay onComplete={goToRoleFlow} />}
+    </View>;
+  }
+
   return (
-    <LinearGradient colors={['#ECFDF5', '#F8FAFC', '#FFFFFF']} style={styles.gradient}>
+    <View style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardView}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
             <View style={styles.brandHeader}>
               <View style={styles.logoCircle}><BrandLogo size={60} /></View>
-              <Text style={styles.brandName}>CleanMaster</Text>
-              <Text style={styles.brandSlogan}>Dịch vụ gia đình tin cậy, chuyên nghiệp</Text>
+              <Text style={[styles.brandName, { color: colors.text }]}>CleanMaster</Text>
+              <Text style={[styles.brandSlogan, { color: colors.textSecondary }]}>Dịch vụ gia đình tin cậy, chuyên nghiệp</Text>
             </View>
 
             <View style={styles.roleSwitch}>
@@ -151,10 +159,7 @@ export default function LoginScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-      {showWelcome && (role === 'STAFF'
-        ? <StaffWelcomeOverlay onComplete={goToRoleFlow} />
-        : <WelcomeSweepOverlay onComplete={goToRoleFlow} />)}
-    </LinearGradient>
+    </View>
   );
 }
 

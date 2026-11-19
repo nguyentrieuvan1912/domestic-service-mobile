@@ -111,10 +111,7 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
   const isModeA = mode === 'MODE_A' || !mode;
 
   return (
-    <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
-      style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Navigation Header */}
         <View style={styles.headerWrapper}>
@@ -427,7 +424,7 @@ export const RequireAddressView: React.FC<RequireAddressViewProps> = ({
           </KeyboardAvoidingView>
         </Modal>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 

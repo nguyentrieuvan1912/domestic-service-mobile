@@ -11,10 +11,8 @@ export interface BackgroundPreset {
   id: BackgroundPresetId;
   label: string;
   swatch: string;
-  lightBg: string;
-  lightGradient: readonly [string, string, string];
-  darkBg: string;
-  darkGradient: readonly [string, string, string];
+  lightGradient: readonly [string, string];
+  darkGradient: readonly [string, string];
 }
 
 export const BACKGROUND_PRESETS: readonly BackgroundPreset[] = [
@@ -22,63 +20,50 @@ export const BACKGROUND_PRESETS: readonly BackgroundPreset[] = [
     id: 'mint',
     label: 'Xanh ngọc',
     swatch: '#10B981',
-    lightBg: '#F2FBF7',
-    lightGradient: ['#B8EED4', '#D8F4E8', '#EEF8F3'],
-    darkBg: '#091815',
-    darkGradient: ['#062920', '#0A1E1A', '#0F172A'],
+    lightGradient: ['#C0DCD0', '#E0ECE6'],
+    darkGradient: ['#12352B', '#091815'],
   },
   {
     id: 'slate',
     label: 'Tinh tế',
     swatch: '#64748B',
-    lightBg: '#F8FAFC',
-    lightGradient: ['#F1F5F9', '#F8FAFC', '#FFFFFF'],
-    darkBg: '#0F172A',
-    darkGradient: ['#0F172A', '#111827', '#0B1120'],
+    lightGradient: ['#D7E1EC', '#EEF3F8'],
+    darkGradient: ['#26354B', '#0F172A'],
   },
   {
     id: 'ocean',
     label: 'Xanh biển',
     swatch: '#0EA5E9',
-    lightBg: '#F0F7FF',
-    lightGradient: ['#CBE7FF', '#E5F2FF', '#F5FAFF'],
-    darkBg: '#0A1929',
-    darkGradient: ['#0B2440', '#0D1D33', '#0F172A'],
+    lightGradient: ['#C5DDF4', '#E8F3FD'],
+    darkGradient: ['#153753', '#0A1929'],
   },
   {
     id: 'lavender',
     label: 'Oải hương',
     swatch: '#8B5CF6',
-    lightBg: '#F6F3FF',
-    lightGradient: ['#E2D9FF', '#EFEBFF', '#F9F7FF'],
-    darkBg: '#151126',
-    darkGradient: ['#21173D', '#17132C', '#0F172A'],
+    lightGradient: ['#DDD0F2', '#F0EAFA'],
+    darkGradient: ['#302449', '#151126'],
   },
   {
     id: 'sunset',
     label: 'Kem ấm',
     swatch: '#F97316',
-    lightBg: '#FFF7F2',
-    lightGradient: ['#FFE4D1', '#FFF1E6', '#FFFBF7'],
-    darkBg: '#1D1412',
-    darkGradient: ['#2E1B14', '#1F1514', '#0F172A'],
+    lightGradient: ['#F2D9C6', '#FBEEE4'],
+    darkGradient: ['#3A2720', '#1D1412'],
   },
   {
     id: 'rose',
     label: 'Hồng phấn',
     swatch: '#EC4899',
-    lightBg: '#FFF4F8',
-    lightGradient: ['#FFDCE8', '#FFEEF4', '#FFF9FB'],
-    darkBg: '#1E111A',
-    darkGradient: ['#301424', '#1F131E', '#0F172A'],
+    lightGradient: ['#EDCEDD', '#FAEBF2'],
+    darkGradient: ['#3B2134', '#1E111A'],
   },
 ] as const;
 
 export interface AppThemeColors {
   isDark: boolean;
   background: string;
-  gradient: readonly [string, string, string];
-  gradientLocations: readonly [number, number, number];
+  backgroundGradient: BackgroundPreset['lightGradient'];
   surface: string;
   surfaceElevated: string;
   surfaceMuted: string;
@@ -150,12 +135,13 @@ function isValidPreset(value: unknown): value is BackgroundPresetId {
 }
 
 function buildColors(isDark: boolean, preset: BackgroundPreset): AppThemeColors {
+  const backgroundGradient = isDark ? preset.darkGradient : preset.lightGradient;
+  const background = backgroundGradient[1];
   if (isDark) {
     return {
       isDark: true,
-      background: preset.darkBg,
-      gradient: preset.darkGradient,
-      gradientLocations: [0, 0.45, 1],
+      background,
+      backgroundGradient,
       surface: '#1E293B',
       surfaceElevated: '#273449',
       surfaceMuted: '#334155',
@@ -184,9 +170,8 @@ function buildColors(isDark: boolean, preset: BackgroundPreset): AppThemeColors 
   }
   return {
     isDark: false,
-    background: preset.lightBg,
-    gradient: preset.lightGradient,
-    gradientLocations: [0, 0.35, 0.9],
+    background,
+    backgroundGradient,
     surface: '#FFFFFF',
     surfaceElevated: '#F8FAFC',
     surfaceMuted: '#F1F5F9',

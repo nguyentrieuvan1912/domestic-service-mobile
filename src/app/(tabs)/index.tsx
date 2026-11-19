@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { StaffResponseDecision } from '@/components/booking/StaffResponseWaiting';
 import { needsStaffResponse } from '@/utils/staff-response';
 import { remoteImageSource } from '@/utils/image-source';
@@ -19,14 +20,13 @@ import {
   AppState,
   LayoutAnimation,
 } from 'react-native';
-import { useIsFocused, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
-import { Staff } from '@/types/user';
 import { ServiceCategoryCard } from '@/components/common/ServiceCategoryCard';
 import { BookingStatusBadge } from '@/components/common/BookingStatusBadge';
 import { PromotionCard } from '@/components/common/PromotionCard';
@@ -43,69 +43,29 @@ import type { ServiceBundle } from '@/data/serviceBundles';
 import { useCatalogResource } from '@/hooks/use-catalog-resource';
 import { useCustomerAddresses } from '@/hooks/use-customer-addresses';
 import type { Promotion } from '@/types/service';
+import type { CatalogHomeBanner } from '@/api/catalog-types';
+import { useBookingResume } from '@/hooks/use-booking-resume';
 
 
-// Hero banners showcasing diverse family services
-const HERO_BANNERS = [
-  {
-    id: 'banner-ac',
-    badge: 'Mùa nóng giảm 20%',
-    badgeColor: '#EF4444',
-    title: 'Vệ sinh máy lạnh 5★',
-    subtitle: 'Xịt rửa áp lực cao • Bảo hành 30 ngày',
-    desc: 'Làm lạnh sâu tức thì, tiết kiệm 20% điện năng cho cả nhà.',
-    serviceId: 'srv-004',
-    btnText: 'Đặt thợ ngay',
-    gradient: ['#0284C7', '#0369A1'] as [string, string],
-    image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'banner-clean',
-    badge: 'Được tin cậy nhất',
-    badgeColor: '#10B981',
-    title: 'Giúp việc nhà theo giờ',
-    subtitle: 'Nhân viên lý lịch chuẩn • Tự chọn thợ',
-    desc: 'Linh hoạt 2 - 4 tiếng. Nhà sạch tinh tươm, mẹ an tâm nghỉ ngơi.',
-    serviceId: 'srv-001',
-    btnText: 'Đặt ca lẻ',
-    gradient: ['#0D9488', '#115E59'] as [string, string],
-    image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'banner-child',
-    badge: 'Yêu trẻ tận tâm',
-    badgeColor: '#F59E0B',
-    title: 'Bảo mẫu chăm sóc bé',
-    subtitle: 'Chứng chỉ mầm non • Camera giám sát',
-    desc: 'Đồng hành cùng bé vui chơi, ăn ngủ đúng giờ khi ba mẹ bận.',
-    serviceId: 'srv-009',
-    btnText: 'Tìm bảo mẫu',
-    gradient: ['#7C3AED', '#6D28D9'] as [string, string],
-    image: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=500&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'banner-deep',
-    badge: 'Toàn diện',
-    badgeColor: '#3B82F6',
-    title: 'Tổng vệ sinh nhà ở',
-    subtitle: 'Máy móc công nghiệp • Sạch bóng mọi ngóc ngách',
-    desc: 'Tẩy ố kính, chà sàn công nghiệp, dọn về nhà mới trọn gói.',
-    serviceId: 'srv-002',
-    btnText: 'Khám phá ngay',
-    gradient: ['#1E3A8A', '#1E40AF'] as [string, string],
-    image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=500&auto=format&fit=crop&q=80',
-  },
-];
+const bannerThemes: Record<CatalogHomeBanner['theme'], { gradient: [string, string]; badge: string }> = {
+  BLUE: { gradient: ['#0284C7', '#0369A1'], badge: '#B91C1C' },
+  GREEN: { gradient: ['#0D9488', '#115E59'], badge: '#047857' },
+  ORANGE: { gradient: ['#C2410C', '#9A3412'], badge: '#7C2D12' },
+  NAVY: { gradient: ['#1E3A8A', '#1E40AF'], badge: '#1D4ED8' },
+};
 
 export default function HomeScreen() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
   const { colors } = useAppTheme();
-  const isFocused=useIsFocused();
+  const { active: isFocused, revision: catalogRevision } = useBookingResume();
   const { currentCustomer } = useAuth();
-  const bookingResource = useCustomerBookings(); const catalog = useBookingCatalog();
+  const bookingResource = useCustomerBookings(); const catalog = useBookingCatalog(catalogRevision);
+  const bannerResource = useCatalogResource<CatalogHomeBanner[]>('/home-banners', catalogRevision);
+  const banners = bannerResource.data ?? [];
+  const bannerOrder = banners.map(banner => banner.id).join(',');
   const services = catalog.services;
   const getServiceById = (id: string) => services.find(s=>s.id===id) || (bookingResource.bookings.find(b=>b.serviceId===id) ? bookingServiceView(bookingResource.bookings.find(b=>b.serviceId===id)!) : undefined);
-  const getStaffById = (id: string): Staff | undefined => { const b=bookingResource.bookings.find(b=>b.staffId===id && b.staff);return b?.staff ? staffView(b.staff) : undefined; };
   const serviceBundles: ServiceBundle[] = catalog.packages.slice(0,4).map(p=>{ const service=services.find(s=>s.id===p.serviceId);return {id:p.id,title:p.name,subtitle:p.description,badgeText:'Gói dịch vụ',discountPercent:0,discountAmount:0,originalPrice:p.price,bundlePrice:p.price,primaryServiceId:p.serviceId,includedServiceIds:[p.serviceId],bannerImage:service?.image || '',aiReason:p.recommendedFor || '',tag:service?.name || ''}; });
   const { unreadCount } = useNotifications();
   const { width: windowWidth } = useWindowDimensions();
@@ -117,6 +77,8 @@ export default function HomeScreen() {
 
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [isCategoriesExpanded, setIsCategoriesExpanded] = useState(true);
+  const [showFloatingAI, setShowFloatingAI] = useState(true);
+  const floatingAIHeight = useRef(48);
   const [blogVisible, setBlogVisible] = useState(false);
   const blogViewport = useRef({ top: 0, height: 0, rowTop: 0, rowHeight: 0, visible: false });
 
@@ -144,6 +106,12 @@ export default function HomeScreen() {
   const activeIndexRef = useRef(0);
   const isInteractingRef = useRef(false);
 
+  useEffect(() => {
+    activeIndexRef.current = 0;
+    setActiveBannerIndex(0);
+    bannerScrollRef.current?.scrollTo({ x: 0, animated: false });
+  }, [bannerOrder, snapInterval]);
+
   // Sync activeIndexRef
   useEffect(() => {
     activeIndexRef.current = activeBannerIndex;
@@ -151,10 +119,10 @@ export default function HomeScreen() {
 
   // Auto-scroll carousel: Tự chuyển đổi qua lại mượt mà mỗi 3.8s
   useEffect(() => {
-    if(!isFocused) return;
+    if (!isFocused || banners.length < 2) return;
     const timer = setInterval(() => {
       if (isInteractingRef.current || AppState.currentState !== 'active') return;
-      const nextIndex = (activeIndexRef.current + 1) % HERO_BANNERS.length;
+      const nextIndex = (activeIndexRef.current + 1) % banners.length;
       bannerScrollRef.current?.scrollTo({
         x: nextIndex * snapInterval,
         animated: true,
@@ -163,7 +131,7 @@ export default function HomeScreen() {
     }, 3800);
 
     return () => clearInterval(timer);
-  }, [snapInterval,isFocused]);
+  }, [snapInterval, isFocused, banners.length]);
 
   // Address
   const { addresses } = useCustomerAddresses();
@@ -204,7 +172,7 @@ export default function HomeScreen() {
   const handleBannerScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / snapInterval);
-    if (index >= 0 && index < HERO_BANNERS.length && index !== activeBannerIndex) {
+    if (index >= 0 && index < banners.length && index !== activeBannerIndex) {
       setActiveBannerIndex(index);
     }
   };
@@ -218,10 +186,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={colors.gradient}
-      locations={colors.gradientLocations}
-      style={styles.gradientContainer}>
+    <View style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -230,11 +195,13 @@ export default function HomeScreen() {
             blogViewport.current.height = nativeEvent.layout.height;
             updateBlogVisibility();
           }}
-          onScroll={({ nativeEvent }) => {
-            blogViewport.current.top = nativeEvent.contentOffset.y;
+          onScroll={({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+            blogViewport.current.top = contentOffset.y;
             updateBlogVisibility();
+            const visibleBottom = contentOffset.y + layoutMeasurement.height;
+            setShowFloatingAI(contentSize.height - visibleBottom > floatingAIHeight.current + floatingAIBottom);
           }}
-          contentContainerStyle={styles.scrollContent}>
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: styles.scrollContent.paddingBottom + bottomTabHeight }]}>
           {/* TOP HEADER: User Greeting, Address, Notifications */}
           <View style={styles.topHeader}>
             <Pressable
@@ -246,8 +213,8 @@ export default function HomeScreen() {
                 style={styles.userAvatar}
               />
               <View style={styles.userMeta}>
-                <Text style={styles.greetingText}>Xin chào bạn,</Text>
-                <Text style={styles.userName}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
+                <Text style={[styles.greetingText, { color: colors.textSecondary }]}>Xin chào bạn,</Text>
+                <Text style={[styles.userName, { color: colors.text }]}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
               </View>
             </Pressable>
 
@@ -318,12 +285,12 @@ export default function HomeScreen() {
               <View style={styles.sectionHeaderRow}>
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.sectionTitle}>Đặt lại dịch vụ đã dùng</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Đặt lại dịch vụ đã dùng</Text>
                     <View style={styles.rebookPill}>
-                      <Text style={styles.rebookPillText}>⚡ 1-chạm</Text>
+                      <Text style={styles.rebookPillText}>1 chạm</Text>
                     </View>
                   </View>
-                  <Text style={styles.sectionSubtitle}>Dành cho bạn • Nhân viên quen thuộc • Tiết kiệm thời gian</Text>
+                  <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Dành cho bạn • Nhân viên quen thuộc • Tiết kiệm thời gian</Text>
                 </View>
               </View>
 
@@ -333,16 +300,13 @@ export default function HomeScreen() {
                 contentContainerStyle={{ paddingHorizontal: Spacing.three, gap: 12 }}>
                 {recentCompletedBookings.slice(0, 3).map((b) => {
                   const srv = getServiceById(b.serviceId);
-                  const staff = b.staffId ? getStaffById(b.staffId) : undefined;
-                  const bAddr = addresses.find((a) => a.id === b.addressId) || defaultAddress;
+                  const staff = b.staff ? staffView(b.staff) : undefined;
+                  const bAddr = addresses.find(a => a.id === b.addressId) || b.address;
                   return (
-                    <View key={b.id} style={styles.rebookCard}>
-                      <View style={styles.rebookCardHeader}>
-                        <View style={styles.rebookTagRow}>
-                          <Text style={styles.rebookBadge}>Đã hoàn thành</Text>
-                          {staff && <Text style={styles.rebookStaffTag}>Thợ quen</Text>}
-                        </View>
-                        <Text style={styles.rebookPrice}>{formatVND(b.totalAmount)}</Text>
+                    <View key={b.id} style={[styles.rebookCard, { maxWidth: windowWidth - Spacing.three * 2 }]}>
+                      <View style={styles.rebookTagRow}>
+                        <Text style={styles.rebookBadge}>Đã hoàn thành</Text>
+                        {staff && <Text style={styles.rebookStaffTag}>Thợ quen</Text>}
                       </View>
 
                       <View style={styles.rebookMainRow}>
@@ -353,7 +317,7 @@ export default function HomeScreen() {
                             <IconSymbol name="🧹" style={{ fontSize: 18 }} />
                           </View>
                         )}
-                        <View style={{ flex: 1 }}>
+                        <View style={styles.rebookMainInfo}>
                           <Text numberOfLines={1} style={styles.rebookServiceName}>
                             {srv?.name || 'Dịch vụ gia đình'}
                           </Text>
@@ -366,15 +330,17 @@ export default function HomeScreen() {
                             </View>
                           )}
                           <Text numberOfLines={1} style={styles.rebookAddrText}>
-                            📍 {bAddr?.fullAddress?.split(',')[0] || 'TP. Hồ Chí Minh'}
+                            {bAddr?.fullAddress?.split(',')[0] || bAddr?.streetAddress || 'Chọn lại địa chỉ'}
                           </Text>
                         </View>
                       </View>
 
+                      <Text style={styles.rebookPrice}>Lần trước · {formatVND(b.totalAmount)}</Text>
                       <Pressable
+                        accessibilityRole="button"
                         style={styles.rebookActionBtn}
                         onPress={() => handleOpenRebook(b)}>
-                        <Text style={styles.rebookActionBtnText}>⚡ Đặt lại ngay (1-chạm)</Text>
+                        <Text style={styles.rebookActionBtnText}>Đặt lại nhanh</Text>
                       </Pressable>
                     </View>
                   );
@@ -419,7 +385,10 @@ export default function HomeScreen() {
           </View>
 
           {/* HERO BANNERS CAROUSEL */}
-          <View style={styles.bannerContainer}>
+          {bannerResource.error && !banners.length && <Pressable accessibilityRole="button" style={styles.bannerRetry} onPress={bannerResource.retry}>
+            <Text style={{ color: colors.text }}>Chưa tải được banner · Thử lại</Text>
+          </Pressable>}
+          {banners.length > 0 && <View style={styles.bannerContainer}>
             <ScrollView
               ref={bannerScrollRef}
               horizontal
@@ -440,7 +409,7 @@ export default function HomeScreen() {
               onMomentumScrollEnd={(e) => {
                 const offsetX = e.nativeEvent.contentOffset.x;
                 const index = Math.round(offsetX / snapInterval);
-                const safeIndex = Math.max(0, Math.min(index, HERO_BANNERS.length - 1));
+                const safeIndex = Math.max(0, Math.min(index, banners.length - 1));
                 setActiveBannerIndex(safeIndex);
                 setTimeout(() => {
                   isInteractingRef.current = false;
@@ -449,53 +418,51 @@ export default function HomeScreen() {
               contentContainerStyle={{
                 paddingHorizontal: horizontalPadding,
                 gap: bannerGap,
+                alignItems: 'center',
               }}>
-              {HERO_BANNERS.map((banner) => (
+              {banners.map((banner) => {
+                const fullImage = banner.layout === 'FULL_IMAGE';
+                const theme = bannerThemes[banner.theme];
+                return (
                 <Pressable
                   key={banner.id}
-                  style={[styles.bannerCard, { width: bannerWidth }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={banner.title}
+                  style={[styles.bannerCard, { width: bannerWidth, height: fullImage ? bannerWidth * 5 / 12 : 160 }]}
                   onPress={() =>
                     router.push({
                       pathname: '/service/[id]',
-                      params: { id: banner.serviceId },
+                      params: { id: String(banner.serviceId) },
                     })
                   }>
-                  <LinearGradient colors={banner.gradient} style={styles.bannerGradient}>
+                  {fullImage ? <Image source={remoteImageSource(banner.imageUrl)} style={styles.bannerFullImage} resizeMode="cover" />
+                    : <LinearGradient colors={theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bannerGradient}>
                     <View style={styles.bannerContentCol}>
-                      <View
-                        style={[
-                          styles.bannerBadge,
-                          { backgroundColor: banner.badgeColor },
-                        ]}>
-                        <Text style={styles.bannerBadgeText}>{banner.badge}</Text>
-                      </View>
-                      <Text style={styles.bannerTitle}>{banner.title}</Text>
-                      <Text numberOfLines={2} style={styles.bannerDesc}>
-                        {banner.desc}
-                      </Text>
-                      <Pressable
-                        style={styles.bannerCtaBtn}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/service/[id]',
-                            params: { id: banner.serviceId },
-                          })
-                        }>
-                        <Text style={styles.bannerCtaText}>{banner.btnText} →</Text>
-                      </Pressable>
+                      {!!banner.badge && <View style={[styles.bannerBadge, { backgroundColor: theme.badge }]}>
+                        <Text numberOfLines={1} style={styles.bannerBadgeText}>{banner.badge}</Text>
+                      </View>}
+                      <Text numberOfLines={2} style={styles.bannerTitle}>{banner.title}</Text>
+                      {!!banner.description && <Text numberOfLines={2} style={styles.bannerDesc}>{banner.description}</Text>}
+                      {!!banner.buttonLabel && <View style={styles.bannerCtaBtn}>
+                        <Text numberOfLines={1} style={styles.bannerCtaText}>{banner.buttonLabel} →</Text>
+                      </View>}
                     </View>
 
-                    <Image source={remoteImageSource(banner.image)} style={styles.bannerImage} />
-                  </LinearGradient>
+                    <Image source={remoteImageSource(banner.imageUrl)} resizeMode="cover"
+                      style={[styles.bannerImage, { width: Math.min(110, (bannerWidth - Spacing.three * 2) * 0.4) }]} />
+                  </LinearGradient>}
                 </Pressable>
-              ))}
+              ); })}
             </ScrollView>
 
             {/* Pagination dots (clickable & smooth) */}
-            <View style={styles.paginationRow}>
-              {HERO_BANNERS.map((_, i) => (
+            {banners.length > 1 && <View style={styles.paginationRow}>
+              {banners.map((banner, i) => (
                 <Pressable
-                  key={i}
+                  key={banner.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Banner ${i + 1}`}
+                  accessibilityState={{ selected: activeBannerIndex === i }}
                   hitSlop={8}
                   onPress={() => handleScrollToBanner(i)}
                   style={[
@@ -504,8 +471,8 @@ export default function HomeScreen() {
                   ]}
                 />
               ))}
-            </View>
-          </View>
+            </View>}
+          </View>}
 
           {/* SERVICE CATEGORIES GRID (2 rows default, expandable) */}
           <View style={styles.categorySectionCard}>
@@ -552,8 +519,8 @@ export default function HomeScreen() {
           {/* POPULAR SERVICES SECTION */}
           <View style={styles.sectionHeaderRow}>
             <View>
-              <Text style={styles.sectionTitle}>Dịch vụ phổ biến</Text>
-              <Text style={styles.sectionSubtitle}>Khách hàng tin tưởng đặt nhiều nhất</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Dịch vụ phổ biến</Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Khách hàng tin tưởng đặt nhiều nhất</Text>
             </View>
             <Pressable onPress={() => router.push('/(tabs)/services')}>
               <Text style={styles.seeAllText}>Xem thêm</Text>
@@ -611,9 +578,9 @@ export default function HomeScreen() {
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <IconSymbol name="💡" style={{ fontSize: 18 }} />
-                <Text style={styles.sectionTitle}>Combo Gợi ý thông minh (AI Bundle)</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Combo Gợi ý thông minh (AI Bundle)</Text>
               </View>
-              <Text style={styles.sectionSubtitle}>Kết hợp dịch vụ liên quan • Tiết kiệm đến 20% chi phí</Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Kết hợp dịch vụ liên quan • Tiết kiệm đến 20% chi phí</Text>
             </View>
           </View>
 
@@ -667,12 +634,12 @@ export default function HomeScreen() {
           {/* PROMOTIONS & VOUCHERS */}
           <View style={[styles.sectionHeaderRow, { marginTop: Spacing.four }]}>
             <View>
-              <Text style={styles.sectionTitle}>Mã giảm giá hấp dẫn</Text>
-              <Text style={styles.sectionSubtitle}>Áp dụng ngay khi thanh toán đơn hàng</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Mã giảm giá hấp dẫn</Text>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Áp dụng ngay khi thanh toán đơn hàng</Text>
             </View>
           </View>
 
-          <View style={{ paddingHorizontal: Spacing.three }}>
+          <View style={styles.promotionList}>
             {promotions.filter(item => item.isActive).slice(0, 2).map((promo) => (
               <PromotionCard
                 key={promo.id}
@@ -686,12 +653,12 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          <View style={{ height: 100 }} />
         </ScrollView>
 
-        {/* FLOATING AI ASSISTANT BUTTON */}
-        <Pressable
-          style={styles.floatingAIBtn}
+        {showFloatingAI && <Pressable
+          accessibilityRole="button"
+          onLayout={({ nativeEvent }) => { floatingAIHeight.current = nativeEvent.layout.height; }}
+          style={[styles.floatingAIBtn, { bottom: bottomTabHeight + floatingAIBottom }]}
           onPress={() => router.push('/ai')}>
           <LinearGradient
             colors={['#10B981', '#059669']}
@@ -705,7 +672,7 @@ export default function HomeScreen() {
               <Text style={styles.aiBtnSub}>Hỏi dịch vụ 24/7</Text>
             </View>
           </LinearGradient>
-        </Pressable>
+        </Pressable>}
 
         {/* MODAL 2: SMART SERVICE BUNDLE DETAIL */}
         <Modal
@@ -781,9 +748,12 @@ export default function HomeScreen() {
           </View>
         </Modal>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
+
+
+const floatingAIBottom = 12;
 
 const styles = StyleSheet.create({
   gradientContainer: {
@@ -793,7 +763,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 12,
+  },
+  promotionList: {
+    paddingHorizontal: Spacing.three,
+    gap: 12,
   },
   topHeader: {
     flexDirection: 'row',
@@ -963,8 +937,16 @@ const styles = StyleSheet.create({
   bannerContainer: {
     marginBottom: Spacing.three,
   },
+  bannerRetry: {
+    marginHorizontal: Spacing.three,
+    marginBottom: Spacing.three,
+    borderWidth: 1,
+    borderColor: BrandColors.gray300,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.two,
+  },
   bannerCard: {
-    height: 160,
+    backgroundColor: BrandColors.gray200,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     elevation: 4,
@@ -980,11 +962,13 @@ const styles = StyleSheet.create({
   },
   bannerContentCol: {
     flex: 1,
-    justifyContent: 'space-between',
+    minWidth: 0,
+    justifyContent: 'space-evenly',
     paddingRight: 8,
   },
   bannerBadge: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
@@ -1006,6 +990,7 @@ const styles = StyleSheet.create({
   },
   bannerCtaBtn: {
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     backgroundColor: '#FFF',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1017,10 +1002,11 @@ const styles = StyleSheet.create({
     color: BrandColors.gray900,
   },
   bannerImage: {
-    width: 110,
-    height: '100%',
+    alignSelf: 'center',
+    aspectRatio: 55 / 64,
     borderRadius: BorderRadius.lg,
   },
+  bannerFullImage: { width: '100%', height: '100%' },
   paginationRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1192,8 +1178,8 @@ const styles = StyleSheet.create({
   },
   floatingAIBtn: {
     position: 'absolute',
-    bottom: 12,
     right: 16,
+    maxWidth: '90%',
     borderRadius: BorderRadius.full,
     elevation: 8,
     shadowColor: '#059669',
@@ -1216,6 +1202,7 @@ const styles = StyleSheet.create({
   },
   aiBtnTextCol: {
     justifyContent: 'center',
+    flexShrink: 1,
   },
   aiBtnTitle: {
     fontSize: 12,
@@ -1256,18 +1243,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
   },
-  rebookCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
   rebookTagRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
+    marginBottom: 8,
   },
   rebookBadge: {
+    flexShrink: 1,
     fontSize: 10,
     fontWeight: '700',
     color: BrandColors.primary,
@@ -1277,6 +1261,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   rebookStaffTag: {
+    flexShrink: 1,
     fontSize: 10,
     fontWeight: '700',
     color: '#D97706',
@@ -1286,6 +1271,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   rebookPrice: {
+    marginTop: 'auto',
+    marginBottom: 8,
     fontSize: 13,
     fontWeight: '800',
     color: BrandColors.gray900,
@@ -1295,6 +1282,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     marginBottom: 10,
+  },
+  rebookMainInfo: {
+    flex: 1,
+    minWidth: 0,
   },
   rebookThumb: {
     width: 50,
@@ -1326,6 +1317,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   rebookStaffName: {
+    flexShrink: 1,
     fontSize: 11,
     color: BrandColors.gray700,
     fontWeight: '600',

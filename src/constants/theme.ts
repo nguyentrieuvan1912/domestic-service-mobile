@@ -29,8 +29,6 @@ export const BrandColors = {
   gray800: '#1F2937',
   gray900: '#111827',
   cardShadow: 'rgba(0, 0, 0, 0.04)',
-  softBgGradient: ['#B8EED4', '#D8F4E8', '#EEF8F3'] as const,
-  softBgGradientLocations: [0, 0.35, 0.9] as const,
 };
 
 export const Colors = {

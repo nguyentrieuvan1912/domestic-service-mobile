@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import AvatarEditor from '@/components/common/AvatarEditor';
 import React, { useCallback, useState } from 'react';
 import {
@@ -12,7 +13,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
@@ -24,6 +24,7 @@ import { Redirect, useFocusEffect } from 'expo-router';
 import { operationRequest } from '@/api/operations';
 
 export default function ProfileScreen() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
   const { currentCustomer, accessToken, logout, isLoading, refreshProfile } = useAuth();
   const { colors, mode, preset } = useAppTheme();
@@ -70,11 +71,8 @@ export default function ProfileScreen() {
   if (!currentCustomer) return <Redirect href="/auth/login" />;
 
   return (
-    <LinearGradient
-      colors={colors.gradient}
-      locations={colors.gradientLocations}
-      style={styles.gradientContainer}>
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <View style={styles.gradientContainer}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Tài khoản</Text>
@@ -82,7 +80,7 @@ export default function ProfileScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: styles.scrollContent.paddingBottom + bottomTabHeight }]}>
 
         {profileError ? <Text style={{ color: BrandColors.danger, marginBottom: 12 }}>{profileError}</Text> : null}
         {/* Customer Profile Card */}
@@ -284,7 +282,6 @@ export default function ProfileScreen() {
 
         <Text style={[styles.versionText, { color: colors.textMuted }]}>CleanMaster v1.0.0 • Nền tảng Đa Dịch Vụ Gia Đình</Text>
 
-        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Appearance modal */}
@@ -305,7 +302,7 @@ export default function ProfileScreen() {
           onCancel={() => setShowLogoutModal(false)}
         />
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -327,6 +324,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.three,
+    paddingBottom: 12,
     gap: 14,
   },
   userCard: {

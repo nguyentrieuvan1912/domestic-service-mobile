@@ -27,6 +27,7 @@ export interface AiBookingDraft {
 export interface AiDraftPanel {
   drafts: AiBookingDraft[];
   expandedDraftId: number | null;
+  switchPending: boolean;
 }
 
 export function loadAiBookingDraft(conversationId: string, signal?: AbortSignal, draftId?: string) {

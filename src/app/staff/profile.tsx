@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { useFocusEffect } from 'expo-router';
 import { remoteImageSource } from '@/utils/image-source';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
@@ -34,6 +35,7 @@ export default function StaffProfileScreen() {
   return <StaffProfileContent key={currentStaff.id} />;
 }
 function StaffProfileContent() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   'use no memo'; // Mutable repository reads follow the subscribed revision.
   const router = useRouter();
   const { currentStaff, logout } = useAuth();
@@ -90,7 +92,7 @@ function StaffProfileContent() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StaffConnectionStatus />
         {!!reviewsError && <Text accessibilityRole="alert" style={{ color: colors.textMuted, padding: Spacing.three }}>{reviewsError}</Text>}
@@ -101,7 +103,7 @@ function StaffProfileContent() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}
         >
           {/* Staff Hero Identity Card */}
           <Pressable
@@ -265,7 +267,7 @@ const styles = StyleSheet.create({
   scheduleDescription: { color: '#065F46', fontSize: 13, lineHeight: 20 },
   scheduleAction: { backgroundColor: '#047857', borderRadius: 12, padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   scheduleActionText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   safeArea: { flex: 1 },
 
   header: {

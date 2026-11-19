@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { remoteImageSource } from '@/utils/image-source';
 import React from 'react';
 import {
@@ -12,13 +13,13 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ChatRepository } from '@/data/connectedChatRepository';
 import { CHAT_TIME_ZONE } from '@/data/chatPolicy';
 import { useChatInbox } from '@/hooks/use-chat-inbox';
 import { useAppTheme } from '@/context/ThemeContext';
 
 export default function ChatListScreen() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   'use no memo'; // Repository access checks must follow each subscribed snapshot.
   const router = useRouter();
   const { colors } = useAppTheme();
@@ -28,10 +29,7 @@ export default function ChatListScreen() {
   const trashCount = inbox.filter(item => !!item.trashedAt || actor?.role === 'CUSTOMER' && !!item.customerTrashedAt).length;
 
   return (
-    <LinearGradient
-      colors={colors.gradient}
-      locations={colors.gradientLocations}
-      style={styles.gradientContainer}>
+    <View style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
@@ -44,7 +42,7 @@ export default function ChatListScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: styles.scrollContent.paddingBottom + bottomTabHeight }]}>
         {error ? <Pressable onPress={() => void ChatRepository.loadList(actor).catch(() => {})} style={{ padding: 12, marginBottom: 12 }}><Text style={{ color: BrandColors.danger }}>{error} Chạm để thử lại.</Text></Pressable> : null}
         {/* Featured AI Assistant Banner */}
         <Pressable style={styles.aiBanner} onPress={() => router.push('/ai')}>
@@ -129,7 +127,7 @@ export default function ChatListScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
-  </LinearGradient>
+  </View>
   );
 }
 

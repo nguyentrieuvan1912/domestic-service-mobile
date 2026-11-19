@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
 import { BrandLogo } from '@/components/common/BrandLogo';
@@ -28,8 +28,7 @@ function Sparkle({ left, top, delay, x, y, size }: typeof PARTICLES[number]) {
   return <Animated.View style={[styles.sparkle, { left, top, width: size, height: size, borderRadius: size / 2 }, animatedStyle]} />;
 }
 
-export function WelcomeSweepOverlay({ onComplete }: { onComplete?: () => void }) {
-  const [visible, setVisible] = useState(true);
+export function WelcomeSweepOverlay({ onComplete }: { onComplete: () => void }) {
   const broomOpacity = useSharedValue(0);
   const broomX = useSharedValue(-118);
   const broomY = useSharedValue(26);
@@ -51,10 +50,7 @@ export function WelcomeSweepOverlay({ onComplete }: { onComplete?: () => void })
     logoScale.value = withDelay(940, withSequence(withTiming(1.08, { duration: 250, easing: Easing.out(Easing.back(1.8)) }), withTiming(1, { duration: 160 })));
     titleOpacity.value = withDelay(1110, withTiming(1, { duration: 260 }));
     titleY.value = withDelay(1110, withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) }));
-    const timeout = setTimeout(() => {
-      setVisible(false);
-      onComplete?.();
-    }, 1680);
+    const timeout = setTimeout(onComplete, 1680);
     return () => clearTimeout(timeout);
   }, [broomOpacity, broomRotation, broomX, broomY, logoOpacity, logoScale, onComplete, titleOpacity, titleY]);
 
@@ -62,7 +58,6 @@ export function WelcomeSweepOverlay({ onComplete }: { onComplete?: () => void })
   const logoStyle = useAnimatedStyle(() => ({ opacity: logoOpacity.value, transform: [{ scale: logoScale.value }] }));
   const titleStyle = useAnimatedStyle(() => ({ opacity: titleOpacity.value, transform: [{ translateY: titleY.value }] }));
 
-  if (!visible) return null;
   return <View pointerEvents="none" style={styles.overlay}>
     <View style={styles.softWaveOne} /><View style={styles.softWaveTwo} />
     {PARTICLES.map((particle, index) => <Sparkle key={index} {...particle} />)}

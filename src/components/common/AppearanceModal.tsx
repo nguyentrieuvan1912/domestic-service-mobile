@@ -128,12 +128,7 @@ export const AppearanceModal: React.FC<AppearanceModalProps> = ({ visible, onClo
                       ]}
                       onPress={() => setBgPreset(item.id)}
                     >
-                      <LinearGradient
-                        colors={previewGradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.presetPreview, { borderColor: colors.border }]}
-                      >
+                      <LinearGradient colors={previewGradient} style={[styles.presetPreview, { borderColor: colors.border }]}>
                         <View style={[styles.swatchDot, { backgroundColor: item.swatch }]} />
                         {active && (
                           <View style={[styles.checkBadge, { backgroundColor: colors.primaryDark }]}>

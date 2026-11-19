@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { useFocusEffect } from 'expo-router';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useCallback, useState, useEffect } from 'react';
@@ -38,6 +39,7 @@ export default function StaffDashboard() {
   return <StaffDashboardContent key={currentUser!.id} />;
 }
 function StaffDashboardContent() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
   const { currentStaff } = useAuth();
   const { colors } = useAppTheme();
@@ -76,10 +78,10 @@ function StaffDashboardContent() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <LinearGradient colors={colors.gradient} locations={colors.gradientLocations} style={styles.gradient}>
+    <View style={styles.screen}>
+      <View style={styles.gradient}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}>
             <StaffScheduleNotice />
             {/* Header */}
             <View style={styles.header}>
@@ -241,8 +243,8 @@ function StaffDashboardContent() {
             <MatchingModePicker value={matchMode} onChange={setMatchMode} invitations={counts.A} open={counts.B} />
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Tìm việc phù hợp</Text>
-                <Text style={styles.sectionSubtitle}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Tìm việc phù hợp</Text>
+                <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
                   Theo năng lực, khu vực và lịch đã lưu
                 </Text>
               </View>
@@ -266,7 +268,7 @@ function StaffDashboardContent() {
             </View>
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
 
       {/* Persistent Staff Bottom Nav */}
       <StaffBottomNav activeTab="home" />
@@ -275,7 +277,7 @@ function StaffDashboardContent() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  screen: { flex: 1 },
   gradient: { flex: 1 },
   safeArea: { flex: 1 },
   content: { padding: Spacing.four, paddingBottom: 24, gap: 14 },

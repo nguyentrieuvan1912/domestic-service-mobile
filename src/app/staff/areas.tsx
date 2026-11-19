@@ -162,7 +162,7 @@ function AreaEditor({ actor }: { actor: AvailabilityActor }) {
   };
 
   return (
-    <SafeAreaView style={[s.screen, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Pressable
@@ -558,7 +558,7 @@ function AreaEditor({ actor }: { actor: AvailabilityActor }) {
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   header: {
     height: 60,
     paddingHorizontal: 16,
