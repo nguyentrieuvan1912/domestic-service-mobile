@@ -143,8 +143,7 @@ const styles = StyleSheet.create({
   loadingBox: { alignItems: 'center', paddingVertical: Spacing.four },
 
   container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+    flex: 1
   },
   header: {
     flexDirection: 'row',

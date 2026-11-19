@@ -1,64 +1,33 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandColors } from '@/constants/theme';
-import { TabImageIcon } from '@/components/common/TabImageIcon';
-import { CenterAIMascotTabButton } from '@/components/common/CenterAIMascotTabButton';
-import { useAuth } from '@/context/AuthContext';
+import { BottomTabLabel, FloatingTabSurface, TabImageIcon, useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { useChatInbox } from '@/hooks/use-chat-inbox';
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
-  const { currentRole } = useAuth();
+  const spacing = useBottomTabSpacing();
   const { unreadCount } = useChatInbox();
-  const isStaff = currentRole === 'STAFF';
-
-  // Compact, lowered padding for mobile screens
-  const tabBottomPadding = Platform.select({
-    ios: Math.min(insets.bottom, 16),
-    web: 8,
-    default: Math.min(insets.bottom, 8),
-  });
-
-  // Sleek tab height with comfortable breathing room
-  const tabHeight = Platform.select({
-    ios: 58 + tabBottomPadding,
-    web: 64,
-    default: 58 + tabBottomPadding,
-  });
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: BrandColors.primary,
-        tabBarInactiveTintColor: BrandColors.gray500,
+        sceneStyle: { backgroundColor: 'transparent' },
+        tabBarLabelPosition: 'below-icon',
+        tabBarHideOnKeyboard: true,
+        tabBarAllowFontScaling: true,
+        tabBarLabel: ({ children, focused }) => <BottomTabLabel label={children} focused={focused} />,
+        tabBarIconStyle: { width: 42, height: 28 },
+        tabBarBackground: () => <FloatingTabSurface inset={spacing.paddingHorizontal} bottom={spacing.paddingBottom} />,
         tabBarStyle: {
-          backgroundColor: BrandColors.white,
-          borderTopColor: '#F1F5F9',
-          borderTopWidth: 1,
-          height: tabHeight,
-          paddingTop: 4,
-          paddingBottom: tabBottomPadding,
-          overflow: 'visible', // Allows center mascot to sit snugly above the bar
-          elevation: 6,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 6,
-        },
-        tabBarItemStyle: {
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingVertical: 1,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          lineHeight: 12,
-          marginTop: 1,
-          marginBottom: 1,
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
+          ...spacing,
+          elevation: 0,
+          shadowOpacity: 0,
         },
       }}>
       {/* 1. Trang chủ */}
@@ -67,7 +36,7 @@ export default function TabLayout() {
         options={{
           title: 'Trang chủ',
           tabBarIcon: ({ focused }) => (
-            <TabImageIcon name="home" focused={focused} size={22} />
+            <TabImageIcon name="home" focused={focused} />
           ),
         }}
       />
@@ -78,7 +47,7 @@ export default function TabLayout() {
         options={{
           title: 'Cộng đồng',
           tabBarIcon: ({ focused }) => (
-            <TabImageIcon name="services" focused={focused} size={22} />
+            <TabImageIcon name="services" focused={focused} />
           ),
         }}
       />
@@ -89,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: 'Đơn hàng',
           tabBarIcon: ({ focused }) => (
-            <TabImageIcon name="bookings" focused={focused} size={22} />
+            <TabImageIcon name="bookings" focused={focused} />
           ),
         }}
       />
@@ -102,7 +71,7 @@ export default function TabLayout() {
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarAccessibilityLabel: `Tin nhắn, ${unreadCount} tin chưa đọc`,
           tabBarIcon: ({ focused }) => (
-            <TabImageIcon name="chat" focused={focused} size={22} />
+            <TabImageIcon name="chat" focused={focused} />
           ),
         }}
       />
@@ -113,7 +82,7 @@ export default function TabLayout() {
         options={{
           title: 'Tài khoản',
           tabBarIcon: ({ focused }) => (
-            <TabImageIcon name="profile" focused={focused} size={22} />
+            <TabImageIcon name="profile" focused={focused} />
           ),
         }}
       />

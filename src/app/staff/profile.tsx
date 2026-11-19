@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { useFocusEffect } from 'expo-router';
 import { remoteImageSource } from '@/utils/image-source';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
@@ -17,7 +18,9 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { AppearanceModal } from '@/components/common/AppearanceModal';
 import { useAuth } from '@/context/AuthContext';
+import { themeModeLabel, useAppTheme } from '@/context/ThemeContext';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffRepository } from '@/data/connectedStaffRepository';
 import { StaffService } from '@/data/staffService';
@@ -32,9 +35,12 @@ export default function StaffProfileScreen() {
   return <StaffProfileContent key={currentStaff.id} />;
 }
 function StaffProfileContent() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   'use no memo'; // Mutable repository reads follow the subscribed revision.
   const router = useRouter();
   const { currentStaff, logout } = useAuth();
+  const { colors, mode, preset } = useAppTheme();
+  const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const capabilityResource = useStaffCapabilities();
   const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
   const [reviewsError, setReviewsError] = useState('');
@@ -89,107 +95,124 @@ function StaffProfileContent() {
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StaffConnectionStatus />
-        {!!reviewsError && <Text accessibilityRole="alert" style={{ color: BrandColors.gray500, padding: Spacing.three }}>{reviewsError}</Text>}
+        {!!reviewsError && <Text accessibilityRole="alert" style={{ color: colors.textMuted, padding: Spacing.three }}>{reviewsError}</Text>}
         {/* Top Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Hồ sơ & Đánh giá</Text>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Hồ sơ & Đánh giá</Text>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}
         >
           {/* Staff Hero Identity Card */}
-          <Pressable style={styles.identityCard} onPress={() => router.push('/staff/personal-info')}>
+          <Pressable
+            style={[styles.identityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => router.push('/staff/personal-info')}
+          >
             <View style={styles.identityTop}>
               <Image source={remoteImageSource(staff.avatar)} style={styles.avatar} />
               <View style={styles.identityInfo}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.staffName}>{staff.fullName}</Text>
-                  <View style={[styles.badgeVerified, !staff.isVerified && { backgroundColor: BrandColors.gray100 }]}>
-                    <Text style={[styles.badgeVerifiedText, !staff.isVerified && { color: BrandColors.gray600 }]}>{staff.isVerified ? 'Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
+                  <Text style={[styles.staffName, { color: colors.text }]}>{staff.fullName}</Text>
+                  <View style={[styles.badgeVerified, { backgroundColor: staff.isVerified ? colors.accentBg : colors.surfaceMuted }]}>
+                    <Text style={[styles.badgeVerifiedText, { color: staff.isVerified ? colors.accentText : colors.textSecondary }]}>{staff.isVerified ? 'Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
                   </View>
                 </View>
-                <Text style={styles.staffMeta}>Mã NV: {staffCode} • {staff.experienceYears} năm kinh nghiệm</Text>
-                <Text style={styles.staffContact}>📞 {staff.phone}</Text>
+                <Text style={[styles.staffMeta, { color: colors.textMuted }]}>Mã NV: {staffCode} • {staff.experienceYears} năm kinh nghiệm</Text>
+                <Text style={[styles.staffContact, { color: colors.textSecondary }]}>📞 {staff.phone}</Text>
               </View>
             </View>
 
-            <View style={styles.identityDivider} />
+            <View style={[styles.identityDivider, { backgroundColor: colors.divider }]} />
 
             {/* Performance KPI Grid */}
             <View style={styles.kpiGrid}>
               <View style={styles.kpiItem}>
                 <View style={styles.kpiStarRow}>
-                  <Text style={styles.kpiValue}>{profile.reviewCount ? profile.rating.toFixed(2) : '—'}</Text>
+                  <Text style={[styles.kpiValue, { color: colors.text }]}>{profile.reviewCount ? profile.rating.toFixed(2) : '—'}</Text>
                   <Text style={styles.kpiStar}>★</Text>
                 </View>
-                <Text style={styles.kpiLabel}>{profile.reviewCount} đánh giá</Text>
+                <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>{profile.reviewCount} đánh giá</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{profile.completionRate}%</Text>
-                <Text style={styles.kpiLabel}>Tỷ lệ hoàn thành</Text>
+                <Text style={[styles.kpiValue, { color: colors.text }]}>{profile.completionRate}%</Text>
+                <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>Tỷ lệ hoàn thành</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{profile.reviewCount ? Math.round(staffReviews.filter(r=>r.rating===5).length/profile.reviewCount*100)+'%' : '—'}</Text>
-                <Text style={styles.kpiLabel}>Hài lòng 5★</Text>
+                <Text style={[styles.kpiValue, { color: colors.text }]}>{profile.reviewCount ? Math.round(staffReviews.filter(r=>r.rating===5).length/profile.reviewCount*100)+'%' : '—'}</Text>
+                <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>Hài lòng 5★</Text>
               </View>
 
               <View style={styles.kpiItem}>
-                <Text style={styles.kpiValue}>{completedJobs.length}</Text>
-                <Text style={styles.kpiLabel}>Ca thành công</Text>
+                <Text style={[styles.kpiValue, { color: colors.text }]}>{completedJobs.length}</Text>
+                <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>Ca thành công</Text>
               </View>
             </View>
-            <View style={styles.editProfileHint}>
-              <Text style={styles.editProfileHintText}>Chạm để xem và cập nhật thông tin cá nhân</Text>
-              <Text style={styles.editProfileHintArrow}>›</Text>
+            <View style={[styles.editProfileHint, { borderTopColor: colors.divider }]}>
+              <Text style={[styles.editProfileHintText, { color: colors.accentText }]}>Chạm để xem và cập nhật thông tin cá nhân</Text>
+              <Text style={[styles.editProfileHintArrow, { color: colors.accentText }]}>›</Text>
             </View>
           </Pressable>
 
-          <Pressable style={styles.scheduleCard} accessibilityRole="button"
-            accessibilityLabel="Đăng ký lịch làm việc và khu vực, bước đầu tiên để tìm và nhận việc"
+          <Pressable style={[styles.scheduleCard, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]} accessibilityRole="button"
+            accessibilityLabel="Đăng ký lịch làm việc"
             onPress={() => router.push('/staff/availability')}>
             <View style={styles.scheduleHeading}>
-              <View style={styles.scheduleIcon}><IconSymbol name="calendar" size={25} color="#047857" /></View>
+              <View style={[styles.scheduleIcon, { backgroundColor: colors.isDark ? '#047857' : '#D1FAE5' }]}><IconSymbol name="calendar" size={25} color={colors.isDark ? '#ECFDF5' : '#047857'} /></View>
               <View style={styles.scheduleHeadingCopy}>
-                <Text style={styles.scheduleStep}>BƯỚC 1 • TRƯỚC KHI NHẬN VIỆC</Text>
-                <Text style={styles.scheduleTitle}>Đăng ký lịch làm việc</Text>
+                <Text style={[styles.scheduleStep, { color: colors.accentText }]}>BƯỚC 1 • TRƯỚC KHI NHẬN VIỆC</Text>
+                <Text style={[styles.scheduleTitle, { color: colors.isDark ? '#ECFDF5' : '#064E3B' }]}>Đăng ký lịch làm việc</Text>
               </View>
             </View>
-            <Text style={styles.scheduleDescription}>Chọn giờ rảnh và khu vực hoạt động tại TP.HCM. Đăng ký đầy đủ lịch tuần để được xét nhận và tìm công việc phù hợp.</Text>
-            <View style={styles.scheduleAction}><Text style={styles.scheduleActionText}>Đăng ký / cập nhật lịch & khu vực</Text><IconSymbol name="chevronRight" size={18} color="#FFFFFF" /></View>
+            <Text style={[styles.scheduleDescription, { color: colors.isDark ? '#A7F3D0' : '#065F46' }]}>Đăng ký đầy đủ lịch tuần để được xét nhận công việc phù hợp.</Text>
+            <View style={styles.scheduleAction}><Text style={styles.scheduleActionText}>Đăng ký / cập nhật lịch</Text><IconSymbol name="chevronRight" size={18} color="#FFFFFF" /></View>
           </Pressable>
 
           {/* Account Utilities / Switch Role */}
-          <View style={styles.card}>
-            <Text style={styles.cardSectionTitle}>Cài đặt & Tiện ích</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardSectionTitle, { color: colors.text }]}>Cài đặt & Tiện ích</Text>
 
-            <Pressable style={styles.utilityRow} onPress={() => router.push('/staff/account-details?section=badges' as never)}>
-              <View style={styles.utilityIconWrap}><IconSymbol name="award" size={18} color="#D97706" /></View>
-              <View style={styles.utilityCopy}><Text style={styles.utilityTitle}>Huy hiệu khen ngợi</Text><Text style={styles.utilitySubtitle}>Các điểm mạnh từ khách hàng</Text></View>
-              <Text style={styles.utilityArrow}>›</Text>
+            <Pressable style={[styles.utilityRow, { borderBottomColor: colors.divider }]} accessibilityRole="button" onPress={() => router.push('/staff/areas')}>
+              <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}><IconSymbol name="location" size={18} color={colors.accentText} /></View>
+              <View style={styles.utilityCopy}><Text style={[styles.utilityTitle, { color: colors.text }]}>Quản lý khu vực hoạt động</Text><Text style={[styles.utilitySubtitle, { color: colors.textMuted }]}>Chọn phường, xã bạn có thể đến nhận việc</Text></View>
+              <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
             </Pressable>
 
-            <Pressable style={styles.utilityRow} onPress={() => router.push({ pathname: '/staff/account-details', params: { section: 'skills' } })}>
-              <View style={styles.utilityIconWrap}><IconSymbol name="success" size={18} color="#047857" /></View>
-              <View style={styles.utilityCopy}><Text style={styles.utilityTitle}>Năng lực được xác nhận</Text><Text style={styles.utilitySubtitle}>{capabilityResource.status === 'READY' && capabilityResource.data
+            <Pressable style={[styles.utilityRow, { borderBottomColor: colors.divider }]} accessibilityRole="button" onPress={() => setShowAppearanceModal(true)}>
+              <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}><IconSymbol name="sparkle" size={18} color={preset.swatch} /></View>
+              <View style={styles.utilityCopy}>
+                <Text style={[styles.utilityTitle, { color: colors.text }]}>Giao diện & Màu nền</Text>
+                <Text style={[styles.utilitySubtitle, { color: colors.textMuted }]}>{themeModeLabel(mode)} • {preset.label}</Text>
+              </View>
+              <View style={[styles.appearanceSwatchDot, { backgroundColor: preset.swatch, borderColor: colors.border }]} />
+              <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
+            </Pressable>
+
+            <Pressable style={[styles.utilityRow, { borderBottomColor: colors.divider }]} onPress={() => router.push('/staff/account-details?section=badges' as never)}>
+              <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}><IconSymbol name="award" size={18} color="#D97706" /></View>
+              <View style={styles.utilityCopy}><Text style={[styles.utilityTitle, { color: colors.text }]}>Huy hiệu khen ngợi</Text><Text style={[styles.utilitySubtitle, { color: colors.textMuted }]}>Các điểm mạnh từ khách hàng</Text></View>
+              <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
+            </Pressable>
+
+            <Pressable style={[styles.utilityRow, { borderBottomColor: colors.divider }]} onPress={() => router.push({ pathname: '/staff/account-details', params: { section: 'skills' } })}>
+              <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}><IconSymbol name="success" size={18} color={colors.accentText} /></View>
+              <View style={styles.utilityCopy}><Text style={[styles.utilityTitle, { color: colors.text }]}>Năng lực được xác nhận</Text><Text style={[styles.utilitySubtitle, { color: colors.textMuted }]}>{capabilityResource.status === 'READY' && capabilityResource.data
                 ? `${capabilityResource.data.eligibleCount} / ${capabilityResource.data.capabilities.length} năng lực còn hiệu lực để nhận dịch vụ`
                 : capabilityResource.status === 'ERROR' ? 'Chưa tải được năng lực • Chạm để thử lại' : 'Đang tải năng lực…'}</Text></View>
-              <Text style={styles.utilityArrow}>›</Text>
+              <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
             </Pressable>
 
-            <Pressable style={styles.utilityRow} onPress={() => router.push('/staff/account-details?section=reviews' as never)}>
-              <View style={styles.utilityIconWrap}><IconSymbol name="message" size={18} color="#2563EB" /></View>
-              <View style={styles.utilityCopy}><Text style={styles.utilityTitle}>Nhận xét từ khách hàng</Text><Text style={styles.utilitySubtitle}>Xem 4 nhận xét gần đây</Text></View>
-              <Text style={styles.utilityArrow}>›</Text>
+            <Pressable style={[styles.utilityRow, { borderBottomColor: colors.divider }]} onPress={() => router.push('/staff/account-details?section=reviews' as never)}>
+              <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}><IconSymbol name="message" size={18} color="#2563EB" /></View>
+              <View style={styles.utilityCopy}><Text style={[styles.utilityTitle, { color: colors.text }]}>Nhận xét từ khách hàng</Text><Text style={[styles.utilitySubtitle, { color: colors.textMuted }]}>Xem 4 nhận xét gần đây</Text></View>
+              <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
             </Pressable>
-
-
 
             <Pressable
-              style={styles.utilityRow}
+              style={[styles.utilityRow, { borderBottomWidth: 0 }]}
               onPress={() =>
                 Alert.alert(
                   'Hồ sơ pháp lý & Chứng nhận',
@@ -197,31 +220,36 @@ function StaffProfileContent() {
                 )
               }
             >
-              <View style={styles.utilityIconWrap}>
+              <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}>
                 <IconSymbol name="shield" size={18} color="#0369A1" />
               </View>
-              <Text style={styles.utilityTitle}>Chứng nhận nghiệp vụ & Pháp lý</Text>
-              <Text style={styles.utilityArrow}>›</Text>
+              <Text style={[styles.utilityTitle, { color: colors.text }]}>Chứng nhận nghiệp vụ & Pháp lý</Text>
+              <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
             </Pressable>
           </View>
 
           {/* Prominent Logout Button */}
           <Pressable
-            style={styles.logoutButton}
+            style={[styles.logoutButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
             onPress={handleLogout}
-            android_ripple={{ color: '#FEE2E2' }}
+            android_ripple={{ color: colors.dangerBorder }}
           >
-            <View style={styles.logoutIconWrap}>
-              <IconSymbol name="close" size={18} color="#DC2626" />
+            <View style={[styles.logoutIconWrap, { backgroundColor: colors.isDark ? '#7F1D1D' : '#FEE2E2' }]}>
+              <IconSymbol name="close" size={18} color={colors.dangerText} />
             </View>
             <View style={styles.logoutTextWrap}>
-              <Text style={styles.logoutTitle}>Đăng xuất tài khoản</Text>
-              <Text style={styles.logoutSubtitle}>Thoát phiên làm việc của đối tác</Text>
+              <Text style={[styles.logoutTitle, { color: colors.dangerText }]}>Đăng xuất tài khoản</Text>
+              <Text style={[styles.logoutSubtitle, { color: colors.isDark ? '#FECACA' : '#991B1B' }]}>Thoát phiên làm việc của đối tác</Text>
             </View>
-            <Text style={styles.logoutArrow}>→</Text>
+            <Text style={[styles.logoutArrow, { color: colors.dangerText }]}>→</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
+
+      <AppearanceModal
+        visible={showAppearanceModal}
+        onClose={() => setShowAppearanceModal(false)}
+      />
 
       {/* Staff Bottom Nav */}
       <StaffBottomNav activeTab="profile" />
@@ -239,7 +267,7 @@ const styles = StyleSheet.create({
   scheduleDescription: { color: '#065F46', fontSize: 13, lineHeight: 20 },
   scheduleAction: { backgroundColor: '#047857', borderRadius: 12, padding: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   scheduleActionText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   safeArea: { flex: 1 },
 
   header: {
@@ -375,6 +403,7 @@ const styles = StyleSheet.create({
   utilityCopy: { flex: 1 },
   utilitySubtitle: { color: BrandColors.gray500, fontSize: 11, marginTop: 2 },
   utilityArrow: { fontSize: 18, color: BrandColors.gray400 },
+  appearanceSwatchDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5 },
 
   logoutButton: {
     flexDirection: 'row',

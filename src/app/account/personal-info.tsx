@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { useAuth } from '@/context/AuthContext';
 
 export default function PersonalInfoScreen() {
@@ -38,10 +38,7 @@ export default function PersonalInfoScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
-      style={styles.gradientContainer}>
+    <KeyboardSafeLayout>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
@@ -51,7 +48,8 @@ export default function PersonalInfoScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
           <View style={styles.avatarSection}>
             <AvatarEditor style={styles.avatar} disabled={saving} />
             <Text style={styles.avatarHint}>Ảnh đại diện</Text>
@@ -112,12 +110,11 @@ export default function PersonalInfoScreen() {
           </Pressable>
         </View>
       </SafeAreaView>
-    </LinearGradient>
+    </KeyboardSafeLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  gradientContainer: { flex: 1 },
   safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -129,7 +126,7 @@ const styles = StyleSheet.create({
   backButton: { width: 32, alignItems: 'flex-start' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: BrandColors.gray900 },
   headerSpacer: { width: 32 },
-  content: { padding: Spacing.three, paddingBottom: 110 },
+  content: { padding: Spacing.three },
   avatarSection: { alignItems: 'center', paddingVertical: Spacing.two },
   avatar: {
     width: 88,
@@ -165,10 +162,6 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: BrandColors.gray900, fontSize: 14, paddingVertical: 10 },
   note: { fontSize: 11, color: BrandColors.gray500, lineHeight: 16, marginTop: Spacing.three, textAlign: 'center' },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: Spacing.three,
     paddingTop: 10,
     paddingBottom: 12,

@@ -6,26 +6,29 @@ import { blogCategories, getPublishedArticle, type BlogArticle } from '@/api/blo
 import { BlogContent, BlogCover } from '@/components/blog/BlogContent';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandColors, BorderRadius, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function BlogArticleScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { colors } = useAppTheme();
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-    <View style={styles.header}>
+    <View style={[styles.header, { borderBottomColor: colors.border }]}>
       <Pressable
         accessibilityLabel="Quay lại"
         accessibilityRole="button"
         style={styles.back}
         onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}>
-        <IconSymbol name="back" size={22} color={BrandColors.gray900} />
+        <IconSymbol name="back" size={22} color={colors.text} />
       </Pressable>
-      <Text accessibilityRole="header" style={styles.headerTitle}>Blog CleanMaster</Text>
+      <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.text }]}>Blog CleanMaster</Text>
     </View>
     <Article key={slug} slug={slug} />
   </SafeAreaView>;
 }
 
 function Article({ slug }: { slug: string }) {
+  const { colors } = useAppTheme();
   const [article, setArticle] = useState<BlogArticle | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -42,9 +45,9 @@ function Article({ slug }: { slug: string }) {
   }, [slug, attempt]);
 
   if (error) return <View style={styles.notice}>
-    <Text style={styles.byline}>{error}</Text>
+    <Text style={[styles.byline, { color: colors.textSecondary }]}>{error}</Text>
     <Pressable accessibilityRole="button" hitSlop={8} onPress={() => { setError(''); setAttempt(value => value + 1); }}>
-      <Text style={styles.retry}>Thử lại</Text>
+      <Text style={[styles.retry, { color: colors.accentText }]}>Thử lại</Text>
     </Pressable>
   </View>;
   if (!article) return <ActivityIndicator accessibilityLabel="Đang tải bài viết" color={BrandColors.primaryDark} style={styles.notice} />;
@@ -55,11 +58,11 @@ function Article({ slug }: { slug: string }) {
 
   return <ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.category}>{blogCategories[article.category]}</Text>
-    <Text accessibilityRole="header" style={styles.title}>{article.title}</Text>
-    <Text style={styles.excerpt}>{article.excerpt}</Text>
+    <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>{article.title}</Text>
+    <Text style={[styles.excerpt, { color: colors.textSecondary }]}>{article.excerpt}</Text>
     <View style={styles.metadata}>
-      <Text style={styles.author}>{article.authorName}</Text>
-      {publishedDate && <Text style={styles.byline}>{publishedDate}</Text>}
+      <Text style={[styles.author, { color: colors.text }]}>{article.authorName}</Text>
+      {publishedDate && <Text style={[styles.byline, { color: colors.textSecondary }]}>{publishedDate}</Text>}
     </View>
     <BlogCover url={article.coverUrl} />
     <BlogContent document={article.document} />
@@ -67,7 +70,7 @@ function Article({ slug }: { slug: string }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: BrandColors.white },
+  screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: BrandColors.gray100 },
   back: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '800', color: BrandColors.gray900 },

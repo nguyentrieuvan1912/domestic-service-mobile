@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useState, useEffect } from 'react';
 import { StaffConnectionStatus } from '@/components/staff/StaffConnectionStatus';
@@ -23,6 +24,7 @@ const PAGE_COPY: Record<DetailSection, { title: string; description: string }> =
 
 
 export default function StaffAccountDetailsScreen() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter(); const [, render] = useState(0);
   useEffect(() => StaffService.subscribe(() => render(x=>x+1)), []);
   const { currentUser, currentStaff } = useAuth();
@@ -50,7 +52,7 @@ export default function StaffAccountDetailsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}>
         <StaffConnectionStatus />
         <Text style={styles.description}>{page.description}</Text>
 
@@ -83,7 +85,7 @@ export default function StaffAccountDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  root: { flex: 1 },
   screen: { flex: 1 },
   header: { height: 60, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },

@@ -104,7 +104,7 @@ function NotificationDetail({ actor, id, goBack, onRetry }: {
   );
 }
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BrandColors.gray50 },
+  container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, padding: Spacing.three, backgroundColor: BrandColors.white },
   backButton: { padding: Spacing.one }, headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: BrandColors.gray900 },
   content: { padding: Spacing.three }, card: { padding: Spacing.three, backgroundColor: BrandColors.white, borderRadius: BorderRadius.lg, gap: Spacing.two },

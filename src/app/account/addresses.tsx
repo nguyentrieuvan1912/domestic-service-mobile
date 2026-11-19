@@ -6,6 +6,8 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
   Modal,
   Alert,
   ActivityIndicator,
@@ -287,7 +289,6 @@ export default function AddressManagementScreen() {
           />
         ))}
 
-        <View style={{ height: params.fromBooking && addresses.length > 0 ? 90 : 40 }} />
       </ScrollView>
 
       {/* Bottom bar when coming from booking flow */}
@@ -315,8 +316,8 @@ export default function AddressManagementScreen() {
         transparent
         animationType="slide"
         onRequestClose={closeModal}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <SafeAreaView style={styles.modalContent} edges={['bottom']}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {editingAddressId ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}
@@ -326,7 +327,7 @@ export default function AddressManagementScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Pressable accessibilityRole="button" disabled={locating || saving || administrative.loading}
                 style={[styles.locationBtn, (locating || saving) && { opacity: 0.6 }]} onPress={() => { void locate(); }}>
                 {locating ? <ActivityIndicator size="small" color={BrandColors.primaryDark} />
@@ -387,8 +388,8 @@ export default function AddressManagementScreen() {
                 <Text style={styles.saveBtnText}>{saving ? 'Đang lưu...' : 'Lưu địa chỉ'}</Text>
               </Pressable>
             </ScrollView>
-          </View>
-        </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Delete Confirmation Modal */}
@@ -411,8 +412,7 @@ const styles = StyleSheet.create({
   locationBtnText: { color: BrandColors.primaryDark, fontWeight: '700', fontSize: 14 },
   locationNotice: { color: BrandColors.gray600, fontSize: 13, lineHeight: 19, marginBottom: 12 },
   container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+    flex: 1
   },
   header: {
     flexDirection: 'row',
@@ -477,10 +477,6 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
@@ -506,6 +502,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,

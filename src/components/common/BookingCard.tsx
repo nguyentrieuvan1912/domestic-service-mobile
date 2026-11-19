@@ -14,6 +14,7 @@ interface BookingCardProps {
   onCancel?: () => void;
   onReview?: () => void;
   onRebook?: () => void;
+  onPay?: () => void;
 }
 
 export const BookingCard: React.FC<BookingCardProps> = ({
@@ -22,6 +23,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   onCancel,
   onReview,
   onRebook,
+  onPay,
 }) => {
   const service = bookingServiceView(booking as ConnectedBooking);
   const staff = (booking as ConnectedBooking & { staff?: { fullName: string; avatar: string } }).staff;
@@ -69,7 +71,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             </View>
           ) : (
             <Text style={styles.matchingNote}>
-              {isClosed ? 'Đã dừng điều phối' : booking.status === 'MATCHING' ? 'Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
+              {isClosed ? 'Đã dừng điều phối' : booking.status === 'AWAITING_PAYMENT' ? 'Tiếp tục thanh toán để hoàn tất đặt dịch vụ.' : booking.status === 'MATCHING' ? 'Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
             </Text>
           )}
         </View>
@@ -112,7 +114,11 @@ export const BookingCard: React.FC<BookingCardProps> = ({
             </Pressable>
           )}
 
-          {onRebook && (
+          {booking.status === 'AWAITING_PAYMENT' && onPay ? (
+            <Pressable accessibilityRole="button" style={styles.detailButton} onPress={(event) => { event.stopPropagation(); onPay(); }}>
+              <Text style={styles.detailButtonText}>Tiếp tục thanh toán</Text>
+            </Pressable>
+          ) : onRebook && (
             <Pressable
               style={styles.rebookButton}
               onPress={(e) => {

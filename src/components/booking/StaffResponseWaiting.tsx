@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { ConnectedBooking, CustomerBookings } from '@/data/connectedBookings';
@@ -47,7 +46,7 @@ export function StaffResponseWaiting({ bookingId }: { bookingId: string }) {
   const expired = booking?.staffWaitState === 'EXPIRED' && booking.status === 'CANCELLED';
   const accepted = !!booking && ['CONFIRMED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.status);
   const name = String(booking?.staff?.fullName || 'nhân viên');
-  return <LinearGradient colors={BrandColors.softBgGradient} locations={BrandColors.softBgGradientLocations} style={{ flex: 1 }}>
+  return <View style={{ flex: 1 }}>
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content}>
         {!booking ? <ActivityIndicator color={BrandColors.primary} size="large" /> : <>
@@ -68,7 +67,7 @@ export function StaffResponseWaiting({ bookingId }: { bookingId: string }) {
         onUpdated={next => { offset.current = Date.parse(next.serverNow || new Date().toISOString()) - Date.now(); setNow(Date.now() + offset.current); setBooking(next); }} />}
 
     </SafeAreaView>
-  </LinearGradient>;
+  </View>;
 }
 
 /** Shared by the waiting page and homepage; only the focused screen can present it. */

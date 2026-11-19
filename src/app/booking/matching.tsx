@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { RatingStars } from '@/components/common/RatingStars';
@@ -54,10 +53,7 @@ function MatchingContent({booking,assignedStaff}: {booking:ConnectedBooking;assi
   };
 
   return (
-    <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
-      style={styles.container}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* HEADER */}
         <View style={styles.header}>
@@ -306,7 +302,7 @@ function MatchingContent({booking,assignedStaff}: {booking:ConnectedBooking;assi
           <View style={{ height: 40 }} />
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

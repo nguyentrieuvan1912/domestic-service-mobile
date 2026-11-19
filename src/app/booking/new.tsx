@@ -1,3 +1,4 @@
+import { useAppTheme } from '@/context/ThemeContext';
 import { BookingExitButton } from '@/components/booking/BookingExitButton';
 import { WalletBalancePreview } from '@/components/booking/WalletBalancePreview';
 import { FavouriteDurationPopup } from '@/components/booking/FavouriteDurationPopup';
@@ -30,6 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
 import { useAuth } from '@/context/AuthContext';
@@ -57,7 +59,7 @@ import type { PackageSuggestion } from '@/api/catalog-types';
 import { ServiceQuantity, ServiceAnswersSummary } from '@/components/booking/ServiceQuestions';
 import type { Staff, CustomerAddress } from '@/types/user';
 import { BookingMode } from '@/types/booking';
-import { PaymentMethod } from '@/types/payment';
+import { BOOKING_PAYMENT_OPTIONS, bookingRequiresPayment, type BookingPaymentMethod } from '@/utils/booking-payment-options';
 import { staffAge, staffAgeLabel } from '@/utils/staff-profile';
 import { customerSlotIssue } from '@/utils/customer-booking-time';
 
@@ -66,6 +68,7 @@ const calendarDays = () => Array.from({ length: 7 }, (_,i) => { const d = new Da
 const TIME_SLOTS = Array.from({length:24}, (_,i) => String(8+Math.floor(i/2)).padStart(2,'0') + ':' + (i%2 ? '30' : '00'));
 
 export default function NewBookingScreen() {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { currentCustomer } = useAuth();
   const catalog = useBookingCatalog();
@@ -120,18 +123,15 @@ export default function NewBookingScreen() {
 
   if (!currentCustomer) {
     return (
-      <LinearGradient
-        colors={BrandColors.softBgGradient}
-        locations={BrandColors.softBgGradientLocations}
-        style={styles.gradientContainer}>
+      <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <View style={styles.stateIconCircle}>
               <IconSymbol name="user" size={38} color={BrandColors.primary} />
             </View>
-            <Text style={styles.stateTitle}>Vui lòng đăng nhập</Text>
-            <Text style={styles.stateSubtitle}>
+            <Text style={[styles.stateTitle, { color: colors.text }]}>Vui lòng đăng nhập</Text>
+            <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>
               Bạn cần đăng nhập tài khoản khách hàng để tiến hành đặt dịch vụ và chọn nhân viên.
             </Text>
             <Pressable
@@ -146,45 +146,39 @@ export default function NewBookingScreen() {
             </Pressable>
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (catalog.loading || addressResource.loading || (!!params.retryBookingId && retryState.key !== retryKey)
     || (!!params.aiConversationId && aiState.key !== aiKey)) {
     return (
-      <LinearGradient
-        colors={BrandColors.softBgGradient}
-        locations={BrandColors.softBgGradientLocations}
-        style={styles.gradientContainer}>
+      <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <ActivityIndicator size="large" color={BrandColors.primary} />
-            <Text style={styles.stateLoadingTitle}>Đang tải dịch vụ và địa chỉ...</Text>
-            <Text style={styles.stateSubtitle}>
+            <Text style={[styles.stateLoadingTitle, { color: colors.text }]}>Đang tải dịch vụ và địa chỉ...</Text>
+            <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>
               Vui lòng đợi giây lát trong khi chúng tôi chuẩn bị dữ liệu đặt lịch cho bạn.
             </Text>
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (catalog.error || addressResource.error || (params.retryBookingId && retryState.error) || restoreIssue || aiIssue) {
     return (
-      <LinearGradient
-        colors={BrandColors.softBgGradient}
-        locations={BrandColors.softBgGradientLocations}
-        style={styles.gradientContainer}>
+      <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <View style={[styles.stateIconCircle, { backgroundColor: BrandColors.dangerLight }]}>
               <IconSymbol name="warning" size={38} color={BrandColors.danger} />
             </View>
-            <Text style={styles.stateTitle}>Có lỗi xảy ra</Text>
-            <Text style={styles.stateSubtitle}>{catalog.error || addressResource.error || retryState.error || restoreIssue || aiIssue}</Text>
+            <Text style={[styles.stateTitle, { color: colors.text }]}>Có lỗi xảy ra</Text>
+            <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>{catalog.error || addressResource.error || retryState.error || restoreIssue || aiIssue}</Text>
             <Pressable
               style={styles.statePrimaryBtn}
               onPress={() => {
@@ -201,7 +195,7 @@ export default function NewBookingScreen() {
             </Pressable>
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
@@ -231,18 +225,15 @@ export default function NewBookingScreen() {
 
   if (!catalog.services.length || !catalog.packages.length) {
     return (
-      <LinearGradient
-        colors={BrandColors.softBgGradient}
-        locations={BrandColors.softBgGradientLocations}
-        style={styles.gradientContainer}>
+      <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
             <View style={styles.stateIconCircle}>
               <IconSymbol name="receipt" size={38} color={BrandColors.primary} />
             </View>
-            <Text style={styles.stateTitle}>Chưa có dịch vụ khả dụng</Text>
-            <Text style={styles.stateSubtitle}>
+            <Text style={[styles.stateTitle, { color: colors.text }]}>Chưa có dịch vụ khả dụng</Text>
+            <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>
               Hiện tại chưa có dịch vụ hoặc gói công việc nào đang hoạt động. Vui lòng quay lại sau.
             </Text>
             <Pressable style={styles.stateBackBtn} onPress={goBack}>
@@ -250,13 +241,14 @@ export default function NewBookingScreen() {
             </Pressable>
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   return <ConnectedNewBooking key={retryKey + aiKey} catalog={catalog} addresses={addressResource.addresses} retryBooking={retrySource} aiDraft={aiDraft} addressRefreshError={addressResource.refreshError} retryAddresses={addressResource.retry} />;
 }
 function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addressRefreshError, retryAddresses }: { catalog: ReturnType<typeof useBookingCatalog>; addresses: CustomerAddress[]; retryBooking?: ConnectedBooking; aiDraft?: AiBookingDraft; addressRefreshError: string; retryAddresses: () => void }) {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const { currentCustomer } = useAuth();
   const retry = useMemo(() => retryBooking ? bookingRetryDraft(retryBooking) : undefined, [retryBooking]);
@@ -426,7 +418,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
   const [customerNote, setCustomerNote] = useState<string>(retry?.notes || '');
 
   // Payment
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<BookingPaymentMethod>('CASH');
 
   // Copy order code feedback
   const [isCopied, setIsCopied] = useState<boolean>(false);
@@ -584,7 +576,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
       if(selectedMode==='MODE_A' && !selectedStaff) throw new Error('Vui lòng chọn nhân viên phù hợp.');
       const body={...JSON.parse(quoteKey),mode:selectedMode,addressId:selectedAddressId,startsAt,staffId:selectedMode==='MODE_A'?selectedStaff?.id:undefined,paymentMethod,notes:customerNote};
       const serialized=JSON.stringify(body);if(requestRef.current?.body!==serialized)requestRef.current={body:serialized,key:'mobile-'+Date.now()+'-'+Math.random().toString(36).slice(2)};
-      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); void CustomerBookings.load().catch(()=>{});if(raw.status==='AWAITING_PAYMENT')router.replace({pathname:'/booking/payment',params:{id:String(raw.id)}});else if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
+      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); void CustomerBookings.load().catch(()=>{});if(bookingRequiresPayment(String(raw.status)))router.replace({pathname:'/booking/payment',params:{id:String(raw.id)}});else if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
     } catch(e) {setSubmitError(e instanceof Error?e.message:'Chưa tạo được đơn.');} finally{setSaving(false);}
   };
   const CLEANING_DURATIONS = packages.filter(p=>p.durationMinutes*quantity<=240&&(p.defaultStaffCount||1)===1).map(p=>({packageId:p.id,hours:p.durationHours,title:p.name,area:p.maxArea || '',unitType:p.recommendedFor || '',desc:p.description,isPopular:false,price:p.price}));
@@ -811,7 +803,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
 
   // Wrapper for step transitions (instant & buttery-smooth)
   const renderAnimatedStep = (content: React.ReactNode) => (
-    <View style={{ flex: 1 }}>{content}{favouritePending && <FavouriteDurationPopup visible={true} fullPackage={(pendingPackage?.durationMinutes || 0)*quantity>=240} packageName={pendingPackage?.name || 'gói hiện tại'} shorterName={pendingShorter?.name} keep={keepFavouritePackage} lower={lowerFavouritePackage} />}<BookingTimingPopup notice={timingNotice} close={()=>setTimingNotice(null)} adjust={()=>{const kind=timingNotice?.kind;setTimingNotice(null);setSubmitError('');triggerStepTransition(selectedMode==='MODE_A'?5:kind==='EXTRAS'?1:0);}} changeTime={()=>{setTimingNotice(null);setSubmitError('');triggerStepTransition(selectedMode==='MODE_A'?1:3);}} /></View>
+    <KeyboardSafeLayout>
+      {content}
+      {favouritePending && <FavouriteDurationPopup visible={true} fullPackage={(pendingPackage?.durationMinutes || 0)*quantity>=240} packageName={pendingPackage?.name || 'gói hiện tại'} shorterName={pendingShorter?.name} keep={keepFavouritePackage} lower={lowerFavouritePackage} />}
+      <BookingTimingPopup notice={timingNotice} close={()=>setTimingNotice(null)} adjust={()=>{const kind=timingNotice?.kind;setTimingNotice(null);setSubmitError('');triggerStepTransition(selectedMode==='MODE_A'?5:kind==='EXTRAS'?1:0);}} changeTime={()=>{setTimingNotice(null);setSubmitError('');triggerStepTransition(selectedMode==='MODE_A'?1:3);}} />
+    </KeyboardSafeLayout>
   );
 
   const applyPromotion = (input: string) => {
@@ -840,10 +836,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
 
   if (selectedMode === null) {
     return (
-      <LinearGradient
-        colors={BrandColors.softBgGradient}
-        locations={BrandColors.softBgGradientLocations}
-        style={styles.gradientContainer}>
+      <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Top Header */}
           <View style={styles.entryHeader}>
@@ -961,24 +954,21 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
             </View>
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (selectedMode === 'MODE_A' && currentStep >= 4 && !selectedStaff) {
     return (
-      <LinearGradient
-        colors={BrandColors.softBgGradient}
-        locations={BrandColors.softBgGradientLocations}
-        style={styles.gradientContainer}>
+      <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={{ alignItems: 'flex-end', padding: 12 }}><BookingExitButton disabled={saving} saved={!!createdBooking} /></View>
           <View style={styles.stateCenterContainer}>
             <View style={styles.stateIconCircle}>
               <IconSymbol name="user" size={38} color={BrandColors.primary} />
             </View>
-            <Text style={styles.stateTitle}>Chưa chọn nhân viên</Text>
-            <Text style={styles.stateSubtitle}>
+            <Text style={[styles.stateTitle, { color: colors.text }]}>Chưa chọn nhân viên</Text>
+            <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>
               Chưa có nhân viên phù hợp khung giờ và dịch vụ đã chọn.
             </Text>
             <Pressable
@@ -990,7 +980,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
             </Pressable>
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
   // =========================================================================
@@ -1000,10 +990,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     // ---------------- STEP 0: CHỌN ĐỊA CHỈ (Mode A) ----------------
     if (currentStep === 0) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Chọn địa chỉ làm việc', 0, 9)}
             {renderAnimatedStep(
@@ -1065,7 +1052,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </Pressable>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => triggerStepTransition(1)}>
@@ -1073,21 +1060,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Chọn ngày & giờ)</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 1: CHỌN NGÀY & GIỜ (Mode A) ----------------
     if (currentStep === 1) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Chọn ngày & giờ', 1, 9)}
             {renderAnimatedStep(
@@ -1188,7 +1172,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => triggerStepTransition(2)}>
@@ -1196,17 +1180,17 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiếp tục chọn dịch vụ</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 2: CHỌN DỊCH VỤ ƯU TIÊN (Mode A) ----------------
     if (currentStep === 2) {
-      return <LinearGradient colors={BrandColors.softBgGradient} locations={BrandColors.softBgGradientLocations} style={styles.gradientContainer}>
+      return <View style={styles.gradientContainer}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {renderHeader('Chọn dịch vụ ưu tiên', 2, 9)}
           {renderAnimatedStep(<View style={styles.stepContainer}>
@@ -1215,25 +1199,22 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 setServiceFilters(ids); setSelectedStaffId(''); setPickedStaff(undefined); setSubmitError('');
               }} />
             </ScrollView>
-            <View style={styles.bottomBar}>
+            <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
               <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={() => triggerStepTransition(3)}>
                 <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                   <Text style={styles.ctaPrimaryText}>Tìm nhân viên phù hợp</Text>
                 </LinearGradient>
               </Pressable>
-            </View>
+            </SafeAreaView>
           </View>)}
         </SafeAreaView>
-      </LinearGradient>;
+      </View>;
     }
 
     // ---------------- STEP 3: DANH SÁCH NHÂN VIÊN PHÙ HỢP (Mode A) ----------------
     if (currentStep === 3) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Nhân viên khả dụng', 3, 9)}
             {renderAnimatedStep(
@@ -1468,7 +1449,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
@@ -1477,10 +1458,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     // ---------------- STEP 4: XEM KĨ PROFILE NHÂN VIÊN (Mode A) ----------------
     if (currentStep === 4) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Hồ sơ nhân viên', 4, 9)}
             {renderAnimatedStep(
@@ -1580,7 +1558,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 </ScrollView>
 
                 {/* Continue to Add-on step */}
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => triggerStepTransition(5)}>
@@ -1590,11 +1568,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       </Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
@@ -1605,15 +1583,12 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     // 3. Dưới nút tiếp theo có hiển thị số tiền ước tính luôn cập nhật khi thêm bớt addon
     if (currentStep === 5) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Thời lượng & Dịch vụ bổ trợ', 5, 9)}
             {renderAnimatedStep(
               <View style={styles.stepContainer}>
-                <ScrollView contentContainerStyle={[styles.stepContent,selectionWarning?{paddingBottom:180}:undefined]} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
                   <View style={styles.summaryDetailCard}>
                     <Text style={styles.sectionHeaderTitle}>Dịch vụ nhân viên có thể thực hiện</Text>
                     <Text style={styles.stepSubtitleNote}>Chọn 1 dịch vụ bạn muốn nhân viên thực hiện trong ca này</Text>
@@ -1703,7 +1678,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 </ScrollView>
 
                 {/* USER REQUIREMENT 4: DƯỚI NÚT TIẾP THEO CÓ HIỂN THỊ SỐ TIỀN ƯỚC TÍNH LUÔN CẬP NHẬT KHI THÊM BỚT ADDON */}
-                <View style={styles.bottomBarWithEstimate}>
+                <SafeAreaView style={styles.bottomBarWithEstimate} edges={['bottom']}>
                   <View style={styles.estimateCol}>
                     <Text style={styles.estimateLabel}>Tạm tính ước tính:</Text>
                     <Text style={styles.estimateAmountVal}>{formatVND(subtotal)}</Text>
@@ -1720,21 +1695,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Tóm tắt) ›</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 6: TÓM TẮT ĐƠN HÀNG & MÃ GIẢM GIÁ (Mode A) ----------------
     if (currentStep === 6) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Tóm tắt đơn hàng', 6, 9)}
             {renderAnimatedStep(
@@ -1825,7 +1797,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => triggerStepTransition(7)}>
@@ -1833,27 +1805,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiến hành thanh toán</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 7: PHƯƠNG THỨC THANH TOÁN (Mode A) ----------------
     if (currentStep === 7) {
-      const paymentMethods: { id: PaymentMethod; name: string; desc: string; icon: string }[] = [
-        { id: 'BANK_TRANSFER_QR', name: 'Chuyển khoản QR · payOS', desc: 'Chuyển đúng số tiền; kết nối nhân viên sau khi nhận đủ', icon: 'creditCard' },
-        { id: 'WALLET', name: 'Ví của tôi', desc: 'Thanh toán bằng số dư ví. Tiền hoàn được trả về ví', icon: 'wallet' },
-        { id: 'CASH', name: 'Tiền mặt', desc: 'Thanh toán sau khi hoàn thành dịch vụ', icon: 'cash' },
-      ];
-
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Phương thức thanh toán', 7, 9)}
             {renderAnimatedStep(
@@ -1861,7 +1824,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
                   <Text style={styles.sectionHeaderTitle}>Chọn phương thức thanh toán</Text>
 
-                  {paymentMethods.map((pm) => {
+                  {BOOKING_PAYMENT_OPTIONS.map((pm) => {
                     const isSelected = pm.id === paymentMethod;
                     return (
                       <Pressable
@@ -1885,7 +1848,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                         <View style={styles.paymentInfo}>
                           <Text style={styles.paymentName}>{pm.name}</Text>
                           <Text style={styles.paymentDesc}>{pm.desc}</Text>
-                          {pm.id === 'WALLET' && <WalletBalancePreview />}
+                          {isSelected && pm.id === 'WALLET' && <WalletBalancePreview />}
                         </View>
                         <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
                           {isSelected && <View style={styles.radioInnerDot} />}
@@ -1906,7 +1869,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     disabled={saving || !quoteReady || quoteLoading} onPress={() => void submitBooking()}>
@@ -1914,11 +1877,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Xác nhận & Đặt ca ({quote ? formatVND(totalAmount) : 'Chờ báo giá'})</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
@@ -1928,10 +1891,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     // ---------------- STEP 9: ĐẶT LỊCH THÀNH CÔNG (Mode A) ----------------
     if (currentStep === 9) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             <ScrollView contentContainerStyle={styles.successContent} showsVerticalScrollIndicator={false}>
               {/* Animated Success Checkmark */}
@@ -1997,7 +1957,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
               </View>
             </ScrollView>
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
   }
@@ -2009,27 +1969,27 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     // ---------------- STEP 0: GÓI DIỆN TÍCH & SỐ LƯỢNG NHÂN VIÊN (Mode B) ----------------
     if (currentStep === 0 && ai && serviceDetail && !setupSteps.length) {
       return (
-        <LinearGradient colors={BrandColors.softBgGradient} style={styles.gradientContainer}>
-          <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.gradientContainer}>
+          <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Thông tin từ đơn nháp', 0, 6)}
             <ScrollView contentContainerStyle={styles.stepContent}>
               <Text style={styles.sectionHeaderTitle}>{service.name}</Text>
-              <Text style={styles.stateSubtitle}>{selectedPackage?.name} · {quantity} gói · {requiredStaffCount} nhân viên</Text>
+              <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>{selectedPackage?.name} · {quantity} gói · {requiredStaffCount} nhân viên</Text>
               <ServiceAnswersSummary fields={serviceDetail.requirements} values={answers} />
               <Pressable accessibilityRole="button" style={styles.stateBackBtn}
                 onPress={() => { setReviewAiSetup(true); setServiceSetupIndex(0); }}>
                 <Text style={styles.stateBackBtnText}>Chỉnh sửa thông tin</Text>
               </Pressable>
             </ScrollView>
-            <View style={styles.bottomBar}>
+            <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
               <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={() => triggerStepTransition(1)}>
                 <LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}>
                   <Text style={styles.ctaPrimaryText}>Tiếp tục</Text>
                 </LinearGradient>
               </Pressable>
-            </View>
+            </SafeAreaView>
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
     if (currentStep === 0 && serviceDetail) {
@@ -2047,10 +2007,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     // Thêm ô "Không chọn" và thanh bottom bar ước tính giá cập nhật real-time
     if (currentStep === 1) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Dịch vụ bổ sung (Add-on)', 1, 8)}
             {renderAnimatedStep(
@@ -2066,7 +2023,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 </ScrollView>
 
                 {/* USER REQUIREMENT: Hiển thị số tiền ước tính cập nhật real-time */}
-                <View style={styles.bottomBarWithEstimate}>
+                <SafeAreaView style={styles.bottomBarWithEstimate} edges={['bottom']}>
                   <View style={styles.estimateCol}>
                     <Text style={styles.estimateLabel}>Tạm tính ước tính:</Text>
                     <Text style={styles.estimateAmountVal}>{formatVND(subtotal)}</Text>
@@ -2082,21 +2039,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Địa chỉ) ›</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 2: CHỌN ĐỊA CHỈ (Mode B) ----------------
     if (currentStep === 2) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Địa chỉ làm việc', 2, 8)}
             {renderAnimatedStep(
@@ -2157,7 +2111,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </Pressable>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => selectedAddressId ? triggerStepTransition(3) : Alert.alert('Chọn địa chỉ', 'Bạn hãy chọn địa chỉ làm việc để tiếp tục.')}>
@@ -2165,21 +2119,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Chọn ngày & giờ)</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 3: CHỌN NGÀY & GIỜ (Mode B) ----------------
     if (currentStep === 3) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Chọn ngày & giờ', 3, 8)}
             {renderAnimatedStep(
@@ -2267,7 +2218,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => triggerStepTransition(4)}>
@@ -2275,21 +2226,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiếp tục (Xem tóm tắt)</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 4: TÓM TẮT ĐƠN HÀNG & MÃ GIẢM GIÁ (Mode B) ----------------
     if (currentStep === 4) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Tóm tắt đơn hàng', 4, 8)}
             {renderAnimatedStep(
@@ -2380,7 +2328,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     onPress={() => triggerStepTransition(5)}>
@@ -2388,27 +2336,18 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       <Text style={styles.ctaPrimaryText}>Tiến hành thanh toán</Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 5: PHƯƠNG THỨC THANH TOÁN (Mode B) ----------------
     if (currentStep === 5) {
-      const paymentMethods: { id: PaymentMethod; name: string; desc: string; icon: string }[] = [
-        { id: 'BANK_TRANSFER_QR', name: 'Chuyển khoản QR · payOS', desc: 'Chuyển đúng số tiền; kết nối nhân viên sau khi nhận đủ', icon: 'creditCard' },
-        { id: 'WALLET', name: 'Ví của tôi', desc: 'Thanh toán bằng số dư ví. Tiền hoàn được trả về ví', icon: 'wallet' },
-        { id: 'CASH', name: 'Tiền mặt', desc: 'Thanh toán sau khi hoàn thành dịch vụ', icon: 'cash' },
-      ];
-
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Phương thức thanh toán', 5, 8)}
             {renderAnimatedStep(
@@ -2416,7 +2355,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
                   <Text style={styles.sectionHeaderTitle}>Chọn phương thức thanh toán</Text>
 
-                  {paymentMethods.map((pm) => {
+                  {BOOKING_PAYMENT_OPTIONS.map((pm) => {
                     const isSelected = pm.id === paymentMethod;
                     return (
                       <Pressable
@@ -2440,7 +2379,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                         <View style={styles.paymentInfo}>
                           <Text style={styles.paymentName}>{pm.name}</Text>
                           <Text style={styles.paymentDesc}>{pm.desc}</Text>
-                          {pm.id === 'WALLET' && <WalletBalancePreview />}
+                          {isSelected && pm.id === 'WALLET' && <WalletBalancePreview />}
                         </View>
                         <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
                           {isSelected && <View style={styles.radioInnerDot} />}
@@ -2460,7 +2399,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </View>
                 </ScrollView>
 
-                <View style={styles.bottomBar}>
+                <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
                   <Pressable
                     style={styles.ctaPrimaryBtn}
                     disabled={saving || !quoteReady || quoteLoading} onPress={() => void submitBooking()}>
@@ -2470,11 +2409,11 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                       </Text>
                     </LinearGradient>
                   </Pressable>
-                </View>
+                </SafeAreaView>
               </View>
             )}
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
@@ -2482,10 +2421,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     if (currentStep === 6) {
       if (isModeBStaffAccepted) {
         return (
-          <LinearGradient
-            colors={BrandColors.softBgGradient}
-            locations={BrandColors.softBgGradientLocations}
-            style={styles.gradientContainer}>
+          <View style={styles.gradientContainer}>
             <SafeAreaView style={styles.safeArea} edges={['top']}>
               <ScrollView contentContainerStyle={styles.matchAcceptedContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.matchAcceptedIcon}>
@@ -2544,15 +2480,12 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                 </Pressable>
               </ScrollView>
             </SafeAreaView>
-          </LinearGradient>
+          </View>
         );
       }
 
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             <View style={styles.radarContainer}>
               {/* Multi-Wave Animated Radar */}
@@ -2618,17 +2551,14 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
               </>}
             </View>
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
 
     // ---------------- STEP 7: ĐẶT LỊCH THÀNH CÔNG (Mode B) ----------------
     if (currentStep === 7) {
       return (
-        <LinearGradient
-          colors={BrandColors.softBgGradient}
-          locations={BrandColors.softBgGradientLocations}
-          style={styles.gradientContainer}>
+        <View style={styles.gradientContainer}>
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             <ScrollView contentContainerStyle={styles.successContent} showsVerticalScrollIndicator={false}>
               <Animated.View style={[styles.successCheckCircle, { transform: [{ scale: successScaleAnim }] }]}>
@@ -2699,7 +2629,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
               </View>
             </ScrollView>
           </SafeAreaView>
-        </LinearGradient>
+        </View>
       );
     }
   }
@@ -2884,7 +2814,6 @@ const styles = StyleSheet.create({
   },
   stepContent: {
     padding: Spacing.three,
-    paddingBottom: 110,
   },
   sectionHeaderTitle: {
     fontSize: 15,
@@ -4027,16 +3956,14 @@ const styles = StyleSheet.create({
 
   // USER REQUIREMENT 3: Thanh bottom bar có hiển thị số tiền ước tính cập nhật real-time
   bottomBarWithEstimate: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(226, 232, 240, 0.85)',
     paddingHorizontal: Spacing.three,
     paddingVertical: 10,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
     alignItems: 'center',
     justifyContent: 'space-between',
     shadowColor: '#000',
@@ -4047,7 +3974,7 @@ const styles = StyleSheet.create({
   },
   estimateCol: {
     flex: 1,
-    marginRight: Spacing.two,
+    minWidth: 120,
   },
   estimateLabel: {
     fontSize: 11,
@@ -4066,7 +3993,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   ctaEstimateBtn: {
-    minWidth: 165,
+    flexGrow: 1,
+    flexBasis: 165,
+    maxWidth: '100%',
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
     shadowColor: BrandColors.primary,
@@ -5029,10 +4958,6 @@ const styles = StyleSheet.create({
 
   // Bottom action bar
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(226, 232, 240, 0.8)',
@@ -5049,11 +4974,13 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   gradientBtn: {
+    paddingHorizontal: 12,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ctaPrimaryText: {
+    textAlign: 'center',
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',

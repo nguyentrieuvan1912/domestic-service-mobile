@@ -1,3 +1,5 @@
+import { useAppTheme } from '@/context/ThemeContext';
+import { AppBackground } from '@/components/common/AppBackground';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -11,6 +13,7 @@ const labels: Record<string, string> = { CREATING: 'Đang tạo / cần khôi ph
 const money = (n: number) => n.toLocaleString('vi-VN') + 'đ';
 
 export function StaffTopupPanel({ visible, onClose, onCredited, audience = 'staff' }: { visible: boolean; onClose: () => void; onCredited: () => void; audience?: 'staff' | 'customer' }) {
+  const { colors } = useAppTheme();
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [items, setItems] = useState<Topup[]>([]);
   const [amount, setAmount] = useState('10000');
@@ -85,6 +88,7 @@ export function StaffTopupPanel({ visible, onClose, onCredited, audience = 'staf
   const seconds = selected ? Math.max(0, Math.ceil((Date.parse(selected.expiresAt) - now) / 1000)) : 0;
   const payable = selected?.status === 'PENDING' && seconds > 0 && !!selected.qrCode;
   return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={close}>
+    <AppBackground gradient={colors.backgroundGradient}>
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
         {selected && <Pressable accessibilityRole="button" accessibilityLabel="Quay lại nhập số tiền nạp" onPress={() => setSelected(null)} style={s.back}><Text style={s.link}>‹</Text></Pressable>}
@@ -94,15 +98,15 @@ export function StaffTopupPanel({ visible, onClose, onCredited, audience = 'staf
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
         {!selected && <View style={s.card}>
 
-    {!capabilities?.topupEnabled && <Text style={s.note}>{capabilities?.message || 'Đang kiểm tra kết nối thanh toán…'}</Text>}
-    <Text style={s.note}>Chọn số tiền cần nạp. Ví được cập nhật sau khi xác minh chuyển khoản; tiền nạp không tính vào thu nhập ca làm.</Text>
+    {!capabilities?.topupEnabled && <Text style={[s.note, { color: colors.textSecondary }]}>{capabilities?.message || 'Đang kiểm tra kết nối thanh toán…'}</Text>}
+    <Text style={[s.note, { color: colors.textSecondary }]}>Chọn số tiền cần nạp. Ví được cập nhật sau khi xác minh chuyển khoản; tiền nạp không tính vào thu nhập ca làm.</Text>
     <TextInput accessibilityLabel="Số tiền nạp" keyboardType="number-pad" value={amount} editable={!busy} onChangeText={value => setAmount(value.replace(/\D/g, ''))} style={s.input} />
     <View style={s.wrap}>{[10000, 50000, 100000].map(value => <Pressable key={value} disabled={busy} onPress={() => setAmount(String(value))} style={s.chip}><Text style={s.link}>{money(value)}</Text></Pressable>)}</View>
     <Pressable accessibilityRole="button" disabled={busy || !capabilities?.topupEnabled} onPress={() => create()} style={[s.button, (!capabilities?.topupEnabled || busy) && s.disabled]}><Text style={s.white}>{busy ? 'Đang xử lý…' : 'Nạp tiền · Hiện mã QR'}</Text></Pressable>
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+    {!!error && <Text accessibilityRole="alert" style={[s.error, { color: colors.dangerText }]}>{error}</Text>}
     <Pressable disabled={busy} onPress={() => void execute(async () => {})} style={s.chip}><Text style={s.link}>Tải lại trạng thái</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHistory }} onPress={() => setShowHistory(value => !value)} style={s.historyToggle}><View style={{ flex: 1 }}><Text style={s.link}>Lịch sử nạp tiền ({items.length})</Text>{items.some(item => ['CREATING', 'PENDING', 'REVIEW'].includes(item.status)) && <Text style={s.historyHint}>Có giao dịch đang chờ xử lý</Text>}</View><Text style={s.link}>{showHistory ? 'Thu gọn' : 'Xem'}</Text></Pressable>
-    {showHistory && !items.length && <Text style={s.note}>Chưa có yêu cầu nạp tiền.</Text>}
+    {showHistory && !items.length && <Text style={[s.note, { color: colors.textSecondary }]}>Chưa có yêu cầu nạp tiền.</Text>}
     {showHistory && items.slice(0, 10).map(item => <View key={item.id} style={s.record}>
       <Text style={s.title}>{money(item.amount)} · #{item.id}</Text>
       <Text style={item.status === 'PAID' ? s.link : s.note}>{labels[item.status] || item.status}</Text>
@@ -135,11 +139,12 @@ export function StaffTopupPanel({ visible, onClose, onCredited, audience = 'staf
               <Text style={s.centerNote}>Đã nhận: {money(selected.amountReceived)}. Trạng thái tự cập nhật khi màn hình đang mở; backend xác minh với payOS khoảng 30 giây một lần.</Text>
               <Pressable accessibilityRole="button" disabled={busy} onPress={() => check(selected)} style={[s.button, busy && s.disabled]}><Text style={s.white}>{busy ? 'Đang kiểm tra…' : 'Kiểm tra giao dịch ngay'}</Text></Pressable>
             </>}
-            {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+            {!!error && <Text accessibilityRole="alert" style={[s.error, { color: colors.dangerText }]}>{error}</Text>}
             <Text style={s.centerNote}>Đóng màn hình vẫn giữ yêu cầu nạp trong lịch sử. Việc đóng màn hình không xác nhận thanh toán hoặc hủy giao dịch.</Text>
           </>}
       </ScrollView>
     </SafeAreaView>
+    </AppBackground>
   </Modal>;
 }
 
@@ -154,7 +159,7 @@ const s = StyleSheet.create({
   link: { fontWeight: '700', fontSize: 13, color: '#00875F' }, button: { backgroundColor: '#00875F', padding: 14, borderRadius: 12, minHeight: 44, justifyContent: 'center' },
   white: { textAlign: 'center', color: '#fff', fontWeight: '700' }, disabled: { opacity: 0.45 }, error: { color: '#B91C1C', fontSize: 13, lineHeight: 20 },
   record: { borderTopWidth: 1, borderTopColor: '#DCE8E2', paddingTop: 12, gap: 8 },
-  screen: { flex: 1, backgroundColor: '#F2F8F5' }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#DCE8E2' },
+  screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#DCE8E2' },
   heading: { flex: 1, fontSize: 17, fontWeight: '700', color: '#163A2C' }, close: { padding: 12, borderRadius: 10, backgroundColor: '#E6F5ED' },
   content: { padding: 16, gap: 16, width: '100%', maxWidth: 540, alignSelf: 'center', paddingBottom: 32 }, summary: { alignItems: 'center', gap: 10 },
   amount: { fontSize: 32, color: '#00875F', fontWeight: '800' }, badge: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 }, waiting: { backgroundColor: '#FEF3C7' }, success: { backgroundColor: '#BBF7D0' }, status: { fontWeight: '700', color: '#163A2C', textAlign: 'center' },

@@ -37,7 +37,7 @@ export default function ServiceDetailScreen() {
 
 function ServiceLoadState(props: React.ComponentProps<typeof CatalogState>) {
   const router = useRouter();
-  return <SafeAreaView style={{ flex: 1, backgroundColor: BrandColors.white }}>
+  return <SafeAreaView style={{ flex: 1 }}>
     <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} style={{ padding: Spacing.three, flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
       <IconSymbol name="chevron.left" size={22} color={BrandColors.primary} />
       <Text style={{ color: BrandColors.primary, fontWeight: '700' }}>Quay lại</Text>
@@ -206,12 +206,9 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
           <View style={styles.tabContentSection}>
             <Text style={styles.sectionHeading}>Đặt dịch vụ theo từng bước</Text>
             <Text style={styles.sectionSubtitle}>
-              Bấm Bắt đầu đặt dịch vụ. Ứng dụng sẽ lần lượt hướng dẫn bạn chọn nhu cầu, gói dịch vụ, địa chỉ và thời gian.
+              Bấm Đặt dịch vụ ở cuối màn hình để chọn nhu cầu, gói dịch vụ, địa chỉ và thời gian.
             </Text>
 
-            <Pressable accessibilityRole="button" style={[styles.bookNowBtn,{padding:16,alignSelf:'stretch',marginBottom:16}]} onPress={handleBookNow}>
-              <Text style={styles.bookNowText}>Đặt dịch vụ →</Text>
-            </Pressable>
             {detail.requirements.length>0 && <Text style={styles.reqText}>Bạn sẽ được hướng dẫn chọn: {detail.requirements.map(field=>field.label).join(' • ')}.</Text>}
 
             {/* Default general requirements */}
@@ -433,7 +430,6 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
           </View>
         )}
 
-        <View style={{ height: 160 }} />
       </ScrollView>
 
       {/* STICKY BOTTOM BOOKING BAR */}
@@ -455,8 +451,7 @@ function ServiceDetailContent({ detail }: { detail: CatalogDetail }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+    flex: 1
   },
   scrollContent: {
     paddingBottom: 20,
@@ -967,10 +962,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: '#FFF',
     flexDirection: 'column',
     justifyContent: 'center',

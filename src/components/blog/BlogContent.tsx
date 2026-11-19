@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import type { BlogNode } from '@/api/blog';
 import { BrandColors, BorderRadius, Fonts } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { useAppTheme } from '@/context/ThemeContext';
 
 function httpsUrl(value: unknown) {
   if (typeof value !== 'string') return undefined;
@@ -18,6 +19,8 @@ function httpsUrl(value: unknown) {
 
 export function BlogContent({ document }: { document: BlogNode }) {
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const paragraphStyle = [styles.paragraph, { color: colors.textSecondary }];
 
   const openLink = (value: unknown) => {
     const blogPath = typeof value === 'string' ? /^\/blog\/([a-z0-9-]+)\/?$/.exec(value) : null;
@@ -32,12 +35,12 @@ export function BlogContent({ document }: { document: BlogNode }) {
     const children = node.content?.map(render);
     switch (node.type) {
       case 'doc': return <View key={index} style={styles.blocks}>{children}</View>;
-      case 'paragraph': return <Text key={index} style={styles.paragraph}>{children?.length ? children : ' '}</Text>;
-      case 'heading': return <Text key={index} accessibilityRole="header" style={[styles.heading, attrs.level === 3 && styles.subheading]}>{children}</Text>;
+      case 'paragraph': return <Text key={index} style={paragraphStyle}>{children?.length ? children : ' '}</Text>;
+      case 'heading': return <Text key={index} accessibilityRole="header" style={[styles.heading, { color: colors.text }, attrs.level === 3 && styles.subheading]}>{children}</Text>;
       case 'hardBreak': return '\n';
       case 'horizontalRule': return <View key={index} style={styles.rule} />;
       case 'blockquote': return <View key={index} style={styles.quote}>{children}</View>;
-      case 'codeBlock': return <Text key={index} style={[styles.paragraph, styles.codeBlock]}>{children}</Text>;
+      case 'codeBlock': return <Text key={index} style={[paragraphStyle, styles.codeBlock, { backgroundColor: colors.surfaceMuted }]}>{children}</Text>;
       case 'listItem': return <View key={index} style={styles.blocks}>{children}</View>;
       case 'bulletList':
       case 'orderedList': {
@@ -45,7 +48,7 @@ export function BlogContent({ document }: { document: BlogNode }) {
         return <View key={index} style={styles.list}>
           {children?.map((child, position) => (
             <View key={position} style={styles.listRow}>
-              <Text style={styles.paragraph}>{node.type === 'bulletList' ? '•' : `${start + position}.`}</Text>
+              <Text style={paragraphStyle}>{node.type === 'bulletList' ? '•' : `${start + position}.`}</Text>
               <View style={styles.listBody}>{child}</View>
             </View>
           ))}
@@ -60,7 +63,7 @@ export function BlogContent({ document }: { document: BlogNode }) {
           fontWeight: hasMark('bold') ? '700' : undefined,
           fontStyle: hasMark('italic') ? 'italic' : undefined,
           fontFamily: hasMark('code') ? Fonts.mono : undefined,
-          color: onPress ? '#047857' : undefined,
+          color: onPress ? colors.accentText : undefined,
           textDecorationLine: underline && strike ? 'underline line-through' : underline ? 'underline' : strike ? 'line-through' : undefined,
         };
         return <Text key={index} onPress={onPress} accessibilityRole={onPress ? 'link' : undefined} style={style}>{node.text}</Text>;
@@ -69,13 +72,13 @@ export function BlogContent({ document }: { document: BlogNode }) {
         const source = httpsUrl(attrs.src);
         return source ? <View key={index} style={styles.media}>
           <Image source={source} style={styles.image} contentFit="contain" accessibilityLabel={String(attrs.alt ?? '')} />
-          {typeof attrs.title === 'string' && !!attrs.title && <Text style={styles.caption}>{attrs.title}</Text>}
+          {typeof attrs.title === 'string' && !!attrs.title && <Text style={[styles.caption, { color: colors.textSecondary }]}>{attrs.title}</Text>}
         </View> : null;
       }
       case 'video':
       case 'youtube': {
         const onPress = openLink(attrs.src);
-        return onPress ? <Text key={index} accessibilityRole="link" onPress={onPress} style={[styles.paragraph, styles.link]}>
+        return onPress ? <Text key={index} accessibilityRole="link" onPress={onPress} style={[paragraphStyle, styles.link, { color: colors.accentText }]}>
           {typeof attrs.title === 'string' && attrs.title ? attrs.title : 'Xem video'} ↗
         </Text> : null;
       }

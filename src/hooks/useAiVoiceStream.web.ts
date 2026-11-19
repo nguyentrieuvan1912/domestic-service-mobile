@@ -3,7 +3,7 @@ import type { AudioStreamBuffer } from 'expo-audio';
 
 const PROCESSOR = `
 class CleanMasterVoiceInput extends AudioWorkletProcessor {
-  pcm = new Int16Array(2048);
+  pcm = new Int16Array(512);
   offset = 0;
 
   process(inputs) {
@@ -11,7 +11,7 @@ class CleanMasterVoiceInput extends AudioWorkletProcessor {
       this.pcm[this.offset++] = Math.round(Math.max(-1, Math.min(1, sample)) * 32767);
       if (this.offset === this.pcm.length) {
         this.port.postMessage(this.pcm.buffer, [this.pcm.buffer]);
-        this.pcm = new Int16Array(2048);
+        this.pcm = new Int16Array(512);
         this.offset = 0;
       }
     }

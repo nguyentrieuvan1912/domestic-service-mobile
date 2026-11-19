@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import React, { useState } from 'react';
 import {
   View,
@@ -9,8 +10,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { BookingCard } from '@/components/common/BookingCard';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuth } from '@/context/AuthContext';
@@ -29,7 +30,9 @@ const FILTER_TABS: { id: TabFilter; label: string }[] = [
 ];
 
 export default function BookingsScreen() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
+  const { colors } = useAppTheme();
   const { currentCustomer } = useAuth();
   const [activeFilter, setActiveFilter] = useState<TabFilter>('ALL');
 
@@ -72,16 +75,13 @@ export default function BookingsScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
-      style={styles.gradientContainer}>
+    <View style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {!!(loading || error) && <CatalogState loading={loading} error={error} onRetry={retry} />}
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Đơn dịch vụ của tôi</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Đơn dịch vụ của tôi</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
             Theo dõi tiến trình thực hiện và lịch sử phục vụ gia đình
           </Text>
         </View>
@@ -111,7 +111,7 @@ export default function BookingsScreen() {
         {/* Bookings List */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}>
+          contentContainerStyle={[styles.listContent, { paddingBottom: Spacing.three + bottomTabHeight }]}>
           {filteredBookings.length === 0 ? (
             <EmptyState
               icon="📅"
@@ -126,6 +126,7 @@ export default function BookingsScreen() {
                 key={b.id}
                 booking={b}
                 onPress={() => router.push(`/booking/${b.id}`)}
+                onPay={() => router.push({ pathname: '/booking/payment', params: { id: b.id } })}
                 onCancel={() => handleCancel(b.id, b.bookingCode)}
                 onReview={() =>
                   router.push({
@@ -141,7 +142,7 @@ export default function BookingsScreen() {
           <View style={{ height: 60 }} />
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 

@@ -8,19 +8,24 @@ const module = { exports: {} };
 new Function('module', 'exports', source)(module, module.exports);
 const { prepareBookingQr } = module.exports;
 const booking = { id: '91', status: 'AWAITING_PAYMENT', paymentMethod: 'BANK_TRANSFER_QR' };
-const intent = { id: 2000000000091, bookingId: 91, status: 'PENDING', qrCode: 'test-only-provider-payload', amount: 2500 };
+const intent = { id: 2000000000091, bookingId: 91, status: 'PENDING', qrCode: 'test-only-provider-payload', amount: 2500, amountReceived: 0, expiresAt: new Date(Date.now() + 60000).toISOString() };
 const calls = [];
 const request = async (...args) => { calls.push(args); return { topup: intent }; };
 assert.equal(await prepareBookingQr(booking, null, request), intent);
-assert.deepEqual(calls[0].slice(0, 4), ['finance', '/customer/bookings/91/pay', 'POST', undefined], 'Automatic creation uses the server-priced booking, without a client amount');
+assert.deepEqual(calls[0].slice(0, 4), ['finance', '/customer/bookings/91/pay?method=BANK_TRANSFER_QR', 'POST', undefined], 'Automatic creation uses the server-priced booking and cannot debit a wallet');
 calls.length = 0;
 assert.equal(await prepareBookingQr(booking, intent, request), intent);
 assert.equal(calls.length, 0, 'A persisted QR is reused when opening the payment screen');
-for (const status of ['PAID', 'EXPIRED', 'CANCELLED', 'REVIEW']) {
-  const previous = { ...intent, status };
+for (const status of ['PAID', 'REVIEW']) {
+  const previous = { ...intent, status, amountReceived: 1000, expiresAt: '2000-01-01T00:00:00Z' };
   assert.equal(await prepareBookingQr(booking, previous, request), previous);
 }
-assert.equal(calls.length, 0, 'Terminal or review intents are never replaced with another payable QR');
+assert.equal(calls.length, 0, 'A payment with money received cannot be replaced');
+for (const status of ['EXPIRED', 'CANCELLED', 'PENDING']) {
+  await prepareBookingQr(booking, { ...intent, status, expiresAt: '2000-01-01T00:00:00Z' }, request);
+}
+assert.equal(calls.length, 3, 'Finance verifies expired attempts before issuing replacements');
+calls.length = 0;
 await prepareBookingQr(booking, { ...intent, status: 'CREATING', qrCode: null }, request);
 assert.equal(calls.length, 1, 'An interrupted creation recovers through the same booking endpoint');
 calls.length = 0;

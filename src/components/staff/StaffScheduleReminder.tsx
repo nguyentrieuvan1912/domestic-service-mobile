@@ -38,7 +38,8 @@ function Reminder({ actor }: { actor: AvailabilityActor }) {
   }, [actor]);
   const missing = useMemo(() => missingRegistrationDates(StaffRepository.getScheduleSnapshot(actor.staffId).saved.registeredWeekStarts ?? [], now), [actor.staffId, revision, now]);
   const key = weekStart(now), { loaded: ready, error } = StaffRepository.getScheduleLoadState();
-  const visible = (ready ? missing.length > 0 : !!error) && dismissed !== key && path.startsWith('/staff') && path !== '/staff/availability';
+  const visible = (ready ? missing.length > 0 : !!error) && dismissed !== key && path.startsWith('/staff')
+    && !['/staff/availability', '/staff/areas'].includes(path);
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setDismissed(key)}><View style={styles.scrim}><View style={styles.card}>
     <Text style={styles.title}>{ready ? 'Đăng ký lịch làm việc tuần này' : 'Chưa kiểm tra được lịch làm việc'}</Text>
     <Text style={styles.body}>{ready ? `Bạn còn ${missing.length} ngày chưa đăng ký: ${missing.map(displayDate).join(', ')}.` : error}</Text>

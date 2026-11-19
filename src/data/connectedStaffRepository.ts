@@ -13,7 +13,9 @@ import type { MatchingSnapshot, MatchItem } from '@/types/staff-matching';
 import type { JobStepStatus } from './staffStateTransitions';
 
 type WalletResponse = { balance: StaffWalletBalance; incomes: {bookingId:number;staffAmount:number;platformFee:number;status:string}[]; transactions: { id: number; type: string; direction: string; bucket: string; amount: number; createdAt: string }[]; withdrawals: { id: number; amount: number; status: string; requestedAt: string; payoutStatus?: string; automaticRequested?: boolean; payoutMessage?: string; rejectionReason?: string; cancellationReason?: string; cancelledAt?: string }[] };
-type Bank = { id: string; bankCode: string; bankName?: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
+export type StaffBankAccount = { id: string; bankCode: string; bankName?: string; accountNumber: string; accountHolder: string; status: string; isDefault: boolean };
+type Bank = StaffBankAccount;
+type BankResponse = Omit<Bank, 'id'> & { id: number };
 const listeners = new Set<() => void>();
 let walletRequest = 0;
 let sessionToken = '';
@@ -111,8 +113,10 @@ async function load(signal?: AbortSignal) {
       matchItems = rawMatching.items.map(item => ({ ...item, opportunity: { ...item.opportunity, id: String(item.opportunity.id), serviceId: String(item.opportunity.serviceId), invitedStaffId: item.opportunity.invitedStaffId == null ? undefined : String(item.opportunity.invitedStaffId) } as unknown as MatchItem['opportunity'] }));
       records = rawCaps.capabilities.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: String(item.serviceId), note: item.note || undefined, approvedAt: item.approvedAt || undefined, validFrom: item.validFrom || undefined, validUntil: item.validUntil || undefined } as StaffCapabilityRecord));
       restrictions = rawCaps.restrictions.map(item => ({ ...item, id: String(item.id), staffId: String(item.staffId), serviceId: item.serviceId == null ? undefined : String(item.serviceId), endsAt: item.endsAt || undefined } as CapabilityRestrictionRecord));
-      if (walletSequence === walletRequest) applyWallet(wallet);
-      banks = rawBanks.map(item => ({ ...item, id: String(item.id) }));
+      if (walletSequence === walletRequest) {
+        applyWallet(wallet);
+        banks = rawBanks.map(item => ({ ...item, id: String(item.id) }));
+      }
       if (reviewSequence === reviewsRequest) reviews = rawReviews.map(item => ({ ...item, id: String(item.id), customerName: 'Khách hàng #' + item.customerId, customerAvatar: '', tags: item.tags || [] }));
       loaded = true; failure = ''; notify();
     } catch (error) { if(active.token!==operationSession()?.token)return; failure = error instanceof Error ? error.message : 'Chưa tải được dữ liệu nhân viên.'; loaded = false; notify(); throw error; }
@@ -159,6 +163,13 @@ async function refreshReviews() {
   try { await task; } finally { if (reviewsRefresh === task) reviewsRefresh = null; }
 }
 async function refreshAfterWrite() { try { await load(); } catch { /* The write has committed; UI presents the refresh error separately. */ } }
+
+function applySavedBanks(token: string, accounts: BankResponse[]) {
+  if (token !== operationSession()?.token) throw new Error('Phiên đăng nhập đã thay đổi.');
+  walletRequest++;
+  banks = accounts.map(bank => ({ ...bank, id: String(bank.id) }));
+  notify();
+}
 export const StaffRepository = {
   load, refreshWallet, refreshReviews,
   loadSchedule,
@@ -209,10 +220,11 @@ export const StaffRepository = {
   async setOnline(staff: string, isOnline: boolean) { const active = assertStaff(staff); const profile = await operationRequest<typeof active.profile>('identity', '/staff/status', 'PATCH', { isOnline }); if (active.token === operationSession()?.token) { active.profile = profile; notify(); await refreshAfterWrite(); } },
   async saveSchedule(staff: string, draft: AvailabilityDraft, version: number) {
     const active = assertStaff(staff);
-    const payload = { ...draft, areaIds: draft.areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id) };
+    const { areaIds, ...scheduleDraft } = draft;
+    const payload = { ...scheduleDraft, areaIds: areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id) };
     const sameSession = () => { if (active.token !== operationSession()?.token) throw new Error('Phiên đăng nhập đã thay đổi.'); };
     const saved = await saveAvailabilityWithReadback(payload, version,
-      () => operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...payload, revision: version }),
+      () => operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...scheduleDraft, revision: version }),
       async () => { sameSession(); const actual = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability'); sameSession(); return actual; });
     sameSession(); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule;
   },
@@ -225,14 +237,52 @@ export const StaffRepository = {
     catch { return { ...result, refreshPending: true }; }
   },
   async withdrawMoney(staff: string, amount: number, bank: string, _account: string, key: string) { assertStaff(staff); const selected = banks.find(item => item.id === bank); if (!selected) throw new Error('Vui lòng chọn tài khoản ngân hàng đã liên kết.'); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/withdrawals', 'POST', { amount, bankAccountId: Number(selected.id), requestKey: key }); await refreshAfterWrite(); return result; },
-  async addBank(staff: string, bankCode: string, accountNumber: string, accountHolder: string) { assertStaff(staff); const result = await operationRequest<{ id: number; status: string }>('finance', '/staff/me/bank-accounts', 'POST', { bankCode, accountNumber, accountHolder }); await refreshAfterWrite(); return result; },
+  async addBank(staff: string, bankCode: string, accountNumber: string, accountHolder: string) {
+    const active = assertStaff(staff);
+    const result = await operationRequest<{ id: number; status: string; accounts: BankResponse[] }>(
+      'finance', '/staff/me/bank-accounts', 'POST', { bankCode, accountNumber, accountHolder },
+    );
+    applySavedBanks(active.token, result.accounts);
+    return result;
+  },
+  async setDefaultBank(staff: string, id: string) {
+    const active = assertStaff(staff);
+    const accounts = await operationRequest<BankResponse[]>('finance', `/staff/me/bank-accounts/${id}/default`, 'PUT');
+    applySavedBanks(active.token, accounts);
+  },
+  async unlinkBank(staff: string, id: string) {
+    const active = assertStaff(staff);
+    const accounts = await operationRequest<BankResponse[]>('finance', `/staff/me/bank-accounts/${id}`, 'DELETE');
+    applySavedBanks(active.token, accounts);
+  },
   async reportIssue(staff: string, id: string, reason: string) { assertStaff(staff); return operationRequest('booking', '/bookings/' + id + '/incidents', 'POST', { reason }); },
   getCapabilitySnapshot: capabilitySnapshot,
   getAvailability(staff: string) { assertStaff(staff); return { slots: [], operatingDistricts: schedule.saved.areaIds, autoAccept: false, maxDistanceKm: 0, primaryDistrict: schedule.saved.areaIds[0] || '' }; },
-  updateOperatingAreas() { throw new Error('Vui lòng lưu khu vực trong màn đăng ký lịch làm.'); },
+  updateOperatingAreas() { throw new Error('Vui lòng lưu khu vực trong mục Quản lý khu vực hoạt động.'); },
   toggleShiftSlot() { throw new Error('Vui lòng lưu khoảng rảnh trong màn đăng ký lịch làm.'); },
 };
 export const StaffCapabilityRepository = { async load(value: StaffCapabilityActor, signal?: AbortSignal) { actor(value); await load(signal); return capabilitySnapshot(); } };
-export const StaffAvailabilityRepository = { async load(value: AvailabilityActor, signal?: AbortSignal) { actor(value); await loadHcmAdministrativeUnits(); await loadSchedule(signal); return schedule; }, async save(value: AvailabilityActor, draft: AvailabilityDraft, version: number, _signal?: AbortSignal) { actor(value); return StaffRepository.saveSchedule(value.staffId, draft, version); } };
+export const StaffAvailabilityRepository = {
+  async load(value: AvailabilityActor, signal?: AbortSignal) {
+    actor(value); await loadHcmAdministrativeUnits(); await loadSchedule(signal); actor(value);
+    return schedule;
+  },
+  async save(value: AvailabilityActor, draft: AvailabilityDraft, version: number) {
+    actor(value);
+    return StaffRepository.saveSchedule(value.staffId, draft, version);
+  },
+  async saveAreas(value: AvailabilityActor, areaIds: string[], revision: number) {
+    actor(value);
+    const names = areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id);
+    const saved = areaView(await operationRequest<AvailabilitySnapshot>(
+      'booking', '/staff/me/areas', 'PUT', { areaIds: names, revision },
+    ));
+    actor(value);
+    if (saved.saved.revision >= schedule.saved.revision) {
+      schedule = saved; scheduleLoaded = true; scheduleFailure = ''; notify();
+    }
+    return schedule;
+  },
+};
 export const StaffMatchingRepository = { async refresh(value: StaffCapabilityActor, signal?: AbortSignal) { actor(value); await refreshWork(signal); }, async load(value: StaffCapabilityActor, signal?: AbortSignal) { actor(value); await load(signal); return StaffRepository.getMatchingSnapshot(value); }, read: (value: StaffCapabilityActor, _now?: number) => StaffRepository.getMatchingSnapshot(value), detail: (value: StaffCapabilityActor, id: string) => StaffRepository.getMatchingOpportunity(value, id), eligibility: (value: StaffCapabilityActor, id: string) => StaffRepository.getOpportunityEligibility(value.staffId, id), claim: (value: StaffCapabilityActor, id: string, _signal?: AbortSignal) => StaffRepository.claimOpportunity(value.staffId, id), setOnline: (value: StaffCapabilityActor, online: boolean) => StaffRepository.setOnline(value.staffId, online) };
 export function availabilityDraft(value: AvailabilitySnapshot): AvailabilityDraft { return JSON.parse(JSON.stringify({ days: value.saved.days, areaIds: value.saved.areaIds, matchNotifications: value.saved.matchNotifications })); }

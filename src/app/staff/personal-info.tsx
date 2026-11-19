@@ -2,9 +2,10 @@ import { useFocusEffect } from 'expo-router';
 import { staffBirthLabel } from '@/utils/staff-profile';
 import { remoteImageSource } from '@/utils/image-source';
 import React, { useCallback, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { BrandColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
@@ -33,7 +34,7 @@ export default function StaffPersonalInfoScreen() {
   };
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-    <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardSafeLayout>
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}><IconSymbol name="back" size={25} color={BrandColors.gray800} /></Pressable>
         <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
@@ -74,7 +75,7 @@ export default function StaffPersonalInfoScreen() {
       </ScrollView>
 
       <View style={styles.bottomBar}><Pressable style={styles.saveButton} disabled={saving} onPress={handleSave}><Text style={styles.saveButtonText}>Lưu thay đổi</Text></Pressable></View>
-    </KeyboardAvoidingView>
+    </KeyboardSafeLayout>
   </SafeAreaView>;
 }
 
@@ -83,14 +84,14 @@ function ReadOnlyRow({ label, value, last = false }: { label: string; value: str
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' }, keyboard: { flex: 1 },
+  screen: { flex: 1 },
   header: { height: 60, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   backButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }, headerTitle: { fontSize: 17, fontWeight: '900', color: BrandColors.gray900 }, headerSpacer: { width: 36 },
-  content: { padding: 16, gap: 14, paddingBottom: 105 },
+  content: { padding: 16, gap: 14 },
   avatarSection: { alignItems: 'center', paddingTop: 4 }, avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#10B981' }, avatarName: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900', marginTop: 9 }, avatarHint: { color: BrandColors.gray500, fontSize: 11, textAlign: 'center', marginTop: 3 },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 16, padding: 15 }, sectionTitle: { color: BrandColors.gray900, fontSize: 14, fontWeight: '900' }, sectionHint: { color: BrandColors.gray500, fontSize: 11, lineHeight: 16, marginTop: 3 },
   fieldLabel: { color: BrandColors.gray700, fontSize: 12, fontWeight: '800', marginTop: 15, marginBottom: 7 }, inputRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, borderRadius: 11, borderWidth: 1, borderColor: '#D8E3E8', backgroundColor: '#F8FAFC' }, inputIcon: { fontSize: 15 }, input: { flex: 1, color: BrandColors.gray900, fontSize: 14, paddingVertical: 10 }, bioInput: { minHeight: 90, alignItems: 'flex-start', paddingTop: 11, color: BrandColors.gray900, fontSize: 14, lineHeight: 20 },
   lockedHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 }, readOnlyRow: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }, readOnlyRowLast: { paddingBottom: 0 }, readOnlyLabel: { color: BrandColors.gray500, fontSize: 11, marginBottom: 3 }, readOnlyValueWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, readOnlyValue: { color: BrandColors.gray800, fontSize: 13, fontWeight: '800' },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#BAE6FD', borderRadius: 13, padding: 12 }, noticeText: { flex: 1, color: '#075985', fontSize: 11, lineHeight: 16 },
-  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, backgroundColor: 'rgba(255,255,255,0.96)', borderTopWidth: 1, borderTopColor: '#E2E8F0' }, saveButton: { backgroundColor: '#047857', borderRadius: 13, paddingVertical: 14, alignItems: 'center' }, saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  bottomBar: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, backgroundColor: 'rgba(255,255,255,0.96)', borderTopWidth: 1, borderTopColor: '#E2E8F0' }, saveButton: { backgroundColor: '#047857', borderRadius: 13, paddingVertical: 14, alignItems: 'center' }, saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
 });

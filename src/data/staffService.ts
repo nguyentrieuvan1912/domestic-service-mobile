@@ -67,6 +67,8 @@ export const StaffService = {
   refreshWallet: StaffRepository.refreshWallet,
   getBankAccounts: StaffRepository.getBankAccounts,
   addBank: StaffRepository.addBank,
+  setDefaultBank: StaffRepository.setDefaultBank,
+  unlinkBank: StaffRepository.unlinkBank,
   reportIssue: StaffRepository.reportIssue,
   getLoadState: StaffRepository.getLoadState,
   subscribe(fn: () => void) {

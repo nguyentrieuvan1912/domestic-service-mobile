@@ -1,3 +1,4 @@
+import { useBottomTabSpacing } from '@/components/common/TabImageIcon';
 import { BookingChatLink } from '@/components/common/BookingChatLink';
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,6 +16,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffJobItem } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
 import { selectMatchingItems } from '@/data/staffMatchingRules';
@@ -32,9 +34,11 @@ export default function StaffJobsScreen() {
   return <StaffJobsContent key={currentUser!.id} />;
 }
 function StaffJobsContent() {
+  const { height: bottomTabHeight } = useBottomTabSpacing();
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; source?: string }>();
   const { currentStaff } = useAuth();
+  const { colors } = useAppTheme();
   const staffId = currentStaff!.id;
   const matching = useStaffMatching();
   const [matchMode, setMatchMode] = useState<'A' | 'B'>(params.source === 'A' ? 'A' : 'B');
@@ -108,10 +112,10 @@ function StaffJobsContent() {
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Quản lý ca làm việc</Text>
-          <View style={styles.badgeCounter}>
-            <Text style={styles.badgeCounterText}>{upcomingList.length} ca sắp tới</Text>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Quản lý ca làm việc</Text>
+          <View style={[styles.badgeCounter, { backgroundColor: colors.accentBg }]}>
+            <Text style={[styles.badgeCounterText, { color: colors.accentText }]}>{upcomingList.length} ca sắp tới</Text>
           </View>
         </View>
 
@@ -207,7 +211,7 @@ function StaffJobsContent() {
         {/* List of Shifts */}
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: styles.scrollContent.paddingBottom + bottomTabHeight }]}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         >
           {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort, mode: matchMode, serviceId: selectedService, date: selectedDate }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); setSelectedService(''); setSelectedDate(''); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
@@ -333,7 +337,7 @@ function StaffJobsContent() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F8FAFC' },
+  screen: { flex: 1 },
   safeArea: { flex: 1 },
 
   header: {

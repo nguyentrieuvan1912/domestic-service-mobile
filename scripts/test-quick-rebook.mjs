@@ -5,11 +5,15 @@ const require=createRequire(import.meta.url), ts=require('typescript');
 Module._extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
 const {rebookTimes,rebookQuoteBody,rebookStaffChoices,rebookAnswers}=require('../src/utils/quick-rebook.ts');
 const {customerSlotIssue}=require('../src/utils/customer-booking-time.ts');
+const {bookingRequiresPayment}=require('../src/utils/booking-payment-options.ts');
 const now=Date.parse('2026-10-20T23:55:00+07:00');
 for(const duration of [30,180,480,720]){
  const slots=rebookTimes(duration,now);assert.equal(slots.length,3);assert.equal(new Set(slots.map(item=>item.startsAt)).size,3);
  for(const slot of slots)assert.equal(customerSlotIssue(slot.startsAt,duration,now),'');
 }
+assert.match(rebookTimes(60,Date.parse('2026-10-20T10:10:00+07:00'))[0].startsAt,/T12:30/);
+assert.equal(bookingRequiresPayment('AWAITING_PAYMENT'),true);
+assert.equal(bookingRequiresPayment('STAFF_ASSIGNED'),false);
 const source={id:'115',customerId:'9',serviceId:'2',packageId:'5',addressId:'8',requiredStaffCount:1,bookingDate:'2026-10-16',startTime:'09:00',startsAt:'2026-10-16T02:00:00Z',endsAt:'2026-10-16T05:00:00Z',paymentMethod:'CASH',addOns:[{addOnId:'7',addOnName:'Extra'}],assignments:[{staffId:'97',status:'COMPLETED',staffSnapshot:{fullName:'Previous'}}],service:{quantity:2,configuration:{acQuantity:2},answers:{areaM2:50},relatedServices:[{id:3,name:'Related'}]},notes:'Existing note',promotionCode:'OLD'};
 const before=JSON.stringify(source), body=rebookQuoteBody(source,['7','9'],'');
 assert.deepEqual(body,{serviceId:'2',packageId:'5',requiredStaffCount:1,quantity:2,configuration:{acQuantity:2},answers:{areaM2:50},addOnIds:['7','9'],relatedServiceIds:['3'],promotionCode:''});
@@ -32,9 +36,9 @@ Module._load=function(name,...args){
  return original.call(this,name,...args);
 };
 const {useQuickRebook}=require('../src/hooks/use-quick-rebook.ts');
-let selectedSource=source, requiredFields=[];
+let selectedSource=source, requiredFields=[], rebookOptions={};
 runner={slots:[],cursor:0,effects:[],dirty:true};
-const flush=()=>{let guard=0;while(runner.dirty){assert(++guard<20);runner.dirty=false;runner.cursor=0;runner.effects=[];runner.value=useQuickRebook(selectedSource,false,requiredFields);for(const effect of runner.effects)effect();}return runner.value;};
+const flush=()=>{let guard=0;while(runner.dirty){assert(++guard<20);runner.dirty=false;runner.cursor=0;runner.effects=[];runner.value=useQuickRebook(selectedSource,false,requiredFields,rebookOptions);for(const effect of runner.effects)effect();}return runner.value;};
 const settle=async()=>{await new Promise(resolve=>setImmediate(resolve));flush();};
 const debounce=()=>new Promise(resolve=>setTimeout(resolve,330));
 flush();assert.equal(runner.value.mode,'KEEP');assert.equal(runner.value.ready,false);await debounce();
@@ -51,16 +55,22 @@ requests.at(-1).resolve({baseAmount:200000,addOnAmount:0,discountAmount:0,totalA
 const auto=runner.value.submit();const autoPost=requests.at(-1);assert.equal(autoPost.body.mode,'MODE_B');assert.equal(autoPost.body.staffId,undefined);autoPost.resolve({id:1000});await auto;
 activity={...activity,active:false};runner.dirty=true;flush();assert.equal(runner.value.ready,false,'A hidden screen cannot submit an old preview');
 for(const slot of runner.slots)slot?.cleanup?.();
-// A historical online method must be explicitly changed to a supported method; voucher changes use fresh server pricing.
-selectedSource={...source,paymentMethod:'BANK_TRANSFER_QR'};requiredFields=[];activity={...activity,active:true};runner={slots:[],cursor:0,effects:[],dirty:true};
+// Unsupported legacy methods require a choice. Current QR and wallet options can create an unpaid booking.
+selectedSource={...source,paymentMethod:'MOMO'};requiredFields=[];activity={...activity,active:true};runner={slots:[],cursor:0,effects:[],dirty:true};
 flush();runner.value.setMode('AUTO');flush();await debounce();requests.at(-1).resolve({baseAmount:200000,addOnAmount:0,discountAmount:0,totalAmount:200000,durationMinutes:180});await settle();
-assert.match(runner.value.paymentIssue,/chưa được cấu hình/);assert.equal(runner.value.ready,false);const beforeUnsupported=requests.length;await assert.rejects(runner.value.submit(),/chưa được cấu hình/);assert.equal(requests.length,beforeUnsupported,'Unsupported payment cannot create a booking');
+assert.match(runner.value.paymentIssue,/Vui lòng chọn phương thức/);assert.equal(runner.value.ready,false);const beforeUnsupported=requests.length;await assert.rejects(runner.value.submit(),/Vui lòng chọn phương thức/);assert.equal(requests.length,beforeUnsupported,'Unsupported payment cannot create a booking');
+for(const method of ['BANK_TRANSFER_QR','WALLET']) {
+ runner.value.setPaymentMethod(method);flush();assert.equal(runner.value.ready,true);
+ const pending=runner.value.submit();const paymentPost=requests.at(-1);
+ assert.equal(paymentPost.body.paymentMethod,method);
+ paymentPost.resolve({id:1001,status:'AWAITING_PAYMENT'});assert(bookingRequiresPayment((await pending).status));
+}
 runner.value.setPaymentMethod('CASH');flush();assert.equal(runner.value.ready,true);
 runner.value.setPromotionCode('INVALID');flush();assert.equal(runner.value.quote,undefined);assert.equal(runner.value.ready,false);await debounce();assert.equal(requests.at(-1).body.promotionCode,'INVALID');requests.at(-1).reject(new Error('Mã đã hết hạn'));await settle();assert.match(runner.value.quoteError,/hết hạn/);assert.equal(runner.value.ready,false);
 runner.value.setPromotionCode('NEW10');flush();await debounce();requests.at(-1).resolve({baseAmount:200000,addOnAmount:0,discountAmount:20000,totalAmount:180000,durationMinutes:180});await settle();assert.equal(runner.value.quote.totalAmount,180000);
 const updatedPayment=runner.value.submit();const updatedPost=requests.at(-1);assert.equal(updatedPost.body.paymentMethod,'CASH');assert.equal(updatedPost.body.promotionCode,'NEW10');updatedPost.resolve({id:1001});await updatedPayment;
 for(const slot of runner.slots)slot?.cleanup?.();
-console.log('Rebook payment/promotion: unsupported method blocked, explicit cash choice persisted, changed/invalid voucher invalidates old totals and only verified new promo is submitted.');
+console.log('Rebook payment/promotion: legacy method blocked, QR/wallet/cash choices persisted, and voucher changes reprice on the server.');
 // Historical orders can have empty answers; never invent home type, area or a boolean default.
 requiredFields=[
  {id:1,fieldKey:'homeType',label:'Loại không gian',fieldType:'SELECT',required:true,options:['Căn hộ','Nhà phố'],validationRules:{}},
@@ -77,6 +87,20 @@ const beforeRepair=requests.length;flush();await debounce();assert.equal(request
 runner.value.setAnswers({homeType:'Căn hộ',areaM2:'35',priorityAreas:['Phòng khách']});flush();await debounce();assert.equal(requests.length,beforeRepair,'Missing boolean must not become an invented false');
 runner.value.setAnswers({...runner.value.answers,hasSupplies:false});flush();await debounce();assert.equal(runner.value.answersIssue,'');assert.equal(requests.length,beforeRepair+1);assert.deepEqual(requests.at(-1).body.answers,{homeType:'Căn hộ',areaM2:'35',priorityAreas:['Phòng khách'],hasSupplies:false});
 assert.equal(JSON.stringify(source),before,'Repair never mutates the historical booking');
+for(const slot of runner.slots)slot?.cleanup?.();
+requiredFields=requiredFields.filter(field=>field.fieldKey==='areaM2');
+selectedSource={...source,packageId:'retired',paymentMethod:'WALLET'};
+rebookOptions={addressId:'',detail:{service:{priceUnit:'PACKAGE'},packages:[{id:5,defaultStaffCount:1,maxArea:30,durationMinutes:120}],addOns:[{id:7}]}};
+runner={slots:[],cursor:0,effects:[],dirty:true};
+flush();assert.equal(runner.value.paymentMethod,'WALLET');assert.match(runner.value.quoteError,/gói dịch vụ/);
+runner.value.setPackageId('5');flush();await debounce();
+const rebasedQuote=requests.at(-1);assert.equal(rebasedQuote.body.packageId,'5');assert.equal(rebasedQuote.body.requiredStaffCount,2);
+rebasedQuote.resolve({baseAmount:400000,addOnAmount:0,discountAmount:0,totalAmount:400000,durationMinutes:120});await settle();
+assert.equal(runner.value.mode,'AUTO');assert.equal(runner.value.ready,false,'A removed address must be replaced before booking');
+rebookOptions={...rebookOptions,addressId:'25'};runner.dirty=true;flush();assert.equal(runner.value.ready,true);
+const newAddress=runner.value.submit();const newAddressPost=requests.at(-1);
+assert.equal(newAddressPost.body.addressId,'25');assert.equal(newAddressPost.body.requiredStaffCount,2);assert.equal(newAddressPost.body.mode,'MODE_B');
+newAddressPost.resolve({id:1002});await newAddress;
 for(const slot of runner.slots)slot?.cleanup?.();Module._load=original;
 console.log('Legacy rebook: absent/invalid requirements are editable, saved configuration restores without guessing, false stays valid, incomplete previews blocked and corrected answers sent to backend.');
 console.log('Quick rebook: three valid future times, preserved owned snapshot, full-service staff intersection, busy-staff blocking, selected/auto modes, idempotent explicit retry, addon quote invalidation, stale response and foreground gates passed.');

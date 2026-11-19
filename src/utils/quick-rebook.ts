@@ -5,19 +5,23 @@ import { bookingRetryDraft } from './booking-retry';
 import { customerSlotIssue } from './customer-booking-time';
 
 export type RebookStaffMode = 'KEEP' | 'CHOOSE' | 'AUTO';
-export function rebookTimes(minutes: number, now = Date.now()) {
+export const REBOOK_HOURS = Array.from({ length: 24 }, (_, slot) => `${String(8 + Math.floor(slot / 2)).padStart(2, '0')}:${slot % 2 ? '30' : '00'}`);
+
+export function rebookDates(now = Date.now()) {
   const today = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
-  const rows: { startsAt: string; label: string }[] = [];
-  // Only real future slots within the existing seven-day service window.
-  for (let day = 1; day <= 6 && rows.length < 3; day++) {
-    const date = new Date(Date.parse(today + 'T12:00:00Z') + day * 86400000).toISOString().slice(0, 10);
-    for (const time of minutes > 690 ? ['08:00'] : ['08:30', '14:00']) {
-      const startsAt = date + 'T' + time + ':00+07:00';
-      if (!customerSlotIssue(startsAt, minutes, now)) rows.push({ startsAt, label: `${day === 1 ? 'Ngày mai' : new Date(startsAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} • ${time}` });
-      if (rows.length === 3) break;
-    }
-  }
-  return rows;
+  return Array.from({ length: 7 }, (_, day) =>
+    new Date(Date.parse(today + 'T12:00:00Z') + day * 86400000).toISOString().slice(0, 10));
+}
+
+export const rebookStart = (date: string, time: string) => `${date}T${time}:00+07:00`;
+
+export function rebookTimes(minutes: number, now = Date.now()) {
+  const byDay = rebookDates(now).map((date, day) => {
+    const label = day === 0 ? 'Hôm nay' : day === 1 ? 'Ngày mai' : `${date.slice(8)}/${date.slice(5, 7)}`;
+    return REBOOK_HOURS.map(time => ({ startsAt: rebookStart(date, time), label: `${label} • ${time}` }))
+      .filter(slot => !customerSlotIssue(slot.startsAt, minutes, now));
+  }).filter(slots => slots.length > 0);
+  return [...byDay.map(slots => slots[0]), ...byDay.flatMap(slots => slots.slice(1))].slice(0, 3);
 }
 export function rebookQuoteBody(source: ConnectedBooking, addOnIds: string[], promotionCode: string) {
   const draft = bookingRetryDraft(source);
@@ -32,12 +36,10 @@ export function rebookStaffChoices(rows: Record<string, unknown>[][], excludedId
 /** Restore only values actually saved on this order, including older configuration storage. */
 export function rebookAnswers(source: ConnectedBooking, fields: CatalogDetail['requirements']) {
   const draft = bookingRetryDraft(source);
-  const answers = { ...draft.answers };
+  const answers: Record<string, unknown> = {};
   for (const field of fields) {
-    if (answers[field.fieldKey] == null && draft.configuration[field.fieldKey] != null) {
-      const value = draft.configuration[field.fieldKey];
-      if (!serviceAnswersIssue([field], { [field.fieldKey]: value })) answers[field.fieldKey] = value;
-    }
+    const value = draft.answers[field.fieldKey] ?? draft.configuration[field.fieldKey];
+    if (value != null && !serviceAnswersIssue([field], { [field.fieldKey]: value })) answers[field.fieldKey] = value;
   }
   return answers;
 }

@@ -2,15 +2,20 @@ import { catalogGet } from './catalog';
 import type { CatalogDetail, CatalogPage } from './catalog-types';
 import type { Promotion } from '../types/service';
 
-export async function loadBookingCatalog(signal: AbortSignal) {
-  const [first, promotions] = await Promise.all([
-    catalogGet<CatalogPage>('/services?size=100', signal),
-    catalogGet<Promotion[]>('/promotions', signal),
-  ]);
+export async function loadCatalogServices(signal: AbortSignal) {
+  const first = await catalogGet<CatalogPage>('/services?size=100', signal);
   const services = [...first.items];
   for (let page = 1; page < first.totalPages; page++) {
     services.push(...(await catalogGet<CatalogPage>('/services?size=100&page=' + page, signal)).items);
   }
+  return services;
+}
+
+export async function loadBookingCatalog(signal: AbortSignal) {
+  const [services, promotions] = await Promise.all([
+    loadCatalogServices(signal),
+    catalogGet<Promotion[]>('/promotions', signal),
+  ]);
   const details: CatalogDetail[] = [];
   // Avoid filling the native HTTP queue with every service at once.
   for (let offset = 0; offset < services.length; offset += 4) {
