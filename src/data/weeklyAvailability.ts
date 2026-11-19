@@ -7,6 +7,7 @@ export function weekStart(now = Date.now()): string {
 }
 export const weekDates = (start: string) => Array.from({ length: 7 }, (_, i) => addCalendarDays(start, i));
 export const WEEK_SLOTS = SCHEDULE_TIME_OPTIONS.slice(0, -1);
+export const HOUR_STARTS = WEEK_SLOTS.slice(0, -1);
 export const WORK_SHIFTS = [{ title: 'Sáng', start: '08:00', end: '12:00' }, { title: 'Chiều', start: '12:00', end: '17:00' }, { title: 'Tối', start: '17:00', end: '20:00' }] as const;
 export function toggleShift(day: AvailabilityDay, start: string, end: string, now: number): AvailabilityDay {
   const before = selectedSlots(day), times = WEEK_SLOTS.filter(time => time >= start && time < end && !slotLocked(day.date, time, now));
@@ -33,5 +34,18 @@ export function intervalsFromSlots(date: string, slots: readonly string[]): Avai
 export const slotLocked = (date: string, time: string, now: number) => Date.parse(intervalFor(date, time, time).startsAt) <= now;
 export function setDaySlots(day: AvailabilityDay, desired: readonly string[], now: number): AvailabilityDay {
   const before = selectedSlots(day);
-  return { ...day, intervals: intervalsFromSlots(day.date, WEEK_SLOTS.filter(time => slotLocked(day.date, time, now) ? before.includes(time) : desired.includes(time))) };
+  const selected = WEEK_SLOTS.filter(time => slotLocked(day.date, time, now) ? before.includes(time) : desired.includes(time));
+  const intervals = intervalsFromSlots(day.date, selected).flatMap(period => {
+    const start = Date.parse(period.startsAt), end = Date.parse(period.endsAt);
+    if (end <= now || end - start >= 3600000) return [period];
+    const previous = day.intervals.find(item => Date.parse(item.startsAt) === start && Date.parse(item.endsAt) >= end);
+    if (previous && (start <= now || Date.parse(previous.endsAt) === end)) return [previous];
+    return [];
+  });
+  return { ...day, intervals: intervalsFromSlots(day.date, selectedSlots({ ...day, intervals })) };
+}
+
+export function hourSlots(time: string): string[] {
+  const index = HOUR_STARTS.indexOf(time);
+  return index < 0 ? [] : WEEK_SLOTS.slice(index, index + 2);
 }

@@ -38,9 +38,9 @@ export function StaffMatchingList({ matching, filter = DEFAULT_MATCH_FILTER, lim
     OFFLINE: ['Bạn đang tạm nghỉ', 'Bật nhận việc để xem ca phù hợp. Ca đã nhận vẫn có trong tab Sắp tới.', 'Bật nhận việc'],
     RESTRICTED: ['Đang hạn chế nhận việc', 'Xem điều kiện và lý do trong Năng lực được xác nhận.', 'Xem điều kiện'],
     NO_CAPABILITY: ['Chưa có năng lực còn hiệu lực', 'Năng lực cần được Admin xác nhận trước khi nhận dịch vụ.', 'Xem năng lực'],
-    NO_SCHEDULE: ['Chưa đăng ký lịch rảnh', 'Lưu lịch rảnh và khu vực trong 7 ngày để kiểm tra việc phù hợp.', 'Đăng ký lịch'],
+    NO_SCHEDULE: ['Chưa đăng ký lịch rảnh', 'Đăng ký lịch tuần để kiểm tra việc phù hợp.', 'Đăng ký lịch'],
     NO_JOBS: ['Chưa có ca mở', 'Hiện chưa có vị trí mở để nhận. Bạn có thể tải lại sau.', 'Tải lại'],
-    NO_MATCH: ['Chưa có ca phù hợp', 'Các ca hiện tại chưa đáp ứng năng lực, khu vực hoặc lịch đã lưu của bạn.', 'Xem lịch và khu vực'],
+    NO_MATCH: ['Chưa có ca phù hợp', 'Các ca hiện tại chưa đáp ứng năng lực, khu vực hoặc lịch đã lưu của bạn.', 'Xem lịch làm'],
     FILTERED: ['Không có ca theo bộ lọc', 'Thử quận khác hoặc xóa từ khóa để xem các ca đủ điều kiện.', 'Xóa bộ lọc'],
   }[kind];
   const emptyAction = () => {

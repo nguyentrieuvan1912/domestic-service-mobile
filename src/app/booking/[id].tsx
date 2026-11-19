@@ -92,7 +92,13 @@ function BookingDetailContent({ initial, staff, invoice, invoiceLoading, invoice
         contentContainerStyle={styles.scrollContent}>
         {!!refreshError && <Pressable onPress={retry} accessibilityRole="button"><Text style={{ color: '#92400E', padding: 12 }}>Đang chờ kết nối để cập nhật đơn. Thông tin bên dưới là lần tải gần nhất. Chạm để thử ngay.</Text></Pressable>}
 
-        {booking.status === 'AWAITING_PAYMENT' && <Pressable onPress={() => router.push({pathname:'/booking/payment',params:{id:booking.id}})} style={{padding:16,backgroundColor:'#D1FAE5',borderRadius:14}}><Text style={{color:'#047857',fontWeight:'700'}}>Tiếp tục thanh toán · {formatVND(booking.totalAmount)}</Text></Pressable>}
+        {booking.status === 'AWAITING_PAYMENT' && <View style={{ padding: 16, backgroundColor: '#FEF3C7', borderRadius: 14, gap: 8 }}>
+          <Text style={{ color: '#92400E', fontWeight: '700' }}>Đơn đang chờ thanh toán</Text>
+          <Text style={{ color: '#92400E' }}>Tiếp tục thanh toán để hoàn tất đặt dịch vụ.</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/booking/payment', params: { id: booking.id } })}>
+            <Text style={{ color: '#047857', fontWeight: '700', paddingVertical: 6 }}>Tiếp tục thanh toán · {formatVND(booking.totalAmount)}</Text>
+          </Pressable>
+        </View>}
         {booking.paymentStatus === 'REFUNDED' && <Text style={{padding:12,color:'#047857'}}>Đã hoàn tiền thanh toán vào ví của bạn.</Text>}
         {/* Status Card & Code */}
         <View style={styles.statusCard}>

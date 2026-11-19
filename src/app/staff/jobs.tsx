@@ -15,6 +15,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffJobItem } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
 import { getCapabilityActor } from '@/data/staffCapabilityAdapter';
 import { selectMatchingItems } from '@/data/staffMatchingRules';
@@ -35,6 +36,7 @@ function StaffJobsContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; source?: string }>();
   const { currentStaff } = useAuth();
+  const { colors } = useAppTheme();
   const staffId = currentStaff!.id;
   const matching = useStaffMatching();
   const [matchMode, setMatchMode] = useState<'A' | 'B'>(params.source === 'A' ? 'A' : 'B');
@@ -105,13 +107,13 @@ function StaffJobsContent() {
   };
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Quản lý ca làm việc</Text>
-          <View style={styles.badgeCounter}>
-            <Text style={styles.badgeCounterText}>{upcomingList.length} ca sắp tới</Text>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Quản lý ca làm việc</Text>
+          <View style={[styles.badgeCounter, { backgroundColor: colors.accentBg }]}>
+            <Text style={[styles.badgeCounterText, { color: colors.accentText }]}>{upcomingList.length} ca sắp tới</Text>
           </View>
         </View>
 

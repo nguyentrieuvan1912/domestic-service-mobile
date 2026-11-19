@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { StaffService, StaffJobItem, StaffOperationalProfile } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffScheduleNotice } from '@/components/staff/StaffScheduleReminder';
@@ -39,6 +40,7 @@ export default function StaffDashboard() {
 function StaffDashboardContent() {
   const router = useRouter();
   const { currentStaff } = useAuth();
+  const { colors } = useAppTheme();
   const { unreadCount } = useNotifications();
   const matching = useStaffMatching();
   const [matchFilter, setMatchFilter] = useState(DEFAULT_MATCH_FILTER);
@@ -74,8 +76,8 @@ function StaffDashboardContent() {
   };
 
   return (
-    <View style={styles.screen}>
-      <LinearGradient colors={['#ECFDF5', '#F8FAFC', '#FFFFFF']} style={styles.gradient}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <LinearGradient colors={colors.gradient} locations={colors.gradientLocations} style={styles.gradient}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
             <StaffScheduleNotice />
@@ -88,22 +90,22 @@ function StaffDashboardContent() {
                 <Image source={remoteImageSource(staffAvatar)} style={styles.avatar} />
                 <View>
                   <View style={styles.nameBadgeRow}>
-                    <Text style={styles.greeting}>{staffName}</Text>
-                    <View style={styles.verifiedBadge}>
-                      <Text style={styles.verifiedText}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
+                    <Text style={[styles.greeting, { color: colors.text }]}>{staffName}</Text>
+                    <View style={[styles.verifiedBadge, { backgroundColor: colors.accentBg }]}>
+                      <Text style={[styles.verifiedText, { color: colors.accentText }]}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
                     </View>
                   </View>
-                  <Text style={styles.subGreeting}>Đối tác dịch vụ gia đình</Text>
+                  <Text style={[styles.subGreeting, { color: colors.textMuted }]}>Đối tác dịch vụ gia đình</Text>
                 </View>
               </Pressable>
 
               <Pressable
-                style={styles.notificationBtn}
+                style={[styles.notificationBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 accessibilityRole="button"
                 accessibilityLabel={`Thông báo, ${unreadCount} chưa đọc`}
                 onPress={() => router.push('/notifications')}
               >
-                <IconSymbol name="bell" size={20} color={BrandColors.gray700} />
+                <IconSymbol name="bell" size={20} color={colors.textSecondary} />
                 <NotificationBadge count={unreadCount} />
               </Pressable>
             </View>

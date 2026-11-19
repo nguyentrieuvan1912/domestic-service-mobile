@@ -209,10 +209,11 @@ export const StaffRepository = {
   async setOnline(staff: string, isOnline: boolean) { const active = assertStaff(staff); const profile = await operationRequest<typeof active.profile>('identity', '/staff/status', 'PATCH', { isOnline }); if (active.token === operationSession()?.token) { active.profile = profile; notify(); await refreshAfterWrite(); } },
   async saveSchedule(staff: string, draft: AvailabilityDraft, version: number) {
     const active = assertStaff(staff);
-    const payload = { ...draft, areaIds: draft.areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id) };
+    const { areaIds, ...scheduleDraft } = draft;
+    const payload = { ...scheduleDraft, areaIds: areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id) };
     const sameSession = () => { if (active.token !== operationSession()?.token) throw new Error('Phiên đăng nhập đã thay đổi.'); };
     const saved = await saveAvailabilityWithReadback(payload, version,
-      () => operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...payload, revision: version }),
+      () => operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability', 'PUT', { ...scheduleDraft, revision: version }),
       async () => { sameSession(); const actual = await operationRequest<AvailabilitySnapshot>('booking', '/staff/me/availability'); sameSession(); return actual; });
     sameSession(); schedule = areaView(saved); scheduleLoaded = true; scheduleFailure = ''; notify(); return schedule;
   },
@@ -229,10 +230,31 @@ export const StaffRepository = {
   async reportIssue(staff: string, id: string, reason: string) { assertStaff(staff); return operationRequest('booking', '/bookings/' + id + '/incidents', 'POST', { reason }); },
   getCapabilitySnapshot: capabilitySnapshot,
   getAvailability(staff: string) { assertStaff(staff); return { slots: [], operatingDistricts: schedule.saved.areaIds, autoAccept: false, maxDistanceKm: 0, primaryDistrict: schedule.saved.areaIds[0] || '' }; },
-  updateOperatingAreas() { throw new Error('Vui lòng lưu khu vực trong màn đăng ký lịch làm.'); },
+  updateOperatingAreas() { throw new Error('Vui lòng lưu khu vực trong mục Quản lý khu vực hoạt động.'); },
   toggleShiftSlot() { throw new Error('Vui lòng lưu khoảng rảnh trong màn đăng ký lịch làm.'); },
 };
 export const StaffCapabilityRepository = { async load(value: StaffCapabilityActor, signal?: AbortSignal) { actor(value); await load(signal); return capabilitySnapshot(); } };
-export const StaffAvailabilityRepository = { async load(value: AvailabilityActor, signal?: AbortSignal) { actor(value); await loadHcmAdministrativeUnits(); await loadSchedule(signal); return schedule; }, async save(value: AvailabilityActor, draft: AvailabilityDraft, version: number, _signal?: AbortSignal) { actor(value); return StaffRepository.saveSchedule(value.staffId, draft, version); } };
+export const StaffAvailabilityRepository = {
+  async load(value: AvailabilityActor, signal?: AbortSignal) {
+    actor(value); await loadHcmAdministrativeUnits(); await loadSchedule(signal); actor(value);
+    return schedule;
+  },
+  async save(value: AvailabilityActor, draft: AvailabilityDraft, version: number) {
+    actor(value);
+    return StaffRepository.saveSchedule(value.staffId, draft, version);
+  },
+  async saveAreas(value: AvailabilityActor, areaIds: string[], revision: number) {
+    actor(value);
+    const names = areaIds.map(id => STAFF_AREA_OPTIONS.find(item => item.id === id)?.name || id);
+    const saved = areaView(await operationRequest<AvailabilitySnapshot>(
+      'booking', '/staff/me/areas', 'PUT', { areaIds: names, revision },
+    ));
+    actor(value);
+    if (saved.saved.revision >= schedule.saved.revision) {
+      schedule = saved; scheduleLoaded = true; scheduleFailure = ''; notify();
+    }
+    return schedule;
+  },
+};
 export const StaffMatchingRepository = { async refresh(value: StaffCapabilityActor, signal?: AbortSignal) { actor(value); await refreshWork(signal); }, async load(value: StaffCapabilityActor, signal?: AbortSignal) { actor(value); await load(signal); return StaffRepository.getMatchingSnapshot(value); }, read: (value: StaffCapabilityActor, _now?: number) => StaffRepository.getMatchingSnapshot(value), detail: (value: StaffCapabilityActor, id: string) => StaffRepository.getMatchingOpportunity(value, id), eligibility: (value: StaffCapabilityActor, id: string) => StaffRepository.getOpportunityEligibility(value.staffId, id), claim: (value: StaffCapabilityActor, id: string, _signal?: AbortSignal) => StaffRepository.claimOpportunity(value.staffId, id), setOnline: (value: StaffCapabilityActor, online: boolean) => StaffRepository.setOnline(value.staffId, online) };
 export function availabilityDraft(value: AvailabilitySnapshot): AvailabilityDraft { return JSON.parse(JSON.stringify({ days: value.saved.days, areaIds: value.saved.areaIds, matchNotifications: value.saved.matchNotifications })); }

@@ -32,6 +32,7 @@ import { BookingStatusBadge } from '@/components/common/BookingStatusBadge';
 import { PromotionCard } from '@/components/common/PromotionCard';
 import { HomeBlogRow } from '@/components/blog/HomeBlogRow';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
 import { SERVICE_CATEGORIES } from '@/data/services';
@@ -98,6 +99,7 @@ const HERO_BANNERS = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { colors } = useAppTheme();
   const isFocused=useIsFocused();
   const { currentCustomer } = useAuth();
   const bookingResource = useCustomerBookings(); const catalog = useBookingCatalog();
@@ -217,8 +219,8 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
+      colors={colors.gradient}
+      locations={colors.gradientLocations}
       style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView

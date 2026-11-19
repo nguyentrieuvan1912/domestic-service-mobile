@@ -6,11 +6,13 @@ import { BrandColors } from '@/constants/theme';
 import { TabImageIcon } from '@/components/common/TabImageIcon';
 import { CenterAIMascotTabButton } from '@/components/common/CenterAIMascotTabButton';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { useChatInbox } from '@/hooks/use-chat-inbox';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { currentRole } = useAuth();
+  const { colors } = useAppTheme();
   const { unreadCount } = useChatInbox();
   const isStaff = currentRole === 'STAFF';
 
@@ -33,10 +35,10 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: BrandColors.primary,
-        tabBarInactiveTintColor: BrandColors.gray500,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: BrandColors.white,
-          borderTopColor: '#F1F5F9',
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder,
           borderTopWidth: 1,
           height: tabHeight,
           paddingTop: 4,

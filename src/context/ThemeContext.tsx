@@ -1,0 +1,302 @@
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform, useColorScheme as useSystemColorScheme } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+import { BrandColors } from '@/constants/theme';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+export type BackgroundPresetId = 'mint' | 'slate' | 'ocean' | 'lavender' | 'sunset' | 'rose';
+
+export interface BackgroundPreset {
+  id: BackgroundPresetId;
+  label: string;
+  swatch: string;
+  lightBg: string;
+  lightGradient: readonly [string, string, string];
+  darkBg: string;
+  darkGradient: readonly [string, string, string];
+}
+
+export const BACKGROUND_PRESETS: readonly BackgroundPreset[] = [
+  {
+    id: 'mint',
+    label: 'Xanh ngọc',
+    swatch: '#10B981',
+    lightBg: '#F2FBF7',
+    lightGradient: ['#B8EED4', '#D8F4E8', '#EEF8F3'],
+    darkBg: '#091815',
+    darkGradient: ['#062920', '#0A1E1A', '#0F172A'],
+  },
+  {
+    id: 'slate',
+    label: 'Tinh tế',
+    swatch: '#64748B',
+    lightBg: '#F8FAFC',
+    lightGradient: ['#F1F5F9', '#F8FAFC', '#FFFFFF'],
+    darkBg: '#0F172A',
+    darkGradient: ['#0F172A', '#111827', '#0B1120'],
+  },
+  {
+    id: 'ocean',
+    label: 'Xanh biển',
+    swatch: '#0EA5E9',
+    lightBg: '#F0F7FF',
+    lightGradient: ['#CBE7FF', '#E5F2FF', '#F5FAFF'],
+    darkBg: '#0A1929',
+    darkGradient: ['#0B2440', '#0D1D33', '#0F172A'],
+  },
+  {
+    id: 'lavender',
+    label: 'Oải hương',
+    swatch: '#8B5CF6',
+    lightBg: '#F6F3FF',
+    lightGradient: ['#E2D9FF', '#EFEBFF', '#F9F7FF'],
+    darkBg: '#151126',
+    darkGradient: ['#21173D', '#17132C', '#0F172A'],
+  },
+  {
+    id: 'sunset',
+    label: 'Kem ấm',
+    swatch: '#F97316',
+    lightBg: '#FFF7F2',
+    lightGradient: ['#FFE4D1', '#FFF1E6', '#FFFBF7'],
+    darkBg: '#1D1412',
+    darkGradient: ['#2E1B14', '#1F1514', '#0F172A'],
+  },
+  {
+    id: 'rose',
+    label: 'Hồng phấn',
+    swatch: '#EC4899',
+    lightBg: '#FFF4F8',
+    lightGradient: ['#FFDCE8', '#FFEEF4', '#FFF9FB'],
+    darkBg: '#1E111A',
+    darkGradient: ['#301424', '#1F131E', '#0F172A'],
+  },
+] as const;
+
+export interface AppThemeColors {
+  isDark: boolean;
+  background: string;
+  gradient: readonly [string, string, string];
+  gradientLocations: readonly [number, number, number];
+  surface: string;
+  surfaceElevated: string;
+  surfaceMuted: string;
+  border: string;
+  divider: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  tabBarBg: string;
+  tabBarBorder: string;
+  primary: string;
+  primaryDark: string;
+  accentBg: string;
+  accentBorder: string;
+  accentText: string;
+  dangerBg: string;
+  dangerBorder: string;
+  dangerText: string;
+  warningBg: string;
+  warningBorder: string;
+  warningText: string;
+  infoBg: string;
+  infoBorder: string;
+  infoText: string;
+}
+
+interface ThemeContextValue {
+  mode: ThemeMode;
+  bgPreset: BackgroundPresetId;
+  preset: BackgroundPreset;
+  isDark: boolean;
+  colors: AppThemeColors;
+  setMode: (mode: ThemeMode) => void;
+  setBgPreset: (preset: BackgroundPresetId) => void;
+  resetAppearance: () => void;
+}
+
+const STORAGE_KEY = 'cleanmaster_appearance_v1';
+const DEFAULT_MODE: ThemeMode = 'light';
+const DEFAULT_PRESET: BackgroundPresetId = 'mint';
+
+async function readStorage(key: string): Promise<string | null> {
+  try {
+    if (Platform.OS === 'web') return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return null;
+  }
+}
+
+async function writeStorage(key: string, value: string): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+function isValidMode(value: unknown): value is ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'system';
+}
+
+function isValidPreset(value: unknown): value is BackgroundPresetId {
+  return BACKGROUND_PRESETS.some(item => item.id === value);
+}
+
+function buildColors(isDark: boolean, preset: BackgroundPreset): AppThemeColors {
+  if (isDark) {
+    return {
+      isDark: true,
+      background: preset.darkBg,
+      gradient: preset.darkGradient,
+      gradientLocations: [0, 0.45, 1],
+      surface: '#1E293B',
+      surfaceElevated: '#273449',
+      surfaceMuted: '#334155',
+      border: '#334155',
+      divider: '#293548',
+      text: '#F8FAFC',
+      textSecondary: '#CBD5E1',
+      textMuted: '#94A3B8',
+      tabBarBg: '#0F172A',
+      tabBarBorder: '#1E293B',
+      primary: BrandColors.primary,
+      primaryDark: '#059669',
+      accentBg: '#064E3B',
+      accentBorder: '#047857',
+      accentText: '#6EE7B7',
+      dangerBg: '#3F1519',
+      dangerBorder: '#7F1D1D',
+      dangerText: '#FCA5A5',
+      warningBg: '#422006',
+      warningBorder: '#92400E',
+      warningText: '#FCD34D',
+      infoBg: '#0C2A42',
+      infoBorder: '#0369A1',
+      infoText: '#7DD3FC',
+    };
+  }
+  return {
+    isDark: false,
+    background: preset.lightBg,
+    gradient: preset.lightGradient,
+    gradientLocations: [0, 0.35, 0.9],
+    surface: '#FFFFFF',
+    surfaceElevated: '#F8FAFC',
+    surfaceMuted: '#F1F5F9',
+    border: '#E2E8F0',
+    divider: '#F1F5F9',
+    text: BrandColors.gray900,
+    textSecondary: BrandColors.gray600,
+    textMuted: BrandColors.gray500,
+    tabBarBg: '#FFFFFF',
+    tabBarBorder: '#E2E8F0',
+    primary: BrandColors.primary,
+    primaryDark: '#047857',
+    accentBg: '#ECFDF5',
+    accentBorder: '#A7F3D0',
+    accentText: '#047857',
+    dangerBg: '#FEF2F2',
+    dangerBorder: '#FECACA',
+    dangerText: '#DC2626',
+    warningBg: '#FEF3C7',
+    warningBorder: '#FDE68A',
+    warningText: '#B45309',
+    infoBg: '#F0F9FF',
+    infoBorder: '#BAE6FD',
+    infoText: '#075985',
+  };
+}
+
+const defaultPreset = BACKGROUND_PRESETS[0];
+const defaultValue: ThemeContextValue = {
+  mode: DEFAULT_MODE,
+  bgPreset: DEFAULT_PRESET,
+  preset: defaultPreset,
+  isDark: false,
+  colors: buildColors(false, defaultPreset),
+  setMode: () => undefined,
+  setBgPreset: () => undefined,
+  resetAppearance: () => undefined,
+};
+
+const ThemeContext = createContext<ThemeContextValue>(defaultValue);
+
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const systemScheme = useSystemColorScheme();
+  const [mode, setModeState] = useState<ThemeMode>(DEFAULT_MODE);
+  const [bgPreset, setBgPresetState] = useState<BackgroundPresetId>(DEFAULT_PRESET);
+
+  useEffect(() => {
+    let active = true;
+    void readStorage(STORAGE_KEY).then(raw => {
+      if (!active || !raw) return;
+      try {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        if (isValidMode(parsed.mode)) setModeState(parsed.mode);
+        if (isValidPreset(parsed.bgPreset)) setBgPresetState(parsed.bgPreset);
+      } catch {
+        /* ignore invalid payload */
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const persist = useCallback((nextMode: ThemeMode, nextPreset: BackgroundPresetId) => {
+    void writeStorage(STORAGE_KEY, JSON.stringify({ mode: nextMode, bgPreset: nextPreset }));
+  }, []);
+
+  const setMode = useCallback(
+    (nextMode: ThemeMode) => {
+      setModeState(nextMode);
+      persist(nextMode, bgPreset);
+    },
+    [bgPreset, persist],
+  );
+
+  const setBgPreset = useCallback(
+    (nextPreset: BackgroundPresetId) => {
+      setBgPresetState(nextPreset);
+      persist(mode, nextPreset);
+    },
+    [mode, persist],
+  );
+
+  const resetAppearance = useCallback(() => {
+    setModeState(DEFAULT_MODE);
+    setBgPresetState(DEFAULT_PRESET);
+    persist(DEFAULT_MODE, DEFAULT_PRESET);
+  }, [persist]);
+
+  const isDark = mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
+  const preset = useMemo(
+    () => BACKGROUND_PRESETS.find(item => item.id === bgPreset) ?? defaultPreset,
+    [bgPreset],
+  );
+  const colors = useMemo(() => buildColors(isDark, preset), [isDark, preset]);
+
+  const value = useMemo<ThemeContextValue>(
+    () => ({ mode, bgPreset, preset, isDark, colors, setMode, setBgPreset, resetAppearance }),
+    [mode, bgPreset, preset, isDark, colors, setMode, setBgPreset, resetAppearance],
+  );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+};
+
+export function useAppTheme(): ThemeContextValue {
+  return useContext(ThemeContext);
+}
+
+export function themeModeLabel(mode: ThemeMode): string {
+  if (mode === 'dark') return 'Tối';
+  if (mode === 'system') return 'Theo hệ thống';
+  return 'Sáng';
+}

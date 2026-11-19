@@ -16,10 +16,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ChatRepository } from '@/data/connectedChatRepository';
 import { CHAT_TIME_ZONE } from '@/data/chatPolicy';
 import { useChatInbox } from '@/hooks/use-chat-inbox';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function ChatListScreen() {
   'use no memo'; // Repository access checks must follow each subscribed snapshot.
   const router = useRouter();
+  const { colors } = useAppTheme();
   const { actor, conversations: inbox, error, isLoaded } = useChatInbox();
   const conversations = inbox.filter((conversation) =>
     ChatRepository.access(conversation.id, actor, inbox).kind === 'READY' && !conversation.trashedAt && (actor?.role !== 'CUSTOMER' || !conversation.customerTrashedAt));
@@ -27,15 +29,15 @@ export default function ChatListScreen() {
 
   return (
     <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
+      colors={colors.gradient}
+      locations={colors.gradientLocations}
       style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tin nhắn & Tư vấn</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Tin nhắn & Tư vấn</Text>
           {actor && <Pressable accessibilityRole="button" accessibilityLabel={`Thùng rác tin nhắn, ${trashCount} hội thoại`} onPress={() => router.push('/chat/trash')} style={styles.trashButton}>
-            <IconSymbol name="trash" size={22} color={BrandColors.gray700} />
+            <IconSymbol name="trash" size={22} color={colors.textSecondary} />
             {trashCount > 0 && <Text style={styles.trashCount}>{trashCount > 99 ? '99+' : trashCount}</Text>}
           </Pressable>}
         </View>

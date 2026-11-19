@@ -96,6 +96,7 @@ react.useSyncExternalStore=(_subscribe,snapshot)=>snapshot();
 const staffLoads=[];const staffActor={userId:'97',staffId:'97'};
 const beforeStaffLoader=Module._load;
 Module._load=function(name,...args){
+ if(name==='@/hooks/use-staff-actor')return require('../src/hooks/use-staff-actor.ts');
  if(name==='@/data/staffCapabilityAdapter')return{getCapabilityActor:()=>staffActor};
  if(name==='@/data/connectedStaffRepository')return{StaffRepository:{subscribe:()=>()=>{},getStoreRevision:()=>0},StaffMatchingRepository:{load:()=>new Promise((resolve,reject)=>staffLoads.push({resolve,reject})),refresh:async()=>{},read:()=>({items:[]})}};
  return beforeStaffLoader.call(this,name,...args);

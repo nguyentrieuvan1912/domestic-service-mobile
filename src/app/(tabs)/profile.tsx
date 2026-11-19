@@ -17,14 +17,18 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { AppearanceModal } from '@/components/common/AppearanceModal';
 import { useAuth } from '@/context/AuthContext';
+import { themeModeLabel, useAppTheme } from '@/context/ThemeContext';
 import { Redirect, useFocusEffect } from 'expo-router';
 import { operationRequest } from '@/api/operations';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { currentCustomer, accessToken, logout, isLoading, refreshProfile } = useAuth();
+  const { colors, mode, preset } = useAppTheme();
   const [profileError, setProfileError] = useState('');
+  const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const [statistics, setStatistics] = useState<{ owner: string; count: number | null; error: string }>({ owner: '', count: null, error: '' });
   const [statisticsAttempt, setStatisticsAttempt] = useState(0);
   useFocusEffect(useCallback(() => {
@@ -67,13 +71,13 @@ export default function ProfileScreen() {
 
   return (
     <LinearGradient
-      colors={BrandColors.softBgGradient}
-      locations={BrandColors.softBgGradientLocations}
+      colors={colors.gradient}
+      locations={colors.gradientLocations}
       style={styles.gradientContainer}>
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tài khoản</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Tài khoản</Text>
         </View>
 
       <ScrollView
@@ -83,33 +87,33 @@ export default function ProfileScreen() {
         {profileError ? <Text style={{ color: BrandColors.danger, marginBottom: 12 }}>{profileError}</Text> : null}
         {/* Customer Profile Card */}
         <Pressable
-          style={styles.userCard}
+          style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           onPress={() => router.push('/account/personal-info')}>
           <AvatarEditor style={styles.avatar} />
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.userName}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
+              <Text style={[styles.userName, { color: colors.text }]}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
               <Badge label="Khách hàng" variant="primary" size="sm" />
             </View>
-            <Text style={styles.userPhone}>📱 {currentCustomer?.phone || 'Chưa đăng nhập'}</Text>
-            <Text style={styles.userEmail}>✉️ {currentCustomer?.email || 'Chưa đăng nhập'}</Text>
+            <Text style={[styles.userPhone, { color: colors.textSecondary }]}>📱 {currentCustomer?.phone || 'Chưa đăng nhập'}</Text>
+            <Text style={[styles.userEmail, { color: colors.textMuted }]}>✉️ {currentCustomer?.email || 'Chưa đăng nhập'}</Text>
           </View>
         </Pressable>
 
         {/* Quick Stats Grid */}
         <View style={styles.statsGrid}>
           <Pressable
-            style={styles.statBox}
+            style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/bookings')}>
             <Text style={styles.statNum}>{statistics.owner === currentCustomer.id && statistics.count !== null ? statistics.count : statistics.error ? '—' : '…'}</Text>
-            <Text style={styles.statLabel}>Đơn hoàn tất</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Đơn hoàn tất</Text>
           </Pressable>
 
           <Pressable
-            style={styles.statBox}
+            style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/account/addresses')}>
             <Text style={styles.statNum}>{currentCustomer.savedAddressCount ?? 0}</Text>
-            <Text style={styles.statLabel}>Địa chỉ lưu</Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Địa chỉ lưu</Text>
           </Pressable>
         </View>
 
@@ -120,103 +124,122 @@ export default function ProfileScreen() {
         )}
 
         {/* SECTION 1: QUẢN LÝ DỊCH VỤ & TIỆN ÍCH */}
-        <View style={styles.menuGroup}>
-          <Text style={styles.groupTitle}>Quản lý dịch vụ & cá nhân</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.groupTitle, { color: colors.textMuted }]}>Quản lý dịch vụ & cá nhân</Text>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
             onPress={() => router.push('/account/addresses')}>
             <View style={styles.menuLeft}>
               <IconSymbol name="📍" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Sổ địa chỉ</Text>
-                <Text numberOfLines={1} style={styles.menuSub}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Sổ địa chỉ</Text>
+                <Text numberOfLines={1} style={[styles.menuSub, { color: colors.textMuted }]}>
                   {currentCustomer.defaultAddressLabel || 'Thêm địa chỉ phục vụ'}
                 </Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
             onPress={() => router.push('/(tabs)/bookings')}>
             <View style={styles.menuLeft}>
               <IconSymbol name="📋" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Lịch sử đơn dịch vụ</Text>
-                <Text style={styles.menuSub}>Theo dõi tiến trình & hóa đơn</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Lịch sử đơn dịch vụ</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>Theo dõi tiến trình & hóa đơn</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
             onPress={() => router.push('/notifications' as any)}>
             <View style={styles.menuLeft}>
               <IconSymbol name="🔔" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Thông báo của tôi</Text>
-                <Text style={styles.menuSub}>Cập nhật đơn và khuyến mãi</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Thông báo của tôi</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>Cập nhật đơn và khuyến mãi</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            style={[styles.menuItem, { borderBottomWidth: 0 }]}
+            accessibilityRole="button"
+            onPress={() => setShowAppearanceModal(true)}>
+            <View style={styles.menuLeft}>
+              <IconSymbol name="sparkle" size={20} color={preset.swatch} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Giao diện & Màu nền</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>
+                  {themeModeLabel(mode)} • {preset.label}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.appearancePreviewRight}>
+              <View style={[styles.appearanceSwatchDot, { backgroundColor: preset.swatch, borderColor: colors.border }]} />
+              <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
+            </View>
           </Pressable>
         </View>
 
         {/* SECTION 2: THANH TOÁN & ƯU ĐÃI */}
-        <View style={styles.menuGroup}>
-          <Text style={styles.groupTitle}>Tài chính & Khuyến mãi</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.groupTitle, { color: colors.textMuted }]}>Tài chính & Khuyến mãi</Text>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
             onPress={() =>
               router.push('/account/wallet')
             }>
             <View style={styles.menuLeft}>
               <IconSymbol name="💳" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Ví của tôi</Text>
-                <Text style={styles.menuSub}>Số dư, nạp tiền và lịch sử giao dịch</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Ví của tôi</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>Số dư, nạp tiền và lịch sử giao dịch</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomWidth: 0 }]}
             onPress={() => router.push('/(tabs)/services')}>
             <View style={styles.menuLeft}>
               <IconSymbol name="🎟️" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Kho voucher ưu đãi</Text>
-                <Text style={styles.menuSub}>FLASH50K, SUMMER20 đang sẵn có</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Kho voucher ưu đãi</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>FLASH50K, SUMMER20 đang sẵn có</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
         </View>
 
         {/* SECTION 3: HỖ TRỢ & ĐIỀU KHOẢN */}
-        <View style={styles.menuGroup}>
-          <Text style={styles.groupTitle}>Hỗ trợ & Thông tin chính sách</Text>
+        <View style={[styles.menuGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.groupTitle, { color: colors.textMuted }]}>Hỗ trợ & Thông tin chính sách</Text>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
             onPress={() => router.push('/ai')}>
             <View style={styles.menuLeft}>
               <IconSymbol name="🤖" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Trợ lý AI CleanMaster 24/7</Text>
-                <Text style={styles.menuSub}>Giải đáp tức thì mọi thắc mắc</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Trợ lý AI CleanMaster 24/7</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>Giải đáp tức thì mọi thắc mắc</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
             onPress={() =>
               Alert.alert(
                 'Tổng đài hỗ trợ CleanMaster',
@@ -226,15 +249,15 @@ export default function ProfileScreen() {
             <View style={styles.menuLeft}>
               <IconSymbol name="📞" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Trung tâm hỗ trợ khách hàng</Text>
-                <Text style={styles.menuSub}>Hotline: 1900 6868 (8:00 - 21:00)</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Trung tâm hỗ trợ khách hàng</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>Hotline: 1900 6868 (8:00 - 21:00)</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
 
           <Pressable
-            style={styles.menuItem}
+            style={[styles.menuItem, { borderBottomWidth: 0 }]}
             onPress={() =>
               Alert.alert(
                 'Điều khoản sử dụng & Bảo mật',
@@ -244,25 +267,31 @@ export default function ProfileScreen() {
             <View style={styles.menuLeft}>
               <IconSymbol name="📄" style={styles.menuIcon} />
               <View>
-                <Text style={styles.menuLabel}>Điều khoản & Chính sách bảo mật</Text>
-                <Text style={styles.menuSub}>Bảo hiểm hư hại, quyền riêng tư</Text>
+                <Text style={[styles.menuLabel, { color: colors.text }]}>Điều khoản & Chính sách bảo mật</Text>
+                <Text style={[styles.menuSub, { color: colors.textMuted }]}>Bảo hiểm hư hại, quyền riêng tư</Text>
               </View>
             </View>
-            <IconSymbol name="chevronRight" size={16} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
         </View>
 
         {/* LOGOUT BUTTON */}
         <Pressable
-          style={styles.logoutBtn}
+          style={[styles.logoutBtn, { backgroundColor: colors.dangerBg }]}
           onPress={() => setShowLogoutModal(true)}>
-          <Text style={styles.logoutBtnText}>Đăng xuất tài khoản</Text>
+          <Text style={[styles.logoutBtnText, { color: colors.dangerText }]}>Đăng xuất tài khoản</Text>
         </Pressable>
 
-        <Text style={styles.versionText}>CleanMaster v1.0.0 • Nền tảng Đa Dịch Vụ Gia Đình</Text>
+        <Text style={[styles.versionText, { color: colors.textMuted }]}>CleanMaster v1.0.0 • Nền tảng Đa Dịch Vụ Gia Đình</Text>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Appearance modal */}
+        <AppearanceModal
+          visible={showAppearanceModal}
+          onClose={() => setShowAppearanceModal(false)}
+        />
 
       {/* Logout confirmation modal */}
         <ConfirmModal
@@ -404,6 +433,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: BrandColors.gray400,
     marginTop: 2,
+  },
+  appearancePreviewRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  appearanceSwatchDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
   },
   logoutBtn: {
     backgroundColor: '#FEE2E2',

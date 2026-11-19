@@ -21,6 +21,10 @@ assert.deepEqual(w.setDaySlots(day,[],Date.parse('2026-10-16T09:00:00+07:00')),d
 assert.deepEqual(w.intervalsFromSlots(day.date,['08:00','08:30','10:00']),[r.intervalFor(day.date,'08:00','09:00'),r.intervalFor(day.date,'10:00','10:30')]);
 assert.equal(day.intervals[0].endsAt,r.intervalFor(day.date,'08:00','12:00').endsAt,'Draft edits do not mutate the original');
 const future={date:'2026-10-16',intervals:[]};
+assert.deepEqual(w.setDaySlots(future,w.hourSlots('08:30'),now).intervals,[r.intervalFor(future.date,'08:30','09:30')]);
+assert.deepEqual(w.setDaySlots(future,w.hourSlots('19:00'),now).intervals,[r.intervalFor(future.date,'19:00','20:00')]);
+assert.deepEqual(w.hourSlots('19:30'),[]);
+assert.deepEqual(w.setDaySlots(future,['08:30'],now).intervals,[]);
 const morning=w.toggleShift(future,'08:00','12:00',now);
 const two=w.toggleShift(morning,'12:00','17:00',now);
 const three=w.toggleShift(two,'17:00','20:00',now);

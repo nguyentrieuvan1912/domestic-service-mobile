@@ -25,6 +25,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffWalletTransaction } from '@/data/staffService';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function StaffWalletScreen() {
   const { currentStaff } = useAuth(); const router = useRouter();
@@ -34,6 +35,7 @@ export default function StaffWalletScreen() {
 function StaffWalletContent() {
   const router = useRouter();
   const { currentStaff } = useAuth();
+  const { colors } = useAppTheme();
   const staffId = currentStaff?.id || '';
 
   const [wallet, setWallet] = useState(() => StaffService.getWallet(staffId));
@@ -114,14 +116,14 @@ function StaffWalletContent() {
 
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StaffConnectionStatus />
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Ví & Thu nhập</Text>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Ví & Thu nhập</Text>
           <Pressable
-            style={styles.helpBtn}
+            style={[styles.helpBtn, { backgroundColor: colors.surfaceMuted }]}
             onPress={() =>
               Alert.alert(
                 'Quy định đối soát & rút tiền',
@@ -129,7 +131,7 @@ function StaffWalletContent() {
               )
             }
           >
-            <IconSymbol name="info" size={18} color={BrandColors.gray600} />
+            <IconSymbol name="info" size={18} color={colors.textSecondary} />
           </Pressable>
         </View>
 

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandColors } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export type StaffTabKey = 'home' | 'jobs' | 'community' | 'wallet' | 'profile';
 
@@ -22,6 +23,7 @@ const TABS: { key: StaffTabKey; label: string; icon: string; route: string }[] =
 export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
 
   const tabBottomPadding = Platform.select({
     ios: Math.min(insets.bottom, 16),
@@ -35,7 +37,16 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => 
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: tabBottomPadding }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: tabBottomPadding,
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder,
+        },
+      ]}
+    >
       <View style={styles.tabBar}>
         {TABS.map((tab) => {
           const isActive = tab.key === activeTab;
@@ -44,16 +55,27 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => 
               key={tab.key}
               onPress={() => handleTabPress(tab)}
               style={styles.tabItem}
-              android_ripple={{ color: '#E2E8F0', borderless: true }}
+              android_ripple={{ color: colors.border, borderless: true }}
             >
-              <View style={[styles.iconWrapper, isActive && styles.iconWrapperActive]}>
+              <View
+                style={[
+                  styles.iconWrapper,
+                  isActive && { backgroundColor: colors.accentBg },
+                ]}
+              >
                 <IconSymbol
                   name={tab.icon}
                   size={20}
-                  color={isActive ? '#047857' : BrandColors.gray400}
+                  color={isActive ? colors.accentText : colors.textMuted}
                 />
               </View>
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  { color: colors.textMuted },
+                  isActive && [styles.tabLabelActive, { color: colors.accentText }],
+                ]}
+              >
                 {tab.label}
               </Text>
             </Pressable>

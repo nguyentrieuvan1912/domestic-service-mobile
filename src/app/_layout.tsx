@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { ThemeProvider, useAppTheme } from '@/context/ThemeContext';
 import { StaffScheduleReminder } from '@/components/staff/StaffScheduleReminder';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -14,11 +15,21 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 export default function RootLayout() {
-  return <SafeAreaProvider><AuthProvider><AuthStack /><SystemAlertHost /></AuthProvider></SafeAreaProvider>;
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AuthStack />
+          <SystemAlertHost />
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
 }
 
 function AuthStack() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { isDark, colors } = useAppTheme();
   useEffect(() => {
     if (!isLoading) SplashScreen.hideAsync().catch(() => {
       /* ignore */
@@ -29,8 +40,8 @@ function AuthStack() {
 
   return (
     <>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="auth/login" options={{ headerShown: false }} />
           <Stack.Screen name="auth/register" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -42,6 +53,7 @@ function AuthStack() {
           <Stack.Screen name="staff/job-detail" options={{ headerShown: false }} />
           <Stack.Screen name="staff/wallet" options={{ headerShown: false }} />
           <Stack.Screen name="staff/availability" options={{ headerShown: false }} />
+          <Stack.Screen name="staff/areas" options={{ headerShown: false }} />
           <Stack.Screen name="staff/community" options={{ headerShown: false }} />
           <Stack.Screen name="staff/profile" options={{ headerShown: false }} />
           <Stack.Screen name="staff/account-details" options={{ headerShown: false }} />
