@@ -5,6 +5,7 @@ import Animated, { scrollTo, useAnimatedRef, useAnimatedScrollHandler, useFrameC
 import { blogCategories, listPublishedBlog, type BlogSummary } from '@/api/blog';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { BlogCover } from './BlogContent';
 
 const CARD_GAP = 12;
@@ -13,6 +14,7 @@ const RESUME_DELAY = 2500;
 const PIXEL_RATIO = PixelRatio.get();
 
 export function HomeBlogRow({ visible, onLayout }: { visible: boolean; onLayout: (event: LayoutChangeEvent) => void }) {
+  const { colors } = useAppTheme();
   const [articles, setArticles] = useState<BlogSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -45,13 +47,13 @@ export function HomeBlogRow({ visible, onLayout }: { visible: boolean; onLayout:
     <View style={styles.section} onLayout={onLayout}>
       <View style={styles.header}>
         <View style={styles.heading}>
-          <Text accessibilityRole="header" style={styles.title}>Blog CleanMaster</Text>
-          <Text style={styles.subtitle}>Mẹo chăm nhà và kiến thức gia đình</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Blog CleanMaster</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Mẹo chăm nhà và kiến thức gia đình</Text>
         </View>
         {(articles?.length ?? 0) > 1 && (
           <View style={styles.hint}>
-            <Text style={styles.hintText}>Vuốt xem</Text>
-            <IconSymbol name="chevronRight" size={14} color="#047857" />
+            <Text style={[styles.hintText, { color: colors.accentText }]}>Vuốt xem</Text>
+            <IconSymbol name="chevronRight" size={14} color={colors.accentText} />
           </View>
         )}
       </View>
@@ -60,19 +62,20 @@ export function HomeBlogRow({ visible, onLayout }: { visible: boolean; onLayout:
       )}
       {failed ? (
         <Pressable accessibilityRole="button" style={styles.notice} onPress={() => setAttempt(value => value + 1)}>
-          <Text style={styles.subtitle}>Chưa tải được blog.</Text>
-          <Text style={styles.readText}>Thử lại</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Chưa tải được blog.</Text>
+          <Text style={[styles.readText, { color: colors.accentText }]}>Thử lại</Text>
         </Pressable>
       ) : !articles ? (
-        <ActivityIndicator accessibilityLabel="Đang tải blog" style={styles.notice} color={BrandColors.primaryDark} />
+        <ActivityIndicator accessibilityLabel="Đang tải blog" style={styles.notice} color={colors.primary} />
       ) : articles.length === 0 ? (
-        <Text style={[styles.notice, styles.subtitle]}>Chưa có bài viết được xuất bản.</Text>
+        <Text style={[styles.notice, styles.subtitle, { color: colors.textSecondary }]}>Chưa có bài viết được xuất bản.</Text>
       ) : null}
     </View>
   );
 }
 
 function BlogCarousel({ articles, visible }: { articles: BlogSummary[]; visible: boolean }) {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const focused = useIsFocused();
   const reduceMotion = useReducedMotion();
@@ -170,15 +173,15 @@ function BlogCarousel({ articles, visible }: { articles: BlogSummary[]; visible:
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Đọc bài viết ${item.title}`}
-            style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.card, { width: cardWidth, backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.pressed]}
             onPress={() => router.push({ pathname: '/blog/[slug]', params: { slug: item.slug } })}>
             <BlogCover url={item.coverUrl} style={styles.cover} />
             <View style={styles.body}>
-              <Text numberOfLines={1} style={styles.category}>{blogCategories[item.category]}</Text>
-              <Text numberOfLines={2} style={styles.cardTitle}>{item.title}</Text>
+              <Text numberOfLines={1} style={[styles.category, { color: colors.accentText }]}>{blogCategories[item.category]}</Text>
+              <Text numberOfLines={2} style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
               <View style={styles.readRow}>
-                <Text style={styles.readText}>Đọc bài viết</Text>
-                <IconSymbol name="chevronRight" size={14} color="#047857" />
+                <Text style={[styles.readText, { color: colors.accentText }]}>Đọc bài viết</Text>
+                <IconSymbol name="chevronRight" size={14} color={colors.accentText} />
               </View>
             </View>
           </Pressable>

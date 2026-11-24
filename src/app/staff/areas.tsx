@@ -13,6 +13,7 @@ import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { administrativeSearchKey, type AdministrativeUnit } from '@/api/administrative-units';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { AnimatedNoticeBanner, CleanMasterLoader, ShimmerSkeleton } from '@/components/common/CleanMasterAnimations';
 import { BrandColors } from '@/constants/theme';
 import { useAppTheme } from '@/context/ThemeContext';
 import { StaffAvailabilityRepository } from '@/data/connectedStaffRepository';
@@ -181,9 +182,9 @@ function AreaEditor({ actor }: { actor: AvailabilityActor }) {
       </View>
 
       {loading ? (
-        <View style={s.centerState}>
-          <ActivityIndicator size="large" color="#047857" />
-          <Text style={s.centerStateText}>Đang tải khu vực hoạt động…</Text>
+        <View style={{ flex: 1 }}>
+          <CleanMasterLoader label="Đang tải khu vực hoạt động…" sublabel="Đang đồng bộ danh mục hành chính TP.HCM" />
+          <ShimmerSkeleton count={3} />
         </View>
       ) : !saved ? (
         <View style={s.content}>
@@ -405,14 +406,7 @@ function AreaEditor({ actor }: { actor: AvailabilityActor }) {
                 </Text>
               </View>
             )}
-            {!!notice && (
-              <View style={[s.alertSuccess, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]}>
-                <IconSymbol name="check" size={16} color={colors.accentText} />
-                <Text accessibilityLiveRegion="polite" style={[s.alertSuccessText, { color: colors.accentText }]}>
-                  {notice}
-                </Text>
-              </View>
-            )}
+            {!!notice && <AnimatedNoticeBanner message={notice} />}
 
             {/* Current / Selected Areas Card */}
             <View style={[s.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

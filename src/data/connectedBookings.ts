@@ -3,18 +3,40 @@ import { publishBookingCancellationNotice } from './bookingCancellationNotice';
 import type { Booking } from '@/types/booking';
 import type { Service } from '@/types/service';
 import type { Staff, CustomerAddress } from '@/types/user';
+import { reuseSnapshot } from '@/utils/stable-snapshot';
 export interface ConnectedBooking extends Booking { serverNow?: string; staffResponseDeadline?: string; staffWaitState?: 'WAITING' | 'EXPIRED' | 'CLOSED'; staffWaitRound?: number; staff?: Record<string,unknown>; service: { image?: string; name?: string; serviceName?: string; packageName?: string; answers?: Record<string, unknown>; answerLabels?: Record<string,string>; configuration?: Record<string,unknown>; configurationLabels?: Record<string,string>; quantity?: number }; address: CustomerAddress; assignments: { staffId: string; status: string; executionStatus: string; staffSnapshot?: Record<string,unknown> }[]; startsAt: string; endsAt: string; paymentStatus: string; paymentMethod: string }
-let items: ConnectedBooking[] = [], owner = '', readEpoch = 0;
+let items: ConnectedBooking[] = [], owner = '', readEpoch = 0, loaded = false;
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach(listener => { try { listener(); } catch { /* A login change can unmount a subscriber. */ } }); }
-subscribeSession(() => { const next = operationSession()?.profile.role === 'CUSTOMER' ? operationSession()!.userId : ''; if (owner !== next) { owner = next; readEpoch++; items = []; notify(); } });
+subscribeSession(() => {
+  const session = operationSession();
+  const next = session?.profile.role === 'CUSTOMER' ? session.token : '';
+  if (owner === next) return;
+  owner = next;
+  readEpoch++;
+  loaded = false;
+  items = [];
+  notify();
+});
 export const bookingView = (raw: Record<string, unknown>): ConnectedBooking => ({ ...raw, id: String(raw.id), customerId: String(raw.customerId), serviceId: String(raw.serviceId), packageId: String(raw.packageId || ''), addressId: String(raw.addressId), staffId: raw.staffId == null ? undefined : String(raw.staffId), addOns: (raw.addOns as Booking['addOns']).map(item => ({ ...item, addOnId: String(item.addOnId) })), assignments: (raw.assignments as ConnectedBooking['assignments']).map(item => ({ ...item, staffId: String(item.staffId) })) } as ConnectedBooking);
 function customerSession() { const active=operationSession();if(!active || active.profile.role!=='CUSTOMER')throw new Error('Vui lòng đăng nhập tài khoản khách hàng.');return active; }
 export const CustomerBookings = {
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   list: () => items,
   get: (id: string) => items.find(item => item.id === id),
-  async load() { const session = operationSession(); if (!session || session.profile.role !== 'CUSTOMER') { items = []; notify(); return; } const epoch = readEpoch; const data = await operationRequest<Record<string, unknown>[]>('booking', '/bookings'); if (session.token === operationSession()?.token && epoch === readEpoch) { items = data.map(bookingView); notify(); } },
+  getLoaded: () => loaded,
+  async load(signal?: AbortSignal) {
+    const session = operationSession();
+    if (!session || session.profile.role !== 'CUSTOMER') return;
+    const epoch = readEpoch;
+    const data = await operationRequest<Record<string, unknown>[]>('booking', '/bookings', 'GET', undefined, signal);
+    if (signal?.aborted || session.token !== operationSession()?.token || epoch !== readEpoch) return;
+    const next = reuseSnapshot(items, data.map(bookingView));
+    if (loaded && next === items) return;
+    items = next;
+    loaded = true;
+    notify();
+  },
   async detail(id: string, signal?: AbortSignal) { customerSession(); const epoch = readEpoch; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id, 'GET', undefined, signal)); if(epoch === readEpoch) { items = [item, ...items.filter(b => b.id !== id)]; notify(); } return item; },
   async staffResponse(id: string, action: 'EXTEND' | 'CANCEL' | 'STOP', round: number) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/staff-response', 'POST', { action, round })); readEpoch++; items = [item, ...items.filter(b => b.id !== id)]; notify(); if(action !== 'EXTEND') publishBookingCancellationNotice(item); return item; },
   async cancel(id: string, reason: string) { customerSession(); readEpoch++; const item = bookingView(await operationRequest<Record<string, unknown>>('booking', '/bookings/' + id + '/cancel', 'POST', { reason })); readEpoch++; items = items.map(b => b.id === id ? item : b); notify(); publishBookingCancellationNotice(item); return item; },

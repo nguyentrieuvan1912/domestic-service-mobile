@@ -3,6 +3,7 @@ import { BookingPromotions } from '@/components/booking/BookingPromotions';
 import { WalletBalancePreview } from '@/components/booking/WalletBalancePreview';
 import { AppBackground } from '@/components/common/AppBackground';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CelebrationOverlay, CleanMasterLoader } from '@/components/common/CleanMasterAnimations';
 import { serviceAnswersIssue } from '@/utils/service-requirements';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -45,7 +46,7 @@ export default function QuickRebookScreen() {
   const data = resource.key === key ? resource : undefined;
   if (!data?.booking || !data.detail) return <SafeAreaView style={s.screen}>
     <View style={s.header}><Text style={s.heading}>Đặt lại nhanh</Text><BookingExitButton /></View>
-    <View style={s.center}>{data?.error ? <><Text style={s.error}>{data.error}</Text><Pressable onPress={() => setAttempt(value => value + 1)}><Text style={s.link}>Thử lại</Text></Pressable></> : <ActivityIndicator color="#00875F" />}</View>
+    <View style={s.center}>{data?.error ? <><Text style={s.error}>{data.error}</Text><Pressable onPress={() => setAttempt(value => value + 1)}><Text style={s.link}>Thử lại</Text></Pressable></> : <CleanMasterLoader label="Đang chuẩn bị đơn đặt lại…" sublabel="Đang kiểm tra giá & nhân viên phù hợp" />}</View>
   </SafeAreaView>;
   return <RebookContent key={key} source={data.booking} detail={data.detail} replaceStaff={replaceStaff === '1' || ['NO_STAFF_FOUND', 'REJECTED'].includes(data.booking.status)} />;
 }
@@ -157,6 +158,7 @@ function RebookContent({ source, detail, replaceStaff }: { source: ConnectedBook
   const presetTimes = duration ? rebookTimes(duration, form.now) : [];
   const dates = rebookDates(form.now);
   const [customDate, setCustomDate] = useState('');
+  const [celebration, setCelebration] = useState<{ code: string; nextRoute: () => void } | null>(null);
   const activeDate = dates.includes(customDate) ? customDate : dates[0];
   const pack = detail.packages.find(item => String(item.id) === form.packageId);
   const related = (source.service as Record<string, unknown>).relatedServices;
@@ -168,9 +170,12 @@ function RebookContent({ source, detail, replaceStaff }: { source: ConnectedBook
       const saved = bookingView(raw);
       void CustomerBookings.load().catch(() => {});
       const params = { id: saved.id };
-      if (bookingRequiresPayment(saved.status)) router.replace({ pathname: '/booking/payment', params });
-      else if (saved.mode === 'MODE_A') router.replace({ pathname: '/booking/waiting', params });
-      else router.replace({ pathname: '/booking/[id]', params });
+      const nextRoute = () => {
+        if (bookingRequiresPayment(saved.status)) router.replace({ pathname: '/booking/payment', params });
+        else if (saved.mode === 'MODE_A') router.replace({ pathname: '/booking/waiting', params });
+        else router.replace({ pathname: '/booking/[id]', params });
+      };
+      setCelebration({ code: saved.bookingCode, nextRoute });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Chưa đặt lại được dịch vụ.';
       setError(message);
@@ -301,6 +306,20 @@ function RebookContent({ source, detail, replaceStaff }: { source: ConnectedBook
       {!!error && <Text style={s.error}>{error}</Text>}
     </ScrollView>
     <View style={s.footer}><Pressable accessibilityRole="button" disabled={saving || !form.ready} onPress={() => void confirm()} style={[s.primary, (saving || !form.ready) && s.disabled]}><Text style={s.white}>{saving ? 'Đang lưu lịch…' : `Xác nhận đặt lại${form.quote ? ' • ' + formatVND(form.quote.totalAmount) : ''}`}</Text></Pressable></View>
+    <CelebrationOverlay
+      visible={!!celebration}
+      variant="booking"
+      title="Đặt lại dịch vụ thành công!"
+      subtitle="Lịch hẹn mới của bạn đã được tạo và sẵn sàng kết nối nhân viên."
+      badgeText={celebration ? `Mã đơn: ${celebration.code}` : undefined}
+      autoDismissMs={1700}
+      actionLabel="Tiếp tục"
+      onDone={() => {
+        const go = celebration?.nextRoute;
+        setCelebration(null);
+        go?.();
+      }}
+    />
     <Modal visible={customOpen} animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setCustomOpen(false)}>
       <AppBackground gradient={colors.backgroundGradient}><SafeAreaView style={s.screen}>
         <View style={s.header}><Text style={s.heading}>Chọn thời gian khác</Text>

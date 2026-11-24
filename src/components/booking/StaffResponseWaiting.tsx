@@ -4,6 +4,7 @@ import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CleanMasterLoader, RadarPulseAura } from '@/components/common/CleanMasterAnimations';
 import { ConnectedBooking, CustomerBookings } from '@/data/connectedBookings';
 import { remoteImageSource } from '@/utils/image-source';
 import { needsStaffResponse, responseClock, responseSeconds } from '@/utils/staff-response';
@@ -49,8 +50,10 @@ export function StaffResponseWaiting({ bookingId }: { bookingId: string }) {
   return <View style={{ flex: 1 }}>
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content}>
-        {!booking ? <ActivityIndicator color={BrandColors.primary} size="large" /> : <>
-          <View style={styles.aura}><Image source={remoteImageSource(String(booking.staff?.avatar || '/api/v1/identity/staff-avatar.png'))} style={styles.avatar} /></View>
+        {!booking ? <CleanMasterLoader label="Đang tải trạng thái đơn…" sublabel="Vui lòng chờ trong giây lát" /> : <>
+          <RadarPulseAura active={waiting} size={138}>
+            <View style={styles.aura}><Image source={remoteImageSource(String(booking.staff?.avatar || '/api/v1/identity/staff-avatar.png'))} style={styles.avatar} /></View>
+          </RadarPulseAura>
           <Text style={styles.title}>{accepted ? `${name} đã nhận đơn!` : expired ? `${name} chưa nhận đơn` : waiting ? `Đang chờ ${name} xác nhận...` : 'Đơn đã kết thúc'}</Text>
           <Text style={styles.subtitle}>{accepted ? 'Bạn có thể xem chi tiết và theo dõi ca làm việc.' : waiting ? 'Yêu cầu đã được gửi trực tiếp đến nhân viên. Mỗi lượt chờ tối đa 5 phút.' : booking.cancellationReason || 'Vui lòng xem lại chi tiết đơn hàng.'}</Text>
           {waiting && <View style={styles.badge}><IconSymbol name="clock" size={18} color={BrandColors.primary} /><Text style={styles.badgeText}>{expired ? 'Đã hết thời gian nhận đơn' : seconds > 0 ? `Thời gian chờ còn lại: ${responseClock(seconds)}` : 'Đang kiểm tra phản hồi của nhân viên...'}</Text></View>}

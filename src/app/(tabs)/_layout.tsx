@@ -1,35 +1,16 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { BottomTabLabel, FloatingTabSurface, TabImageIcon, useBottomTabSpacing } from '@/components/common/TabImageIcon';
+import { TabImageIcon, useFloatingTabOptions } from '@/components/common/TabImageIcon';
 import { useChatInbox } from '@/hooks/use-chat-inbox';
 
 export default function TabLayout() {
-  const spacing = useBottomTabSpacing();
+  const screenOptions = useFloatingTabOptions();
   const { unreadCount } = useChatInbox();
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: 'transparent' },
-        tabBarLabelPosition: 'below-icon',
-        tabBarHideOnKeyboard: true,
-        tabBarAllowFontScaling: true,
-        tabBarLabel: ({ children, focused }) => <BottomTabLabel label={children} focused={focused} />,
-        tabBarIconStyle: { width: 42, height: 28 },
-        tabBarBackground: () => <FloatingTabSurface inset={spacing.paddingHorizontal} bottom={spacing.paddingBottom} />,
-        tabBarStyle: {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'transparent',
-          borderTopWidth: 0,
-          ...spacing,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
-      }}>
+      detachInactiveScreens={false}
+      screenOptions={screenOptions}>
       {/* 1. Trang chủ */}
       <Tabs.Screen
         name="index"

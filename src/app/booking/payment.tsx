@@ -8,6 +8,7 @@ import { operationRequest, operationSession } from '@/api/operations';
 import { CustomerBookings, ConnectedBooking } from '@/data/connectedBookings';
 import { PaymentQr } from '@/components/staff/PaymentQr';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CelebrationOverlay, CleanMasterLoader } from '@/components/common/CleanMasterAnimations';
 import { BrandColors } from '@/constants/theme';
 import { needsBookingQr, prepareBookingQr, type BookingQrIntent as Topup } from '@/utils/booking-payment-intent';
 const money = (n: number) => n.toLocaleString('vi-VN') + 'đ';
@@ -29,12 +30,19 @@ function CustomerPayment() {
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [balance, setBalance] = useState<number | null>(null), [now, setNow] = useState(Date.now());
   const [balanceVisible, setBalanceVisible] = useState(false);
   const [showMethods, setShowMethods] = useState(false);
+  const [paidCelebration, setPaidCelebration] = useState<{ booking: ConnectedBooking } | null>(null);
   const lock = useRef(false), actionVersion = useRef(0), mounted = useRef(true), owner = operationSession()?.token;
   const current = useCallback(() => mounted.current && owner === operationSession()?.token, [owner]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const route = useCallback((b: ConnectedBooking) => {
-    if (b.status !== 'AWAITING_PAYMENT') router.replace(b.mode === 'MODE_A' && b.status === 'STAFF_ASSIGNED' ? { pathname: '/booking/waiting', params: { id: b.id } } : { pathname: '/booking/[id]', params: { id: b.id } });
+  const navigateAfterPayment = useCallback((b: ConnectedBooking) => {
+    router.replace(b.mode === 'MODE_A' && b.status === 'STAFF_ASSIGNED' ? { pathname: '/booking/waiting', params: { id: b.id } } : { pathname: '/booking/[id]', params: { id: b.id } });
   }, [router]);
+  const route = useCallback((b: ConnectedBooking) => {
+    if (b.status !== 'AWAITING_PAYMENT') {
+      if (b.paymentStatus === 'PAID') setPaidCelebration({ booking: b });
+      else navigateAfterPayment(b);
+    }
+  }, [navigateAfterPayment]);
   useFocusEffect(useCallback(() => {
     const controller = new AbortController(); let running = false, attempted = '';
     const load = async () => {
@@ -130,7 +138,7 @@ function CustomerPayment() {
       <LinearGradient colors={['#075E48', '#008C5C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.summary}><View style={s.summaryTop}><Text style={s.eyebrow}>SỐ TIỀN THANH TOÁN</Text><Text style={s.orderCode}>{book?.bookingCode || 'Đang tải đơn…'}</Text></View><Text adjustsFontSizeToFit numberOfLines={1} style={s.amount}>{book ? money(book.totalAmount) : '…'}</Text><Text numberOfLines={2} style={s.serviceName}>{book?.service.name || book?.service.serviceName || 'Dịch vụ của bạn'}</Text></LinearGradient>
       {!walletPayment && <View style={s.qrCard}>
         <Text style={s.sectionTitle}>Quét mã để thanh toán</Text><Text style={s.caption}>Mở ứng dụng ngân hàng và quét mã bên dưới</Text>
-        <View style={s.qrFrame}>{payable && topup?.qrCode ? <PaymentQr value={topup.qrCode} size={Math.max(140, Math.min(width - 120, 268))} /> : <View style={s.qrPlaceholder}>{busy || !topup && !error ? <><ActivityIndicator size="large" color={BrandColors.primary} /><Text style={s.placeholderText}>Đang chuẩn bị mã QR…</Text></> : <><IconSymbol name={topup?.status === 'PAID' ? 'check' : 'info'} size={38} color={BrandColors.primaryDark} /><Text style={s.placeholderText}>{topup ? status : 'Chưa tải được mã QR'}</Text><Text style={s.caption}>Kiểm tra lại kết nối và trạng thái thanh toán.</Text></>}</View>}</View>
+        <View style={s.qrFrame}>{payable && topup?.qrCode ? <PaymentQr value={topup.qrCode} size={Math.max(140, Math.min(width - 120, 268))} /> : <View style={s.qrPlaceholder}>{busy || !topup && !error ? <CleanMasterLoader compact label="Đang chuẩn bị mã QR…" /> : <><IconSymbol name={topup?.status === 'PAID' ? 'check' : 'info'} size={38} color={BrandColors.primaryDark} /><Text style={s.placeholderText}>{topup ? status : 'Chưa tải được mã QR'}</Text><Text style={s.caption}>Kiểm tra lại kết nối và trạng thái thanh toán.</Text></>}</View>}</View>
         {payable && <View style={s.countdown}><IconSymbol name="clock" size={15} color="#A36A16" /><Text style={s.countdownText}>Mã có hiệu lực trong {countdown}</Text></View>}
         {topup && <View style={[s.statusBadge, topup.status === 'PAID' && s.paidBadge]}><View style={[s.statusDot, topup.status === 'PAID' && { backgroundColor: BrandColors.primary }]} /><Text style={s.statusText}>{status}</Text></View>}
         <View style={s.autoNote}><IconSymbol name="info" size={16} color="#819389" /><Text style={s.autoNoteText}>Trạng thái tự cập nhật sau khi ngân hàng ghi nhận tiền.</Text></View>
@@ -162,6 +170,20 @@ function CustomerPayment() {
         </SafeAreaView>
       </View>
     </Modal>
+    <CelebrationOverlay
+      visible={!!paidCelebration}
+      variant="payment"
+      title="Thanh toán thành công!"
+      subtitle="Hệ thống đã xác nhận thanh toán và đang kết nối dịch vụ của bạn."
+      badgeText={paidCelebration ? `${paidCelebration.booking.bookingCode} • ${money(paidCelebration.booking.totalAmount)}` : undefined}
+      autoDismissMs={1600}
+      actionLabel="Xem đơn hàng"
+      onDone={() => {
+        const target = paidCelebration?.booking;
+        setPaidCelebration(null);
+        if (target) navigateAfterPayment(target);
+      }}
+    />
   </SafeAreaView>;
 }
 const s = StyleSheet.create({

@@ -5,5 +5,5 @@ import CommunityScreen from '@/components/community/CommunityScreen';
 export default function StaffCommunityScreen() {
   const { currentStaff } = useAuth();
   if (!currentStaff) return <Redirect href="/auth/login" />;
-  return <CommunityScreen staffNavigation />;
+  return <CommunityScreen />;
 }

@@ -17,10 +17,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { LivePulseDot } from '@/components/common/CleanMasterAnimations';
 import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/context/ThemeContext';
 import { StaffService, StaffJobItem, StaffOperationalProfile } from '@/data/staffService';
-import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffScheduleNotice } from '@/components/staff/StaffScheduleReminder';
 import { NotificationBadge } from '@/components/common/NotificationBadge';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -87,17 +87,15 @@ function StaffDashboardContent() {
             <View style={styles.header}>
               <Pressable
                 style={styles.profileRow}
-                onPress={() => router.push('/staff/profile')}
+                onPress={() => router.navigate('/staff/profile')}
               >
                 <Image source={remoteImageSource(staffAvatar)} style={styles.avatar} />
-                <View>
-                  <View style={styles.nameBadgeRow}>
-                    <Text style={[styles.greeting, { color: colors.text }]}>{staffName}</Text>
-                    <View style={[styles.verifiedBadge, { backgroundColor: colors.accentBg }]}>
-                      <Text style={[styles.verifiedText, { color: colors.accentText }]}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
-                    </View>
-                  </View>
+                <View style={styles.profileText}>
+                  <Text style={[styles.greeting, { color: colors.text }]} numberOfLines={2}>{staffName}</Text>
                   <Text style={[styles.subGreeting, { color: colors.textMuted }]}>Đối tác dịch vụ gia đình</Text>
+                  <View style={[styles.verifiedBadge, { backgroundColor: colors.accentBg }]}>
+                    <Text style={[styles.verifiedText, { color: colors.accentText }]}>{currentStaff?.isVerified ? '✓ Hồ sơ đã xác minh' : 'Hồ sơ chưa xác minh'}</Text>
+                  </View>
                 </View>
               </Pressable>
 
@@ -119,12 +117,7 @@ function StaffDashboardContent() {
             >
               <View style={styles.statusTopRow}>
                 <View style={styles.statusIndicator}>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      { backgroundColor: isOnline ? '#34D399' : '#94A3B8' },
-                    ]}
-                  />
+                  <LivePulseDot active={isOnline} size={10} />
                   <Text style={styles.statusText}>
                     {isOnline ? 'Đang sẵn sàng nhận ca' : 'Đang tạm dừng nhận việc'}
                   </Text>
@@ -162,11 +155,11 @@ function StaffDashboardContent() {
 
             {/* Active / Current Urgent Shift Banner */}
             {activeJob && (
-              <View style={styles.activeJobContainer}>
-                <View style={styles.activeJobHeader}>
-                  <View style={styles.urgentBadge}>
-                    <Text style={styles.urgentDot}>●</Text>
-                    <Text style={styles.urgentText}>
+              <View style={[styles.activeJobContainer, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+                <View style={[styles.activeJobHeader, { borderBottomColor: colors.divider }]}>
+                  <View style={[styles.urgentBadge, { backgroundColor: colors.dangerBg }]}>
+                    <Text style={[styles.urgentDot, { color: colors.dangerText }]}>●</Text>
+                    <Text style={[styles.urgentText, { color: colors.dangerText }]}>
                       {activeJob.status === 'IN_PROGRESS'
                         ? 'CA ĐANG LÀM VIỆC'
                         : activeJob.status === 'EN_ROUTE'
@@ -174,23 +167,23 @@ function StaffDashboardContent() {
                         : 'CA TIẾP THEO'}
                     </Text>
                   </View>
-                  <Text style={styles.activeJobCode}>{activeJob.bookingCode}</Text>
+                  <Text style={[styles.activeJobCode, { color: colors.textMuted }]}>{activeJob.bookingCode}</Text>
                 </View>
 
                 <View style={styles.activeJobBody}>
                   <View style={styles.activeJobInfo}>
-                    <Text style={styles.activeJobService}>{activeJob.serviceName}</Text>
-                    <Text style={styles.activeJobTime}>⏱️ {activeJob.timeSlot}</Text>
-                    <Text style={styles.activeJobAddress} numberOfLines={1}>
+                    <Text style={[styles.activeJobService, { color: colors.text }]}>{activeJob.serviceName}</Text>
+                    <Text style={[styles.activeJobTime, { color: colors.accentText }]}>⏱️ {activeJob.timeSlot}</Text>
+                    <Text style={[styles.activeJobAddress, { color: colors.textSecondary }]} numberOfLines={1}>
                       📍 {activeJob.address}
                     </Text>
-                    <Text style={styles.activeJobCustomer}>
-                      👤 Khách: <Text style={styles.boldText}>{activeJob.customerName}</Text>
+                    <Text style={[styles.activeJobCustomer, { color: colors.textMuted }]}>
+                      👤 Khách: <Text style={[styles.boldText, { color: colors.text }]}>{activeJob.customerName}</Text>
                     </Text>
                   </View>
 
                   <View style={styles.activeJobActionColumn}>
-                    <Text style={styles.activeJobIncome}>
+                    <Text style={[styles.activeJobIncome, { color: colors.accentText }]}>
                       {activeJob.incomePendingPolicy ? 'Chờ quyết toán' : '+'+activeJob.netIncome.toLocaleString('vi-VN')+'đ'}
                     </Text>
                     <Pressable
@@ -213,29 +206,29 @@ function StaffDashboardContent() {
             {/* Quick Metrics */}
             <View style={styles.metricsRow}>
               <Pressable
-                style={styles.metricCard}
-                onPress={() => router.push('/staff/wallet')}
+                style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => router.navigate('/staff/wallet')}
               >
-                <Text style={styles.metricLabel}>Số dư khả dụng</Text>
-                <Text style={styles.metricValue}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Số dư khả dụng</Text>
+                <Text style={[styles.metricValue, { color: colors.text }]}>
                   {(wallet.balance.available / 1000000).toFixed(2)}tr
                 </Text>
-                <Text style={styles.metricSub}>Rút tiền ngay ›</Text>
+                <Text style={[styles.metricSub, { color: colors.accentText }]}>Rút tiền ngay ›</Text>
               </Pressable>
 
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Đánh giá đối tác</Text>
+              <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Đánh giá đối tác</Text>
                 <View style={styles.ratingRow}>
-                  <Text style={styles.metricValue}>{profile.rating.toFixed(2)}</Text>
+                  <Text style={[styles.metricValue, { color: colors.text }]}>{profile.rating.toFixed(2)}</Text>
                   <Text style={styles.metricStar}>★</Text>
                 </View>
-                <Text style={styles.metricSub}>{profile.reviewCount} lượt khen ngợi</Text>
+                <Text style={[styles.metricSub, { color: colors.accentText }]}>{profile.reviewCount} lượt khen ngợi</Text>
               </View>
 
-              <View style={styles.metricCard}>
-                <Text style={styles.metricLabel}>Tỷ lệ hoàn thành</Text>
-                <Text style={styles.metricValue}>{profile.completionRate}%</Text>
-                <Text style={styles.metricSub}>Đạt chuẩn dịch vụ</Text>
+              <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Tỷ lệ hoàn thành</Text>
+                <Text style={[styles.metricValue, { color: colors.text }]}>{profile.completionRate}%</Text>
+                <Text style={[styles.metricSub, { color: colors.accentText }]}>Đạt chuẩn dịch vụ</Text>
               </View>
             </View>
 
@@ -248,8 +241,8 @@ function StaffDashboardContent() {
                   Theo năng lực, khu vực và lịch đã lưu
                 </Text>
               </View>
-              <Pressable onPress={() => router.push({ pathname: '/staff/jobs', params: { tab: 'open', source: matchMode } })}>
-                <Text style={styles.seeAllText}>Xem tất cả ({matchCount}) ›</Text>
+              <Pressable onPress={() => router.navigate({ pathname: '/staff/jobs', params: { tab: 'open', source: matchMode } })}>
+                <Text style={[styles.seeAllText, { color: colors.accentText }]}>Xem tất cả ({matchCount}) ›</Text>
               </Pressable>
             </View>
 
@@ -257,11 +250,11 @@ function StaffDashboardContent() {
             <StaffMatchingList matching={matching} filter={{ ...matchFilter, mode: matchMode }} limit={3} />
 
             {/* Safety & Support Banner */}
-            <View style={styles.supportCard}>
-              <IconSymbol name="shield" size={20} color="#0369A1" />
+            <View style={[styles.supportCard, { backgroundColor: colors.infoBg, borderColor: colors.infoBorder }]}>
+              <IconSymbol name="shield" size={20} color={colors.infoText} />
               <View style={styles.supportContent}>
-                <Text style={styles.supportTitle}>Tổng đài hỗ trợ đối tác 24/7</Text>
-                <Text style={styles.supportText}>
+                <Text style={[styles.supportTitle, { color: colors.infoText }]}>Tổng đài hỗ trợ đối tác 24/7</Text>
+                <Text style={[styles.supportText, { color: colors.textSecondary }]}>
                   Nếu gặp sự cố tại điểm làm việc, vui lòng gọi ngay hotline 1900 6868 để được trợ giúp khẩn cấp.
                 </Text>
               </View>
@@ -271,7 +264,6 @@ function StaffDashboardContent() {
       </View>
 
       {/* Persistent Staff Bottom Nav */}
-      <StaffBottomNav activeTab="home" />
     </View>
   );
 }
@@ -285,14 +277,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingTop: 4,
   },
-  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  profileRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: '#10B981' },
-  nameBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  profileText: { flex: 1, minWidth: 0 },
   greeting: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900' },
   verifiedBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
     backgroundColor: '#D1FAE5',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -301,6 +295,7 @@ const styles = StyleSheet.create({
   verifiedText: { color: '#047857', fontSize: 10, fontWeight: '800' },
   subGreeting: { color: BrandColors.gray500, fontSize: 12, marginTop: 2 },
   notificationBtn: {
+    flexShrink: 0,
     width: 40,
     height: 40,
     borderRadius: 20,

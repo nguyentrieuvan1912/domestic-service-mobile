@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { Notification } from '@/types/notification';
 import { IconSymbol } from './IconSymbol';
 import { formatNotificationTime, getNotificationPresentation } from '@/data/notificationAdapter';
@@ -16,34 +17,39 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   onPress,
   disabled = false,
 }) => {
+  const { colors, isDark } = useAppTheme();
   const { icon, background, label } = getNotificationPresentation(notification);
 
   return (
     <Pressable
-      style={[styles.container, !notification.isRead && styles.unreadContainer]}
+      style={[
+        styles.container,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        !notification.isRead && { backgroundColor: isDark ? colors.accentBg : '#F0FDF4', borderColor: colors.accentBorder },
+      ]}
       disabled={disabled} accessibilityRole="button" accessibilityState={{ disabled }}
       accessibilityLabel={`${label}. ${notification.title}. ${notification.isRead ? 'Đã đọc' : 'Chưa đọc'}${disabled ? '. Đang cập nhật trạng thái đã đọc' : ''}`}
       onPress={onPress}>
-      <View style={[styles.iconBox, { backgroundColor: background }]}>
-        <IconSymbol name={icon} size={20} />
+      <View style={[styles.iconBox, { backgroundColor: isDark ? colors.surfaceElevated : background }]}>
+        <IconSymbol name={icon} size={20} color={isDark ? colors.accentText : undefined} />
       </View>
 
       <View style={styles.body}>
-        <Text style={styles.typeLabel}>{label} • {notification.isRead ? 'Đã đọc' : 'Chưa đọc'}</Text>
+        <Text style={[styles.typeLabel, { color: colors.textMuted }]}>{label} • {notification.isRead ? 'Đã đọc' : 'Chưa đọc'}</Text>
         <View style={styles.topRow}>
           <Text
             numberOfLines={1}
-            style={[styles.title, !notification.isRead && styles.titleUnread]}>
+            style={[styles.title, { color: colors.text }, !notification.isRead && [styles.titleUnread, { color: colors.text }]]}>
             {notification.title}
           </Text>
           {!notification.isRead && <View style={styles.unreadDot} />}
         </View>
 
-        <Text numberOfLines={2} style={styles.content}>
+        <Text numberOfLines={2} style={[styles.content, { color: colors.textSecondary }]}>
           {notification.content}
         </Text>
 
-        <Text style={styles.timeText}>
+        <Text style={[styles.timeText, { color: colors.textMuted }]}>
           {formatNotificationTime(notification.createdAt)}
         </Text>
       </View>

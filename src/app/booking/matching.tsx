@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CleanMasterLoader, RadarPulseAura } from '@/components/common/CleanMasterAnimations';
 import { RatingStars } from '@/components/common/RatingStars';
 import { StaffCard } from '@/components/common/StaffCard';
 import { useBookingDetail } from '@/hooks/use-booking-detail';
@@ -32,7 +33,7 @@ type MatchingState =
 
 export default function MatchingStaffScreen() {
   const router=useRouter();const {bookingId}=useLocalSearchParams<{bookingId?:string}>();const data=useBookingDetail(bookingId);
-  if(!data.booking)return <SafeAreaView><Text>{data.loading?'Đang tải trạng thái đơn...':data.error}</Text><Pressable onPress={data.retry}><Text>Thử lại</Text></Pressable><Pressable onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)')}><Text>Quay lại</Text></Pressable></SafeAreaView>;
+  if(!data.booking)return <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 }}>{data.loading ? <CleanMasterLoader label="Đang tải trạng thái đơn…" sublabel="Đang kết nối điều phối CleanMaster" /> : <><Text>{data.error}</Text><Pressable onPress={data.retry}><Text style={{ color: BrandColors.primaryDark, fontWeight: '700' }}>Thử lại</Text></Pressable></>}<Pressable onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)')}><Text style={{ color: BrandColors.gray600 }}>Quay lại</Text></Pressable></SafeAreaView>;
   return <MatchingContent booking={data.booking} assignedStaff={data.staff} />;
 }
 function MatchingContent({booking,assignedStaff}: {booking:ConnectedBooking;assignedStaff?:Staff}) {
@@ -107,13 +108,15 @@ function MatchingContent({booking,assignedStaff}: {booking:ConnectedBooking;assi
           {/* ================= 1. SEARCHING: Đang tìm Staff ================= */}
           {matchingState === 'SEARCHING' && (
             <View style={styles.stateCenterBox}>
-              <View style={styles.radarCircleOuter}>
-                <View style={styles.radarCircleMid}>
-                  <View style={styles.radarCircleInner}>
-                    <IconSymbol name="📡" style={{ fontSize: 32 }} />
+              <RadarPulseAura active size={126}>
+                <View style={styles.radarCircleOuter}>
+                  <View style={styles.radarCircleMid}>
+                    <View style={styles.radarCircleInner}>
+                      <IconSymbol name="📡" style={{ fontSize: 32 }} />
+                    </View>
                   </View>
                 </View>
-              </View>
+              </RadarPulseAura>
 
               <Text style={styles.statusHeading}>Hệ thống đang tìm thợ gần bạn</Text>
               <Text style={styles.statusDescription}>

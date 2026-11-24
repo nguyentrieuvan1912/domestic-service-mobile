@@ -194,7 +194,7 @@ export const CenterAIMascotTabButton: React.FC<CenterAIMascotTabButtonProps> = (
                 isSelected && styles.mascotCircleActive,
               ]}>
               <Image
-                source={require('@/assets/images/ai-mascot.png')}
+                source={require('@/assets/images/ai-mascot.jpg')}
                 style={styles.mascotImage}
                 resizeMode="cover"
               />

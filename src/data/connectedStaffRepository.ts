@@ -119,7 +119,7 @@ async function load(signal?: AbortSignal) {
       }
       if (reviewSequence === reviewsRequest) reviews = rawReviews.map(item => ({ ...item, id: String(item.id), customerName: 'Khách hàng #' + item.customerId, customerAvatar: '', tags: item.tags || [] }));
       loaded = true; failure = ''; notify();
-    } catch (error) { if(active.token!==operationSession()?.token)return; failure = error instanceof Error ? error.message : 'Chưa tải được dữ liệu nhân viên.'; loaded = false; notify(); throw error; }
+    } catch (error) { if(active.token!==operationSession()?.token)return; failure = error instanceof Error ? error.message : 'Chưa tải được dữ liệu nhân viên.'; notify(); throw error; }
   })();
   loading = task;
   try { await task; } finally { if (loading === task) loading = null; }

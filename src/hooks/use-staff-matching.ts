@@ -10,20 +10,22 @@ export function useStaffMatching() {
   const key = actor ? `${actor.userId}:${actor.staffId}` : '';
   const [attempt, setAttempt] = useState(0);
   const revision = useSyncExternalStore(StaffRepository.subscribe, StaffRepository.getStoreRevision, StaffRepository.getStoreRevision);
-  const [state, setState] = useState<{ key: string; status: 'LOADING' | 'READY' | 'ERROR'; error?: string }>({ key: '', status: 'LOADING' });
+  const [failure, setFailure] = useState<{ key: string; status: 'ERROR'; error: string }>();
   const query = useMemo(() => ({ actor, key, attempt }), [actor, key, attempt]);
   useFocusEffect(useCallback(() => {
     if (!query.actor) return;
+    const activeActor = query.actor;
     const controller = new AbortController();
-    let ready = false, inFlight = false;
+    let inFlight = false;
     const refresh = async () => {
       if (inFlight || controller.signal.aborted || AppState.currentState !== 'active') return;
       inFlight = true;
       try {
-        await (ready ? StaffMatchingRepository.refresh(query.actor!, controller.signal) : StaffMatchingRepository.load(query.actor!, controller.signal));
-        if (!controller.signal.aborted) { ready = true; setState({ key: query.key, status: 'READY' }); }
+        await (StaffRepository.getLoadState().loaded
+          ? StaffMatchingRepository.refresh(activeActor, controller.signal)
+          : StaffMatchingRepository.load(activeActor, controller.signal));
       } catch (error) {
-        if (!controller.signal.aborted && !ready) setState({ key: query.key, status: 'ERROR', error: error instanceof Error ? error.message : 'Chưa tải được việc phù hợp.' });
+        if (!controller.signal.aborted && !StaffRepository.getLoadState().loaded) setFailure({ key: query.key, status: 'ERROR', error: error instanceof Error ? error.message : 'Chưa tải được việc phù hợp.' });
       } finally { inFlight = false; }
     };
     const timer = setInterval(() => void refresh(), 5000);
@@ -31,9 +33,11 @@ export function useStaffMatching() {
     void refresh();
     return () => { controller.abort(); clearInterval(timer); foreground.remove(); };
   }, [query]));
-  const scoped = state.key === key ? state : { key, status: 'LOADING' as const };
+  const scoped = actor && StaffRepository.getLoadState().loaded
+    ? { key, status: 'READY' as const, error: undefined }
+    : failure?.key === key ? failure : { key, status: 'LOADING' as const, error: undefined };
   const data = useMemo(() => actor && scoped.status === 'READY'
     ? { ...StaffMatchingRepository.read(actor), revision } : undefined, [actor, scoped.status, revision]);
-  const retry = () => { setState({ key, status: 'LOADING' }); setAttempt(value => value + 1); };
+  const retry = () => { setFailure(undefined); setAttempt(value => value + 1); };
   return { actor, ...scoped, data, retry };
 }

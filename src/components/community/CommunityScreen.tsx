@@ -22,13 +22,16 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CleanMasterLoader, ShimmerSkeleton } from '@/components/common/CleanMasterAnimations';
 import { useAuth } from '@/context/AuthContext';
-import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
+import { reuseSnapshot } from '@/utils/stable-snapshot';
 import { CommunityThread } from './CommunityThread';
 import { CommunityMediaGallery, CommunityMediaViewer, type DisplayMedia } from './CommunityMediaGallery';
+import { CommunityRoleBadge, isAdminRole } from './CommunityRoleBadge';
 import {
   CommunityPost,
   createCommunityPost,
@@ -65,21 +68,21 @@ function formatPostTime(iso: string) {
   });
 }
 
-export default function CommunityScreen({ staffNavigation = false }: { staffNavigation?: boolean }) {
+export default function CommunityScreen() {
   const { currentUser, accessToken } = useAuth();
   return (
     <CommunityContent
       key={String(currentUser?.id) + ':' + accessToken}
-      staffNavigation={staffNavigation}
     />
   );
 }
 
-function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
+function CommunityContent() {
   const { height: bottomTabHeight } = useBottomTabSpacing();
   const { colors } = useAppTheme();
   const { currentUser, accessToken } = useAuth();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'ADMIN' | 'STAFF' | 'CUSTOMER'>('ALL');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -135,7 +138,7 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
           ),
         ]);
         if (current() && !signal?.aborted && version === revision.current) {
-          setPosts(rows);
+          setPosts(previous => reuseSnapshot(previous, rows));
           setMediaEnabled(capability.enabled);
           setLoadError('');
         }
@@ -145,7 +148,7 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
         }
       } finally {
         reading.current = false;
-        if (current()) setLoading(false);
+        if (current() && !signal?.aborted) setLoading(false);
       }
     },
     [accessToken]
@@ -153,16 +156,15 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
 
   useFocusEffect(
     useCallback(() => {
-      const abort = new AbortController();
-      void refresh(abort.signal);
+      const { signal } = controller.current;
+      void refresh(signal);
       const timer = setInterval(() => {
-        if (AppState.currentState === 'active' && !locked.current) void refresh(abort.signal);
+        if (AppState.currentState === 'active' && !locked.current) void refresh(signal);
       }, 15000);
       const listener = AppState.addEventListener('change', state => {
-        if (state === 'active') void refresh(abort.signal);
+        if (state === 'active') void refresh(signal);
       });
       return () => {
-        abort.abort();
         clearInterval(timer);
         listener.remove();
       };
@@ -284,11 +286,27 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
   const displayName = currentUser?.fullName || 'Bạn';
   const hasDraft = !!draft.trim() || media.length > 0;
 
+  const filteredPosts = React.useMemo(() => {
+    const matched = posts.filter(post => {
+      if (roleFilter === 'ALL') return true;
+      if (roleFilter === 'ADMIN') return isAdminRole(post.authorRole, post.author);
+      if (roleFilter === 'STAFF') return post.authorRole === 'STAFF';
+      return !isAdminRole(post.authorRole, post.author) && post.authorRole !== 'STAFF';
+    });
+    if (roleFilter !== 'ALL') return matched;
+    // Pin official Admin posts at the top of the community feed
+    return [...matched].sort((a, b) => {
+      const aAdmin = isAdminRole(a.authorRole, a.author) ? 1 : 0;
+      const bAdmin = isAdminRole(b.authorRole, b.author) ? 1 : 0;
+      return bAdmin - aAdmin;
+    });
+  }, [posts, roleFilter]);
+
   return (
     <View style={styles.gradient}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <FlatList
-          data={posts}
+          data={filteredPosts}
           keyExtractor={post => String(post.id)}
           contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}
           keyboardShouldPersistTaps="handled"
@@ -297,24 +315,29 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
           windowSize={5}
           ListHeaderComponent={
             <View style={styles.headerBlock}>
-              {/* Top Community Banner Header */}
-              <View style={styles.header}>
+              {/* Modern Emerald Community Hero Header */}
+              <LinearGradient
+                colors={colors.isDark ? ['#064E3B', '#0F766E'] : ['#047857', '#0D9488']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroBanner}
+              >
                 <View style={styles.headerLeft}>
-                  <View style={styles.headerBadgeIcon}>
+                  <View style={styles.heroIconCircle}>
                     <IconSymbol name="users" size={20} color="#047857" />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.title}>Cộng đồng</Text>
-                    <Text style={styles.subtitle}>
-                      Chia sẻ, hỏi đáp và kết nối cùng CleanMaster
+                    <Text style={styles.heroTitle}>Cộng đồng CleanMaster</Text>
+                    <Text style={styles.heroSubtitle}>
+                      Thông báo chính thức, mẹo dọn nhà & kết nối
                     </Text>
                   </View>
                 </View>
-                <View style={styles.memberCount}>
-                  <View style={styles.memberDot} />
-                  <Text style={styles.memberText}>{posts.length} bài viết</Text>
+                <View style={styles.heroCountPill}>
+                  <View style={styles.heroCountDot} />
+                  <Text style={styles.heroCountText}>{posts.length} bài</Text>
                 </View>
-              </View>
+              </LinearGradient>
 
               {!!(error || loadError) && (
                 <Pressable onPress={() => void refresh()} style={styles.backendHint}>
@@ -336,7 +359,11 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
                   }
                   setComposerOpen(true);
                 }}
-                style={({ pressed }) => [styles.composerShortcut, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.composerShortcut,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  pressed && styles.pressed,
+                ]}
               >
                 {currentUser?.avatar ? (
                   <Image source={remoteImageSource(currentUser.avatar)} style={styles.shortcutAvatar} />
@@ -348,43 +375,107 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
                   </View>
                 )}
 
-                <View style={styles.shortcutPromptPill}>
-                  <Text numberOfLines={1} style={[styles.shortcutText, hasDraft && styles.shortcutDraftText]}>
-                    {hasDraft ? 'Tiếp tục bản nháp của bạn…' : 'Bạn muốn chia sẻ điều gì?'}
+                <View style={[styles.shortcutPromptPill, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <Text numberOfLines={1} style={[styles.shortcutText, { color: colors.textMuted }, hasDraft && styles.shortcutDraftText]}>
+                    {hasDraft ? 'Tiếp tục bản nháp của bạn…' : 'Chia sẻ mẹo dọn nhà hoặc câu hỏi…'}
                   </Text>
                 </View>
 
-                <View style={styles.shortcutActionIcon}>
-                  <IconSymbol name="plus" size={18} color="#00734F" />
+                <View style={[styles.shortcutActionIcon, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]}>
+                  <IconSymbol name="plus" size={18} color={colors.accentText} />
                 </View>
               </Pressable>
+
+              {/* Role Filter Chips */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+              >
+                {(
+                  [
+                    { key: 'ALL', label: 'Tất cả' },
+                    { key: 'ADMIN', label: '✓ Quản trị viên' },
+                    { key: 'STAFF', label: 'Đối tác Staff' },
+                    { key: 'CUSTOMER', label: 'Khách hàng' },
+                  ] as const
+                ).map(chip => {
+                  const active = roleFilter === chip.key;
+                  const isAdminChip = chip.key === 'ADMIN';
+                  return (
+                    <Pressable
+                      key={chip.key}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => setRoleFilter(chip.key)}
+                      style={[
+                        styles.filterChip,
+                        { backgroundColor: colors.surface, borderColor: colors.border },
+                        active && (isAdminChip ? styles.filterChipAdminActive : { backgroundColor: '#047857', borderColor: '#047857' }),
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          { color: colors.textSecondary },
+                          active && styles.filterChipTextActive,
+                        ]}
+                      >
+                        {chip.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
           }
           ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <View style={styles.emptyIconWrap}>
-                <IconSymbol name="users" size={30} color={BrandColors.primary} />
+            loading ? (
+              <View>
+                <CleanMasterLoader label="Đang tải cộng đồng…" sublabel="Đang đồng bộ bài viết mới nhất" />
+                <ShimmerSkeleton count={2} />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                {loading ? 'Đang tải cộng đồng…' : 'Chưa có bài viết để hiển thị'}
-              </Text>
-              {!loading && (
+            ) : (
+              <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[styles.emptyIconWrap, { backgroundColor: colors.accentBg }]}>
+                  <IconSymbol name="users" size={30} color={BrandColors.primary} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                  Chưa có bài viết trong mục này
+                </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                   Hãy mở đầu cuộc trò chuyện bằng cách chia sẻ mẹo chăm sóc nhà cửa hoặc câu hỏi của bạn.
                 </Text>
-              )}
-            </View>
+              </View>
+            )
           }
           renderItem={({ item: post }) => {
             const myReactionObj = post.myReaction
               ? REACTIONS.find(r => r.id === post.myReaction)
               : null;
             const activeReactions = REACTIONS.filter(r => post.reactions[r.id]);
-            const isLongContent = post.content.length > 260 || post.content.split('\n').length > 5;
+            const isLongContent = post.content.length > 340 || post.content.split('\n').length > 7;
             const isExpanded = !!expandedPost[post.id];
+            const isAdminPost = isAdminRole(post.authorRole, post.author);
 
             return (
-              <View style={[styles.post, post.status === 'PENDING' && styles.pendingPost]}>
+              <View
+                style={[
+                  styles.post,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  isAdminPost && (colors.isDark ? styles.adminPostDark : styles.adminPost),
+                  post.status === 'PENDING' && styles.pendingPost,
+                ]}
+              >
+                {isAdminPost && (
+                  <View style={[styles.officialRibbon, colors.isDark && styles.officialRibbonDark]}>
+                    <IconSymbol name="shield" size={13} color={colors.isDark ? '#93C5FD' : '#1D4ED8'} />
+                    <Text style={[styles.officialRibbonText, colors.isDark && { color: '#DBEAFE' }]}>
+                      THÔNG BÁO CHÍNH THỨC TỪ CLEANMASTER
+                    </Text>
+                  </View>
+                )}
+
                 {post.status === 'PENDING' && (
                   <View style={styles.pendingNotice}>
                     <View style={styles.pendingHeaderRow}>
@@ -407,28 +498,29 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
                 {/* Post Author Row */}
                 <View style={styles.postHeader}>
                   {post.avatar ? (
-                    <Image source={remoteImageSource(post.avatar)} style={styles.postAvatar} />
+                    <Image
+                      source={remoteImageSource(post.avatar)}
+                      style={[styles.postAvatar, isAdminPost && styles.adminAvatarRing]}
+                    />
                   ) : (
-                    <View style={styles.postAvatarFallback}>
-                      <Text style={styles.avatarInitial}>
-                        {post.author.charAt(0).toUpperCase()}
+                    <View style={[styles.postAvatarFallback, isAdminPost && styles.adminAvatarFallback]}>
+                      <Text style={[styles.avatarInitial, isAdminPost && { color: '#FFFFFF' }]}>
+                        {isAdminPost ? 'CM' : post.author.charAt(0).toUpperCase()}
                       </Text>
                     </View>
                   )}
 
                   <View style={styles.postMeta}>
                     <View style={styles.authorRow}>
-                      <Text numberOfLines={1} style={styles.author}>
+                      <Text numberOfLines={1} style={[styles.author, { color: colors.text }]}>
                         {post.author}
                       </Text>
-                      <View style={styles.memberTag}>
-                        <Text style={styles.memberTagText}>Thành viên</Text>
-                      </View>
+                      <CommunityRoleBadge role={post.authorRole} author={post.author} />
                     </View>
                     <View style={styles.postTimeRow}>
-                      <IconSymbol name="globe" size={11} color="#94A3B8" />
-                      <Text style={styles.postTime}>
-                        {formatPostTime(post.createdAt)} · Cộng đồng
+                      <IconSymbol name="globe" size={11} color={colors.textMuted} />
+                      <Text style={[styles.postTime, { color: colors.textMuted }]}>
+                        {formatPostTime(post.createdAt)} · {isAdminPost ? 'Kênh chính thức' : 'Cộng đồng'}
                       </Text>
                     </View>
                   </View>
@@ -438,8 +530,8 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
                 {!!post.content && (
                   <View style={styles.postBodyWrap}>
                     <Text
-                      numberOfLines={!isExpanded && isLongContent ? 5 : undefined}
-                      style={styles.postContent}
+                      numberOfLines={!isExpanded && isLongContent ? 6 : undefined}
+                      style={[styles.postContent, { color: colors.text }]}
                     >
                       {post.content}
                     </Text>
@@ -450,7 +542,7 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
                         }
                         style={styles.readMoreBtn}
                       >
-                        <Text style={styles.readMoreText}>
+                        <Text style={[styles.readMoreText, { color: colors.accentText }]}>
                           {isExpanded ? 'Thu gọn' : 'Xem thêm'}
                         </Text>
                       </Pressable>
@@ -770,7 +862,6 @@ function CommunityContent({ staffNavigation }: { staffNavigation: boolean }) {
           )}
         </Modal>
       </SafeAreaView>
-      {staffNavigation && <StaffBottomNav activeTab="community" />}
     </View>
   );
 }
@@ -1387,6 +1478,129 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     lineHeight: 17,
+  },
+  heroBanner: {
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    shadowColor: '#065F46',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  heroIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  heroSubtitle: {
+    fontSize: 11.5,
+    color: '#D1FAE5',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  heroCountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  heroCountDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#6EE7B7',
+  },
+  heroCountText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+  },
+  filterChipAdminActive: {
+    backgroundColor: '#1D4ED8',
+    borderColor: '#1D4ED8',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  adminPost: {
+    borderColor: '#93C5FD',
+    borderWidth: 1.5,
+    shadowColor: '#1D4ED8',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  adminPostDark: {
+    borderColor: '#3B82F6',
+    borderWidth: 1.5,
+  },
+  officialRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#DBEAFE',
+    marginHorizontal: -16,
+    marginTop: -16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  officialRibbonDark: {
+    backgroundColor: '#172554',
+    borderBottomColor: '#1E3A8A',
+  },
+  officialRibbonText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    color: '#1D4ED8',
+  },
+  adminAvatarRing: {
+    borderWidth: 2.5,
+    borderColor: '#2563EB',
+  },
+  adminAvatarFallback: {
+    backgroundColor: '#2563EB',
+    borderColor: '#93C5FD',
   },
   pressed: {
     opacity: 0.82,

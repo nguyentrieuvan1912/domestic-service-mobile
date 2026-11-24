@@ -7,6 +7,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { NotificationItem } from '@/components/common/NotificationItem';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { useNotifications } from '@/hooks/use-notifications';
 import { NotificationRepository } from '@/data/connectedNotifications';
 import { CUSTOMER_NOTIFICATION_FILTERS, STAFF_NOTIFICATION_FILTERS, getNotificationGroup } from '@/data/notificationAdapter';
@@ -17,6 +18,7 @@ type ReadAction = { kind: 'ALL' } | { kind: 'OPEN'; id: string };
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { colors } = useAppTheme();
   const { currentRole } = useAuth();
   const { actor, notifications, unreadCount } = useNotifications();
   const goBack = () => {
@@ -25,7 +27,7 @@ export default function NotificationsScreen() {
   };
   if (!actor) return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}><Pressable style={styles.backBtn} onPress={goBack} accessibilityLabel="Quay lại"><IconSymbol name="back" size={20} /></Pressable><Text style={styles.headerTitle}>Thông báo</Text></View>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}><Pressable style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} onPress={goBack} accessibilityLabel="Quay lại"><IconSymbol name="back" size={20} color={colors.text} /></Pressable><Text style={[styles.headerTitle, { color: colors.text }]}>Thông báo</Text></View>
       <EmptyState icon="bell" title="Vui lòng đăng nhập" description="Đăng nhập để xem thông báo dành riêng cho tài khoản của bạn."
         actionText="Đăng nhập" onAction={() => router.push('/auth/login')} />
     </SafeAreaView>
@@ -37,6 +39,7 @@ function NotificationsContent({ actor, notifications, unreadCount, goBack }: {
   actor: NotificationActor; notifications: readonly AppNotification[]; unreadCount: number; goBack: () => void;
 }) {
   const router = useRouter();
+  const { colors } = useAppTheme();
   const [activeFilter, setActiveFilter] = useState<NotificationGroup>('ALL');
   const [loadState, setLoadState] = useState<'LOADING' | 'READY' | 'ERROR'>('LOADING');
   const [loadError, setLoadError] = useState('');
@@ -94,35 +97,35 @@ function NotificationsContent({ actor, notifications, unreadCount, goBack }: {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={goBack} accessibilityLabel="Quay lại"><IconSymbol name="back" size={20} color={BrandColors.gray800} /></Pressable>
-        <Text style={styles.headerTitle}>{actor.role === 'STAFF' ? 'Thông báo công việc' : 'Thông báo của bạn'}</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Pressable style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} onPress={goBack} accessibilityLabel="Quay lại"><IconSymbol name="back" size={20} color={colors.text} /></Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{actor.role === 'STAFF' ? 'Thông báo công việc' : 'Thông báo của bạn'}</Text>
         <Pressable disabled={reading || loadState !== 'READY' || unreadCount === 0}
           hitSlop={10}
           accessibilityRole="button" accessibilityState={{ disabled: reading || loadState !== 'READY' || unreadCount === 0 }}
           accessibilityLabel={reading ? 'Đang cập nhật trạng thái đã đọc' : unreadCount === 0 ? 'Bạn đã đọc tất cả thông báo' : 'Đọc tất cả thông báo của tài khoản này'}
           onPress={() => void read({ kind: 'ALL' })}>
-          <Text style={[styles.markAllText, (reading || loadState !== 'READY' || unreadCount === 0) && styles.disabledText]}>{reading ? 'Đang đọc…' : 'Đọc tất cả'}</Text>
+          <Text style={[styles.markAllText, { color: colors.accentText }, (reading || loadState !== 'READY' || unreadCount === 0) && { color: colors.textMuted }]}>{reading ? 'Đang đọc…' : 'Đọc tất cả'}</Text>
         </Pressable>
       </View>
-      <View style={styles.filterBar}>
-        <Text style={styles.countText}>{loadState === 'READY' ? 'Chưa đọc: ' + unreadCount : 'Đang tải danh sách thông báo'}</Text>
+      <View style={[styles.filterBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.countText, { color: colors.textSecondary }]}>{loadState === 'READY' ? 'Chưa đọc: ' + unreadCount : 'Đang tải danh sách thông báo'}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillScroll}>
           {filters.map((filter) => {
             const selected = activeFilter === filter.id;
             const count = notifications.filter((item) => !item.isRead && (filter.id === 'ALL' || getNotificationGroup(item) === filter.id)).length;
-            return <Pressable key={filter.id} style={[styles.filterPill, selected && styles.filterPillActive]}
+            return <Pressable key={filter.id} style={[styles.filterPill, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }, selected && styles.filterPillActive]}
               accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setActiveFilter(filter.id)}>
-              <Text style={[styles.filterPillText, selected && styles.filterPillTextActive]}>{filter.label}{loadState === 'READY' ? ' (' + count + ')' : ''}</Text>
+              <Text style={[styles.filterPillText, { color: colors.textSecondary }, selected && styles.filterPillTextActive]}>{filter.label}{loadState === 'READY' ? ' (' + count + ')' : ''}</Text>
             </Pressable>;
           })}
         </ScrollView>
       </View>
-      {!!notice && <Text style={styles.feedback} accessibilityLiveRegion="polite">{notice}</Text>}
-      {!!readError && <View style={styles.feedbackBox}><Text style={styles.feedback} accessibilityLiveRegion="polite">{readError}</Text>
+      {!!notice && <Text style={[styles.feedback, { color: colors.accentText }]} accessibilityLiveRegion="polite">{notice}</Text>}
+      {!!readError && <View style={styles.feedbackBox}><Text style={[styles.feedback, { color: colors.dangerText }]} accessibilityLiveRegion="polite">{readError}</Text>
         <Pressable disabled={reading} style={styles.retryButton} onPress={() => retryAction && void read(retryAction)}><Text style={styles.retryText}>Thử lại</Text></Pressable></View>}
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {loadState === 'LOADING' ? <View style={styles.loadingBox}><ActivityIndicator color={BrandColors.primary} /><Text style={styles.feedback}>Đang tải thông báo…</Text></View> :
+        {loadState === 'LOADING' ? <View style={styles.loadingBox}><ActivityIndicator color={colors.primary} /><Text style={[styles.feedback, { color: colors.textSecondary }]}>Đang tải thông báo…</Text></View> :
           loadState === 'ERROR' ? <EmptyState icon="warning" title="Chưa tải được thông báo" description={loadError} actionText="Thử lại"
             onAction={() => { setLoadState('LOADING'); setAttempt((value) => value + 1); }} /> :
           filtered.length === 0 ? <EmptyState icon="bell" title="Chưa có thông báo" description={activeFilter === 'ALL' ? 'Tài khoản của bạn chưa có thông báo.' : 'Chưa có thông báo trong nhóm đang chọn.'} /> :

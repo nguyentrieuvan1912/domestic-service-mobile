@@ -5,18 +5,19 @@ import { User, Customer, Staff, UserRole } from '@/types/user';
 import { IdentityProfile, IdentitySession, identityRequest } from '@/api/identity';
 import { setCustomerNotificationSession } from '@/data/connectedNotifications';
 import { connectOperationsSession, onOperationSessionInvalidated } from '@/api/operations';
-import { clearPersistedSession, saveRememberedLogin, LoginRole } from '@/utils/remembered-login';
+import { clearLegacyLoginStorage } from '@/utils/remembered-login';
 
 interface AuthContextType {
   accessToken: string | null;
   currentUser: User | null; currentRole: UserRole; currentCustomer: Customer | null; currentStaff: Staff | null;
   isAuthenticated: boolean; isLoading: boolean;
-  login: (identifier: string, password: string, role: UserRole, remember?: boolean) => Promise<void>;
+  login: (identifier: string, password: string, role: UserRole) => Promise<void>;
   completeRegistration: (session: IdentitySession) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateCustomerProfile: (profile: Pick<Customer, 'fullName' | 'phone' | 'email' | 'avatar'>) => Promise<void>;
   updateAvatar: (avatar: string) => Promise<void>;
   updateStaffProfile: (profile: Pick<Staff, 'phone' | 'email' | 'bio'>) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,8 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let active = true;
     clear();
-    // Credentials may be remembered, but a cold launch always requires explicit login.
-    void clearPersistedSession().catch(() => undefined).finally(() => { if (active) setIsLoading(false); });
+    void clearLegacyLoginStorage().finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; };
   }, []);
   useEffect(() => { onOperationSessionInvalidated(clear); return () => onOperationSessionInvalidated(null); }, []);
@@ -67,17 +67,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const timer = setTimeout(() => { if (sessionRef.current === session) clear(); }, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
     return () => clearTimeout(timer);
   }, [currentUser]);
-  const accept = async (session: IdentitySession, credentials?: { identifier: string; password: string; role: LoginRole; remember: boolean }) => {
+  const accept = async (session: IdentitySession) => {
     const profile = await identityRequest<IdentityProfile>('/auth/profile', undefined, session.accessToken);
-    if (credentials) await saveRememberedLogin(credentials.identifier, credentials.password, credentials.role, credentials.remember);
     sessionRef.current = session; setAccessToken(session.accessToken); apply(profile);
   };
-  const login = async (identifier: string, password: string, role: UserRole, remember = false) => {
+  const login = async (identifier: string, password: string, role: UserRole) => {
     if (role !== 'CUSTOMER' && role !== 'STAFF') throw new Error('Vui lòng đăng nhập Admin trên website.');
-    const session = await identityRequest<IdentitySession>('/auth/login', { identifier, password });
+    const session = await identityRequest<IdentitySession>('/auth/login', { identifier, password, role });
     try {
       if (session.user.role !== role) throw new Error('Tài khoản không thuộc vai trò đang chọn.');
-      await accept(session, { identifier, password, role, remember });
+      await accept(session);
     } catch (error) {
       await identityRequest('/auth/logout', {}, session.accessToken).catch(() => undefined);
       throw error;
@@ -101,12 +100,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saved = await identityRequest<IdentityProfile>('/staff/profile', { phone: profile.phone, bio: profile.bio }, session.accessToken, 'PATCH');
     if (sessionRef.current === session) apply(saved);
   };
+  const changePassword = async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+    const session = sessionRef.current;
+    const role = session?.user.role;
+    if (!session || (role !== 'CUSTOMER' && role !== 'STAFF')) throw new Error('Vui lòng đăng nhập.');
+    await identityRequest<void>('/auth/password', { currentPassword, newPassword, confirmPassword }, session.accessToken, 'PATCH');
+
+  };
   const logout = async () => {
     const session = sessionRef.current;
     clear();
     if (session) await identityRequest('/auth/logout', {}, session.accessToken);
   };
   return <AuthContext.Provider value={{ accessToken, currentUser, currentRole, currentCustomer, currentStaff, isAuthenticated: !!currentUser, isLoading,
-    login, completeRegistration: accept, refreshProfile, updateCustomerProfile, updateAvatar, updateStaffProfile, logout }}>{children}</AuthContext.Provider>;
+    login, completeRegistration: accept, refreshProfile, updateCustomerProfile, updateAvatar, updateStaffProfile, changePassword, logout }}>{children}</AuthContext.Provider>;
 };
 export const useAuth = () => { const context = useContext(AuthContext); if (!context) throw new Error('useAuth must be used within an AuthProvider'); return context; };

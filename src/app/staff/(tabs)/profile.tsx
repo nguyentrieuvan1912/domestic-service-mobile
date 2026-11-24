@@ -21,7 +21,6 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { AppearanceModal } from '@/components/common/AppearanceModal';
 import { useAuth } from '@/context/AuthContext';
 import { themeModeLabel, useAppTheme } from '@/context/ThemeContext';
-import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffRepository } from '@/data/connectedStaffRepository';
 import { StaffService } from '@/data/staffService';
 import { useStaffCapabilities } from '@/hooks/use-staff-capabilities';
@@ -228,6 +227,17 @@ function StaffProfileContent() {
             </Pressable>
           </View>
 
+          <Pressable
+            style={[styles.utilityRow, { borderBottomWidth: 0 }]}
+            accessibilityRole="button"
+            onPress={() => router.push('/account/change-password')}>
+            <View style={[styles.utilityIconWrap, { backgroundColor: colors.accentBg }]}>
+              <IconSymbol name="lock" size={18} color={colors.accentText} />
+            </View>
+            <Text style={[styles.utilityTitle, { color: colors.text }]}>Đổi mật khẩu</Text>
+            <Text style={[styles.utilityArrow, { color: colors.textMuted }]}>›</Text>
+          </Pressable>
+
           {/* Prominent Logout Button */}
           <Pressable
             style={[styles.logoutButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
@@ -252,7 +262,6 @@ function StaffProfileContent() {
       />
 
       {/* Staff Bottom Nav */}
-      <StaffBottomNav activeTab="profile" />
     </View>
   );
 }

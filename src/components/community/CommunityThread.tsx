@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandColors, BorderRadius } from '@/constants/theme';
 import { CommunityMediaGallery, CommunityMediaViewer, type DisplayMedia } from './CommunityMediaGallery';
+import { CommunityRoleBadge } from './CommunityRoleBadge';
 import { CommentReportDialog } from './CommentReportDialog';
 import { remoteImageSource } from '@/utils/image-source';
 import {
@@ -363,7 +364,10 @@ export function CommunityThread({
                     </View>
                   )}
                   <View style={s.grow}>
-                    <Text style={s.postSummaryAuthor}>{post.author}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={s.postSummaryAuthor}>{post.author}</Text>
+                      <CommunityRoleBadge role={post.authorRole} author={post.author} compact />
+                    </View>
                     <Text style={s.postSummaryTime}>{formatCommentTime(post.createdAt)} · Bài viết gốc</Text>
                   </View>
                 </View>
@@ -483,6 +487,7 @@ export function CommunityThread({
                       <View style={s.bubbleHeader}>
                         <View style={s.authorBadgeRow}>
                           <Text style={s.author}>{item.author}</Text>
+                          <CommunityRoleBadge role={item.authorRole} author={item.author} compact />
                           {isReply && item.parentAuthor && (
                             <View style={s.replyTargetChip}>
                               <IconSymbol name="reply" size={11} color="#047857" />
