@@ -2,16 +2,16 @@ import { reuseSnapshot } from '@/utils/stable-snapshot';
 import { staffRating } from '@/utils/staff-profile';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { User, Customer, Staff, UserRole } from '@/types/user';
-import { IdentityProfile, IdentitySession, identityRequest } from '@/api/identity';
+import { IdentityProfile, IdentityRequestError, IdentitySession, identityRequest } from '@/api/identity';
 import { setCustomerNotificationSession } from '@/data/connectedNotifications';
 import { connectOperationsSession, onOperationSessionInvalidated } from '@/api/operations';
-import { clearLegacyLoginStorage } from '@/utils/remembered-login';
+import { clearLegacyLoginStorage, readRememberedSession, storeRememberedSession } from '@/utils/remembered-login';
 
 interface AuthContextType {
   accessToken: string | null;
   currentUser: User | null; currentRole: UserRole; currentCustomer: Customer | null; currentStaff: Staff | null;
   isAuthenticated: boolean; isLoading: boolean;
-  login: (identifier: string, password: string, role: UserRole) => Promise<void>;
+  login: (identifier: string, password: string, role: UserRole, remember: boolean) => Promise<boolean>;
   completeRegistration: (session: IdentitySession) => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateCustomerProfile: (profile: Pick<Customer, 'fullName' | 'phone' | 'email' | 'avatar'>) => Promise<void>;
@@ -48,13 +48,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } : null));
   }
   function clear() { sessionRef.current = null; connectOperationsSession(null, null); setCustomerNotificationSession(null, null); setAccessToken(null); setCurrentUser(null); setCurrentCustomer(null); setCurrentStaff(null); }
-  useEffect(() => {
-    let active = true;
+  function startSession(session: IdentitySession, profile: IdentityProfile) {
+    sessionRef.current = session;
+    setAccessToken(session.accessToken);
+    apply(profile);
+  }
+  function expireSession() {
     clear();
-    void clearLegacyLoginStorage().finally(() => { if (active) setIsLoading(false); });
-    return () => { active = false; };
+    void storeRememberedSession(null).catch(() => {});
+  }
+  useEffect(() => {
+    const controller = new AbortController();
+    async function restoreSession() {
+      try {
+        await clearLegacyLoginStorage();
+        const saved = await readRememberedSession();
+        if (!saved || controller.signal.aborted) return;
+        const profile = await identityRequest<IdentityProfile>('/auth/profile', undefined, saved.accessToken, 'GET', controller.signal);
+        if (controller.signal.aborted) return;
+        if ((profile.role !== 'CUSTOMER' && profile.role !== 'STAFF') || Date.parse(saved.expiresAt) <= Date.now()) {
+          await storeRememberedSession(null);
+          return;
+        }
+        startSession({ ...saved, user: profile }, profile);
+      } catch (error) {
+        if (!controller.signal.aborted && error instanceof IdentityRequestError && [401, 403].includes(error.status)) {
+          await storeRememberedSession(null).catch(() => {});
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
+    }
+    void restoreSession();
+    return () => controller.abort();
   }, []);
-  useEffect(() => { onOperationSessionInvalidated(clear); return () => onOperationSessionInvalidated(null); }, []);
+  useEffect(() => { onOperationSessionInvalidated(expireSession); return () => onOperationSessionInvalidated(null); }, []);
   const refreshProfile = useCallback(async () => {
     const session = sessionRef.current;
     if (!session) throw new Error('Vui lòng đăng nhập.');
@@ -63,20 +91,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
   useEffect(() => {
     const session = sessionRef.current;
-    if (!session || !currentUser) return;
-    const timer = setTimeout(() => { if (sessionRef.current === session) clear(); }, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
+    if (!session || !accessToken) return;
+    const timer = setTimeout(() => { if (sessionRef.current === session) expireSession(); }, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
     return () => clearTimeout(timer);
-  }, [currentUser]);
-  const accept = async (session: IdentitySession) => {
+  }, [accessToken]);
+  const accept = async (session: IdentitySession, remember = false) => {
     const profile = await identityRequest<IdentityProfile>('/auth/profile', undefined, session.accessToken);
-    sessionRef.current = session; setAccessToken(session.accessToken); apply(profile);
+    if (profile.id !== session.user.id || profile.role !== session.user.role) throw new Error('Phiên đăng nhập không khớp với tài khoản.');
+    const stored = await storeRememberedSession(remember ? session : null).then(() => true, () => false);
+    startSession(session, profile);
+    return stored;
   };
-  const login = async (identifier: string, password: string, role: UserRole) => {
+  const completeRegistration = async (session: IdentitySession) => { await accept(session); };
+  const login = async (identifier: string, password: string, role: UserRole, remember: boolean) => {
     if (role !== 'CUSTOMER' && role !== 'STAFF') throw new Error('Vui lòng đăng nhập Admin trên website.');
     const session = await identityRequest<IdentitySession>('/auth/login', { identifier, password, role });
     try {
       if (session.user.role !== role) throw new Error('Tài khoản không thuộc vai trò đang chọn.');
-      await accept(session);
+      return await accept(session, remember);
     } catch (error) {
       await identityRequest('/auth/logout', {}, session.accessToken).catch(() => undefined);
       throw error;
@@ -110,9 +142,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     const session = sessionRef.current;
     clear();
-    if (session) await identityRequest('/auth/logout', {}, session.accessToken);
+    const forget = storeRememberedSession(null);
+    await Promise.all([forget, session && identityRequest('/auth/logout', {}, session.accessToken)]);
   };
   return <AuthContext.Provider value={{ accessToken, currentUser, currentRole, currentCustomer, currentStaff, isAuthenticated: !!currentUser, isLoading,
-    login, completeRegistration: accept, refreshProfile, updateCustomerProfile, updateAvatar, updateStaffProfile, changePassword, logout }}>{children}</AuthContext.Provider>;
+    login, completeRegistration, refreshProfile, updateCustomerProfile, updateAvatar, updateStaffProfile, changePassword, logout }}>{children}</AuthContext.Provider>;
 };
 export const useAuth = () => { const context = useContext(AuthContext); if (!context) throw new Error('useAuth must be used within an AuthProvider'); return context; };

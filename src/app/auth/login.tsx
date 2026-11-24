@@ -3,6 +3,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { BorderRadius, BrandColors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { supportsRememberedLogin } from '@/utils/remembered-login';
 import { StaffWelcomeOverlay } from '@/components/common/StaffWelcomeOverlay';
 import { WelcomeSweepOverlay } from '@/components/common/WelcomeSweepOverlay';
 import { useRouter } from 'expo-router';
@@ -25,6 +26,7 @@ export default function LoginScreen() {
   const [role, setRole] = useState<LoginRole>('CUSTOMER');
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showWelcome, setShowWelcome] = useState(false);
@@ -36,6 +38,7 @@ export default function LoginScreen() {
     setRole(nextRole);
     setAccount('');
     setPassword('');
+    setRemember(false);
     setErrorMessage('');
   };
 
@@ -50,7 +53,12 @@ export default function LoginScreen() {
     if (!account.trim() || !password) { setErrorMessage('Vui lòng nhập email/số điện thoại và mật khẩu.'); return; }
     Keyboard.dismiss();
     setIsLoading(true);
-    try { await login(account.trim(), password, role); setPassword(''); setShowWelcome(true); }
+    try {
+      const stored = await login(account.trim(), password, role, remember);
+      setPassword('');
+      setShowWelcome(true);
+      if (remember && !stored) Alert.alert('Chưa ghi nhớ được phiên', 'Ứng dụng đã đăng nhập. Bạn cần nhập lại mật khẩu khi mở lại ứng dụng.');
+    }
     catch (error) { setErrorMessage(error instanceof Error ? error.message : 'Không thể đăng nhập.'); }
     finally { setIsLoading(false); }
   };
@@ -110,6 +118,19 @@ export default function LoginScreen() {
               </View>
 
               <View style={styles.optionsRow}>
+                {supportsRememberedLogin && (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: remember, disabled: busy }}
+                    disabled={busy}
+                    onPress={() => setRemember(value => !value)}
+                    style={styles.rememberOption}>
+                    <View style={[styles.checkbox, remember && styles.checkboxChecked]}>
+                      {remember && <IconSymbol name="check" size={14} color="#FFFFFF" />}
+                    </View>
+                    <Text style={styles.rememberText}>Ghi nhớ đăng nhập</Text>
+                  </Pressable>
+                )}
                 <Pressable onPress={() => Alert.alert('Quên mật khẩu', 'Tính năng khôi phục mật khẩu sẽ gửi mã xác thực tới thông tin tài khoản đã đăng ký.')}><Text style={styles.forgotText}>Quên mật khẩu?</Text></Pressable>
               </View>
 
@@ -138,7 +159,12 @@ const styles = StyleSheet.create({
   roleSwitch: { flexDirection: 'row', gap: 10, marginBottom: 14 }, roleOption: { flex: 1, minHeight: 82, borderWidth: 1, borderColor: '#DCE5E8', backgroundColor: 'rgba(255,255,255,0.72)', borderRadius: BorderRadius.lg, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 7 }, roleOptionActive: { borderColor: BrandColors.primary, backgroundColor: '#F0FDFA', shadowColor: BrandColors.primary, shadowOpacity: 0.1, shadowRadius: 8, elevation: 2 }, roleEmoji: { fontSize: 22 }, roleCopy: { flex: 1 }, roleTitle: { fontSize: 13, fontWeight: '800', color: BrandColors.gray700 }, roleTitleActive: { color: '#047857' }, roleHint: { fontSize: 10, color: BrandColors.gray500, marginTop: 3, lineHeight: 13 }, roleHintActive: { color: '#059669' }, roleCheck: { width: 18, height: 18, borderRadius: 9, backgroundColor: BrandColors.primary, alignItems: 'center', justifyContent: 'center' }, roleCheckText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   formCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOpacity: 0.08, shadowRadius: 18, elevation: 4 }, formHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }, formIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' }, formHeadingCopy: { flex: 1 }, formTitle: { color: BrandColors.gray900, fontSize: 18, fontWeight: '900' }, formSubtitle: { color: BrandColors.gray600, fontSize: 12, lineHeight: 17, marginTop: 2 },
   errorBox: { backgroundColor: '#FEF2F2', borderRadius: 10, padding: 10, marginBottom: 14 }, errorText: { color: '#B91C1C', fontSize: 12, lineHeight: 17 }, inputLabel: { color: BrandColors.gray700, fontSize: 12, fontWeight: '800', marginBottom: 7 }, passwordLabel: { marginTop: 14 }, inputWrapper: { height: 50, flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderColor: '#D7E0E8', backgroundColor: '#F8FAFC', borderRadius: 13, paddingHorizontal: 12 }, input: { flex: 1, color: BrandColors.gray900, fontSize: 14 },
-  optionsRow: { alignItems: 'flex-end', marginTop: 14, marginBottom: 18 }, forgotText: { color: BrandColors.primary, fontSize: 11, fontWeight: '800' },
+  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', columnGap: 12, minHeight: 44, marginTop: 4, marginBottom: 8 },
+  rememberOption: { flexDirection: 'row', flexGrow: 1, alignItems: 'center', gap: 7, minHeight: 44 },
+  checkbox: { width: 19, height: 19, borderRadius: 5, borderWidth: 1, borderColor: BrandColors.gray400, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary },
+  rememberText: { flexShrink: 1, color: BrandColors.gray700, fontSize: 12, fontWeight: '700' },
+  forgotText: { color: BrandColors.primary, fontSize: 11, fontWeight: '800' },
   submitButton: { minHeight: 52, borderRadius: 14, backgroundColor: BrandColors.primary, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 8, elevation: 3 }, buttonLoading: { opacity: 0.75 }, submitButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' }, submitArrow: { color: '#FFFFFF', fontSize: 27, lineHeight: 28 },
   registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 17 }, registerText: { color: BrandColors.gray600, fontSize: 12 }, registerLink: { color: BrandColors.primary, fontSize: 12, fontWeight: '900' }, staffNotice: { flexDirection: 'row', gap: 7, alignItems: 'flex-start', marginTop: 15, padding: 10, borderRadius: 10, backgroundColor: '#F0F9FF' }, staffNoticeText: { flex: 1, color: '#075985', fontSize: 11, lineHeight: 16 },
 });

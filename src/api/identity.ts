@@ -12,6 +12,9 @@ export interface IdentityProfile extends IdentityUser {
 export interface IdentitySession { accessToken: string; expiresAt: string; user: IdentityUser }
 export interface EmailChallenge { challengeId: string; email: string; expiresAt: string; resendAt: string }
 export interface EmailVerified { verificationToken: string; email: string; expiresAt: string }
+export class IdentityRequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
 export async function identityRequest<T>(path: string, body?: object, token?: string, method = body ? 'POST' : 'GET', signal?: AbortSignal): Promise<T> {
   if (!API_BASE_URL) throw new Error('Chưa cấu hình địa chỉ backend.');
   const controller = new AbortController();
@@ -27,7 +30,7 @@ export async function identityRequest<T>(path: string, body?: object, token?: st
     }); } catch { throw new Error('Không thể kết nối hệ thống. Vui lòng thử lại.'); }
     if (!response.ok) {
       const error = await response.json().catch(() => null);
-      throw new Error(error?.detail || 'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin.');
+      throw new IdentityRequestError(error?.detail || 'Không thể xử lý yêu cầu. Vui lòng kiểm tra thông tin.', response.status);
     }
     return response.status === 204 ? undefined as T : await readJsonResponse<T>(response);
   } catch (error) {
