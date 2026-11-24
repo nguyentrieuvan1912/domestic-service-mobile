@@ -97,9 +97,18 @@ export default function BookingsScreen() {
               return (
                 <Pressable
                   key={tab.id}
-                  style={[styles.tabPill, isSelected && styles.tabPillActive]}
+                  style={[
+                    styles.tabPill,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    isSelected && styles.tabPillActive,
+                  ]}
                   onPress={() => setActiveFilter(tab.id)}>
-                  <Text style={[styles.tabPillText, isSelected && styles.tabPillTextActive]}>
+                  <Text
+                    style={[
+                      styles.tabPillText,
+                      { color: colors.textSecondary },
+                      isSelected && styles.tabPillTextActive,
+                    ]}>
                     {tab.label}
                   </Text>
                 </Pressable>

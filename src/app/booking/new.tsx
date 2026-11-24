@@ -31,6 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CelebrationOverlay, CleanMasterLoader } from '@/components/common/CleanMasterAnimations';
 import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
@@ -56,7 +57,7 @@ import { ServiceRecommendation } from '@/components/booking/ServiceRecommendatio
 import { usePackageRecommendation } from '@/hooks/use-package-recommendation';
 import { minimumStaffForArea } from '@/utils/service-setup';
 import type { PackageSuggestion } from '@/api/catalog-types';
-import { ServiceQuantity, ServiceAnswersSummary } from '@/components/booking/ServiceQuestions';
+import { ServiceQuantity, ServiceAnswersSummary, ServiceQuestions } from '@/components/booking/ServiceQuestions';
 import type { Staff, CustomerAddress } from '@/types/user';
 import { BookingMode } from '@/types/booking';
 import { BOOKING_PAYMENT_OPTIONS, bookingRequiresPayment, type BookingPaymentMethod } from '@/utils/booking-payment-options';
@@ -157,11 +158,10 @@ export default function NewBookingScreen() {
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
           <View style={{ alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}><BookingExitButton /></View>
           <View style={styles.stateCenterContainer}>
-            <ActivityIndicator size="large" color={BrandColors.primary} />
-            <Text style={[styles.stateLoadingTitle, { color: colors.text }]}>Đang tải dịch vụ và địa chỉ...</Text>
-            <Text style={[styles.stateSubtitle, { color: colors.textSecondary }]}>
-              Vui lòng đợi giây lát trong khi chúng tôi chuẩn bị dữ liệu đặt lịch cho bạn.
-            </Text>
+            <CleanMasterLoader
+              label="Đang tải dịch vụ và địa chỉ…"
+              sublabel="Vui lòng đợi giây lát trong khi chúng tôi chuẩn bị dữ liệu đặt lịch cho bạn."
+            />
           </View>
         </SafeAreaView>
       </View>
@@ -287,6 +287,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
   const [serviceSetupIndex,setServiceSetupIndex]=useState(0);
   const [questionWizardOpen,setQuestionWizardOpen]=useState(false);
   const [questionIndex,setQuestionIndex]=useState(0);
+  const modeAOptionsScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   // Instant & buttery-smooth step transition (eliminates all blinking and delay)
   const triggerStepTransition = (nextStep: number) => {
@@ -294,7 +295,12 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     setFavouritePending(null);
     if(nextStep>currentStep&&!createdBooking){
       if ((selectedMode==='MODE_B' && currentStep===0) || (selectedMode==='MODE_A' && currentStep===5)) {
-        const issue = serviceAnswersIssue(serviceDetail?.requirements || [], answers);
+        if (selectedMode === 'MODE_A' && modeAAreaIssue) {
+          setSubmitError(modeAAreaIssue);
+          modeAOptionsScroll.current?.scrollTo({ y: 0 });
+          return;
+        }
+        const issue = questionnaireIssue;
         if(issue){setSubmitError(issue);if(selectedMode==='MODE_A'){setQuestionIndex(0);setQuestionWizardOpen(true);}else{setServiceSetupIndex(0);Alert.alert('Hoàn tất nhu cầu dịch vụ',issue);}return;}
       }
       if((selectedMode==='MODE_A'&&currentStep>=1)||(selectedMode==='MODE_B'&&currentStep>=3)){
@@ -404,7 +410,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
     setSelectedServiceId(id);setUnitQuantity(1);setServiceSetupIndex(0);setQuestionIndex(0);setQuestionWizardOpen(false);
     setSelectedPackageId(getPackagesByServiceId(id)[0]?.id || '');
     // A different primary service must not silently retain/charge unrelated extras.
-    setSelectedExtraKeys([]); setAnswers({}); setRequiredStaffCount(getPackagesByServiceId(id)[0]?.defaultStaffCount || 1);setSelectedDurationHours(getPackagesByServiceId(id)[0]?.durationHours || 1);
+    setSelectedExtraKeys([]); setAnswers({}); setSubmitError(''); setRequiredStaffCount(getPackagesByServiceId(id)[0]?.defaultStaffCount || 1);setSelectedDurationHours(getPackagesByServiceId(id)[0]?.durationHours || 1);
   };
 
   // Promotion / Voucher (integrated directly in Order Summary)
@@ -436,6 +442,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
   const [radarStatusText, setRadarStatusText] = useState('Đang tìm nhân viên phù hợp năng lực, khu vực và lịch làm việc...');
   // Mode B stays in MATCHING until a staff member accepts it in the staff flow.
   const [createdBooking, setCreatedBooking] = useState<ConnectedBooking | null>(null);
+  const [bookingCelebration, setBookingCelebration] = useState<{ code: string; next: () => void } | null>(null);
   const modeBAcceptedStaff = createdBooking?.assignments.filter(item => ['ACCEPTED','COMPLETED'].includes(item.status)) || [];
   const isModeBStaffAccepted=!!createdBooking && ['CONFIRMED','IN_PROGRESS','COMPLETED'].includes(createdBooking.status) && modeBAcceptedStaff.length >= createdBooking.requiredStaffCount;
   const [answers, setAnswers] = useState<Record<string, unknown>>(() => {if(ai)return ai.answers || {};if(retry)return retry.answers;try {const data=JSON.parse(params.answers || '{}');return data && typeof data==='object' && !Array.isArray(data)?data:{};}catch{return {};}});
@@ -460,7 +467,15 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
       return !supplied || !!serviceSetupIssue(step, serviceDetail, initial);
     });
   },[serviceDetail,ai,reviewAiSetup]);
-  const questionSteps=useMemo(()=>serviceDetail?serviceSetupSteps(serviceDetail,true):[],[serviceDetail]);
+  const modeAAreaFields = useMemo(() => serviceDetail?.requirements.filter(
+    field => field.fieldKey === 'areaM2' && field.fieldType === 'NUMBER',
+  ) ?? [], [serviceDetail]);
+  const questionSteps = useMemo(() => serviceDetail ? serviceSetupSteps(serviceDetail, true)
+    .filter(step => step.kind === 'QUESTION')
+    .filter(step => !modeAAreaFields.includes(step.field)) : [], [serviceDetail, modeAAreaFields]);
+  const followUpFields = questionSteps.map(step => step.field);
+  const modeAAreaIssue = serviceAnswersIssue(modeAAreaFields, answers);
+  const modeAFollowUpIssue = serviceAnswersIssue(followUpFields, answers);
   const [unitQuantity,setUnitQuantity]=useState(() => Math.max(1, Math.min(100, Math.trunc(Number(ai?.quantity || params.quantity || retry?.quantity || configuration.acQuantity || 1) || 1))));
   const quantity=serviceDetail?.service.priceUnit==='ITEM'?unitQuantity:1;
   const quoteBody = { quantity,configuration:service.id===configuredServiceId?{...configuration,...('acQuantity' in configuration?{acQuantity:quantity}:{})}:{},serviceId:service.id, packageId:actualPackage?.id, requiredStaffCount: selectedMode === 'MODE_A' ? 1 : requiredStaffCount, addOnIds:selectedAddOnIds, relatedServiceIds:selectedRelatedServiceIds, promotionCode:selectedPromoCode, answers };
@@ -491,6 +506,10 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
   },[serviceDetail,selectedMode]);
   const appliedMeasurement=useRef('');
   useEffect(()=>{
+    if (!recommendation.measurementKey) {
+      appliedMeasurement.current = '';
+      return;
+    }
     const option=recommendation.data?.options[0];
     if(!ai&&option&&bookingActivity.active&&appliedMeasurement.current!==recommendation.measurementKey){
       appliedMeasurement.current=recommendation.measurementKey;applyRecommendedOption(option);
@@ -576,7 +595,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
       if(selectedMode==='MODE_A' && !selectedStaff) throw new Error('Vui lòng chọn nhân viên phù hợp.');
       const body={...JSON.parse(quoteKey),mode:selectedMode,addressId:selectedAddressId,startsAt,staffId:selectedMode==='MODE_A'?selectedStaff?.id:undefined,paymentMethod,notes:customerNote};
       const serialized=JSON.stringify(body);if(requestRef.current?.body!==serialized)requestRef.current={body:serialized,key:'mobile-'+Date.now()+'-'+Math.random().toString(36).slice(2)};
-      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); setCreatedBooking(bookingView(raw)); void CustomerBookings.load().catch(()=>{});if(bookingRequiresPayment(String(raw.status)))router.replace({pathname:'/booking/payment',params:{id:String(raw.id)}});else if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6);
+      const raw=await operationRequest<Record<string,unknown>>('booking','/bookings','POST',{...body,requestKey:requestRef.current!.key}); const created = bookingView(raw); setCreatedBooking(created); void CustomerBookings.load().catch(()=>{}); const goNext = () => { if(bookingRequiresPayment(String(raw.status)))router.replace({pathname:'/booking/payment',params:{id:String(raw.id)}});else if(selectedMode==='MODE_A')router.replace({pathname:'/booking/waiting',params:{id:String(raw.id)}});else setCurrentStep(6); }; setBookingCelebration({ code: created.bookingCode, next: goNext });
     } catch(e) {setSubmitError(e instanceof Error?e.message:'Chưa tạo được đơn.');} finally{setSaving(false);}
   };
   const CLEANING_DURATIONS = packages.filter(p=>p.durationMinutes*quantity<=240&&(p.defaultStaffCount||1)===1).map(p=>({packageId:p.id,hours:p.durationHours,title:p.name,area:p.maxArea || '',unitType:p.recommendedFor || '',desc:p.description,isPopular:false,price:p.price}));
@@ -828,7 +847,6 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
   // =========================================================================
   if(questionWizardOpen && serviceDetail && questionSteps.length>0) {
     return <ServiceSetupWizard detail={serviceDetail} steps={questionSteps} index={questionIndex}
-      recommendation={recommendation} applyRecommendation={applyRecommendedOption}
       answers={answers} packageId={selectedPackageId} quantity={unitQuantity} staffCount={1}
       setAnswers={setAnswers} setQuantity={setUnitQuantity} setStaffCount={setRequiredStaffCount} setPackage={setSelectedPackageId}
       setIndex={setQuestionIndex} back={handleBack} complete={()=>setQuestionWizardOpen(false)} nextSection="Gói dịch vụ và công việc thêm" />;
@@ -983,6 +1001,27 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
       </View>
     );
   }
+  if (bookingCelebration) {
+    return (
+      <View style={styles.gradientContainer}>
+        <CelebrationOverlay
+          visible
+          variant="booking"
+          title="Đặt dịch vụ thành công!"
+          subtitle="Yêu cầu của bạn đã được CleanMaster ghi nhận và đang chuyển sang bước tiếp theo."
+          badgeText={`Mã đơn: ${bookingCelebration.code}`}
+          autoDismissMs={1700}
+          actionLabel="Tiếp tục"
+          onDone={() => {
+            const go = bookingCelebration.next;
+            setBookingCelebration(null);
+            go();
+          }}
+        />
+      </View>
+    );
+  }
+
   // =========================================================================
   // ===================== LUỒNG MODE A: CHỌN NHÂN VIÊN =======================
   // =========================================================================
@@ -1587,23 +1626,32 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
           <SafeAreaView style={styles.safeArea} edges={['top']}>
             {renderHeader('Thời lượng & Dịch vụ bổ trợ', 5, 9)}
             {renderAnimatedStep(
+              <KeyboardSafeLayout>
               <View style={styles.stepContainer}>
-                <ScrollView contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false}>
+                <ScrollView ref={modeAOptionsScroll} contentContainerStyle={styles.stepContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                   <View style={styles.summaryDetailCard}>
                     <Text style={styles.sectionHeaderTitle}>Dịch vụ nhân viên có thể thực hiện</Text>
                     <Text style={styles.stepSubtitleNote}>Chọn 1 dịch vụ bạn muốn nhân viên thực hiện trong ca này</Text>
                     <View style={styles.staffServiceGrid}>{(pickedStaff?.eligibleServices||selectedStaff.eligibleServices||[]).map(item=><Pressable key={item.id} style={[styles.staffServiceChip,item.id===service.id&&styles.staffServiceChipActive]} onPress={()=>chooseService(item.id)}><Text numberOfLines={1} style={[styles.staffServiceChipText,item.id===service.id&&styles.staffServiceChipTextActive]}>{item.id===service.id?'✓ ':''}{item.name}</Text></Pressable>)}</View>
                   </View>
+                  {modeAAreaFields.length > 0 && <View style={styles.summaryDetailCard}>
+                    <ServiceQuestions fields={modeAAreaFields} values={answers} change={next => {
+                      setAnswers(next);
+                      setSubmitError('');
+                    }} />
+                    {!!modeAAreaIssue && (String(answers.areaM2 ?? '').trim() || submitError === modeAAreaIssue) &&
+                      <Text accessibilityRole="alert" style={styles.selectionWarningText}>{modeAAreaIssue}</Text>}
+                    <ServiceRecommendation resource={recommendation} packageId={actualPackage?.id || ''} quantity={quantity} staffCount={1} apply={applyRecommendedOption} fixedStaff />
+                  </View>}
                   {serviceDetail?.service.priceUnit==='ITEM' && <ServiceQuantity value={unitQuantity} change={setUnitQuantity} />}
                   {questionSteps.length>0 && <View style={styles.summaryDetailCard}>
                     <Text style={styles.sectionHeaderTitle}>Yêu cầu riêng cho dịch vụ</Text>
                     <Text style={styles.stepSubtitleNote}>Chúng tôi sẽ hướng dẫn bạn chọn từng thông tin trên một màn hình riêng.</Text>
-                    <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={()=>{setQuestionIndex(0);setQuestionWizardOpen(true);}}><LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}><Text style={styles.ctaPrimaryText}>{serviceAnswersIssue(serviceDetail?.requirements || [],answers)?'Bắt đầu chọn thông tin →':'Xem lại / Chỉnh sửa thông tin →'}</Text></LinearGradient></Pressable>
-                    {!serviceAnswersIssue(serviceDetail?.requirements || [],answers) && <View style={{ marginTop: 12 }}><ServiceAnswersSummary fields={serviceDetail?.requirements || []} values={answers} /></View>}
+                    <Pressable accessibilityRole="button" style={styles.ctaPrimaryBtn} onPress={()=>{setQuestionIndex(0);setQuestionWizardOpen(true);}}><LinearGradient colors={BrandColors.primaryGradient} style={styles.gradientBtn}><Text style={styles.ctaPrimaryText}>{modeAFollowUpIssue?'Bắt đầu chọn thông tin →':'Xem lại / Chỉnh sửa thông tin →'}</Text></LinearGradient></Pressable>
+                    {!modeAFollowUpIssue && <View style={{ marginTop: 12 }}><ServiceAnswersSummary fields={followUpFields} values={answers} /></View>}
                   </View>}
                   {staffLoading&&<Text style={styles.stepSubtitleNote}>Đang kiểm tra lại toàn bộ thời lượng…</Text>}
                   {/* Duration selection */}
-                  <ServiceRecommendation resource={recommendation} packageId={actualPackage?.id || ''} quantity={quantity} staffCount={1} apply={applyRecommendedOption}/>
                   <Text style={styles.sectionHeaderTitle}>Gói dịch vụ & Thời lượng</Text>
                   <Text style={styles.stepSubtitleNote}>
                     Chọn gói và thời lượng phù hợp với nhu cầu của bạn
@@ -1697,6 +1745,7 @@ function ConnectedNewBooking({ catalog, addresses, retryBooking, aiDraft, addres
                   </Pressable>
                 </SafeAreaView>
               </View>
+              </KeyboardSafeLayout>
             )}
           </SafeAreaView>
         </View>

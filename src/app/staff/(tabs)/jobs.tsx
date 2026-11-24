@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffService, StaffJobItem } from '@/data/staffService';
-import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/context/ThemeContext';
 import { useStaffMatching } from '@/hooks/use-staff-matching';
@@ -120,36 +119,37 @@ function StaffJobsContent() {
         </View>
 
         {/* Tab Segment Selector */}
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <Pressable
-            style={[styles.tabButton, activeTab === 'upcoming' && styles.tabButtonActive]}
+            style={[styles.tabButton, { backgroundColor: colors.surfaceMuted }, activeTab === 'upcoming' && styles.tabButtonActive]}
             onPress={() => setActiveTab('upcoming')}
           >
             <Text
-              style={[styles.tabButtonText, activeTab === 'upcoming' && styles.tabButtonTextActive]}
+              style={[styles.tabButtonText, { color: colors.textSecondary }, activeTab === 'upcoming' && styles.tabButtonTextActive]}
             >
               Sắp tới ({upcomingList.length})
             </Text>
           </Pressable>
 
           <Pressable
-            style={[styles.tabButton, activeTab === 'open' && styles.tabButtonActive]}
+            style={[styles.tabButton, { backgroundColor: colors.surfaceMuted }, activeTab === 'open' && styles.tabButtonActive]}
             onPress={() => setActiveTab('open')}
           >
             <Text
-              style={[styles.tabButtonText, activeTab === 'open' && styles.tabButtonTextActive]}
+              style={[styles.tabButtonText, { color: colors.textSecondary }, activeTab === 'open' && styles.tabButtonTextActive]}
             >
               Việc mới ({matchCount})
             </Text>
           </Pressable>
 
           <Pressable
-            style={[styles.tabButton, activeTab === 'completed' && styles.tabButtonActive]}
+            style={[styles.tabButton, { backgroundColor: colors.surfaceMuted }, activeTab === 'completed' && styles.tabButtonActive]}
             onPress={() => setActiveTab('completed')}
           >
             <Text
               style={[
                 styles.tabButtonText,
+                { color: colors.textSecondary },
                 activeTab === 'completed' && styles.tabButtonTextActive,
               ]}
             >
@@ -158,21 +158,21 @@ function StaffJobsContent() {
           </Pressable>
         </View>
 
-        {activeTab === 'open' && <View style={{ paddingHorizontal: Spacing.three, paddingBottom: Spacing.two }}><MatchingModePicker value={matchMode} onChange={setMatchMode} invitations={counts.A} open={counts.B} /></View>}
+        {activeTab === 'open' && <View style={{ paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.two }}><MatchingModePicker value={matchMode} onChange={setMatchMode} invitations={counts.A} open={counts.B} /></View>}
         {/* Search & Filter */}
-        <View style={styles.filterSection}>
-          <View style={styles.searchBar}>
-            <IconSymbol name="search" size={16} color={BrandColors.gray400} />
+        <View style={[styles.filterSection, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <View style={[styles.searchBar, { backgroundColor: colors.surfaceMuted }]}>
+            <IconSymbol name="search" size={16} color={colors.textMuted} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder={activeTab === 'open' ? 'Tìm dịch vụ, mã ca, khu vực...' : 'Tìm khách hàng, mã ca, địa chỉ...'}
-              placeholderTextColor={BrandColors.gray400}
+              placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery ? (
               <Pressable onPress={() => setSearchQuery('')}>
-                <IconSymbol name="close" size={14} color={BrandColors.gray400} />
+                <IconSymbol name="close" size={14} color={colors.textMuted} />
               </Pressable>
             ) : null}
           </View>
@@ -188,10 +188,22 @@ function StaffJobsContent() {
               return (
                 <Pressable
                   key={d}
-                  style={[styles.chip, selected && styles.chipActive]}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                    selected && { backgroundColor: colors.accentBg, borderColor: colors.primary },
+                  ]}
                   onPress={() => setSelectedDistrict(d)}
                 >
-                  <Text style={[styles.chipText, selected && styles.chipTextActive]}>{d}</Text>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: colors.textSecondary },
+                      selected && { color: colors.accentText, fontWeight: '800' },
+                    ]}
+                  >
+                    {d}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -199,12 +211,44 @@ function StaffJobsContent() {
         </View>
 
         {activeTab === 'open' && <View style={{ padding: Spacing.two, gap: 8 }}>
-          <Text style={{ color: BrandColors.gray500 }}>Việc đã lọc theo năng lực được duyệt, khu vực và lịch làm đã đăng ký của bạn.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12.5 }}>Việc đã lọc theo năng lực được duyệt, khu vực và lịch làm đã đăng ký của bạn.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {[['', 'Mọi dịch vụ'], ...services].map(([id, name]) => <Pressable key={id} style={[styles.chip, selectedService === id && styles.chipActive]} onPress={() => setSelectedService(id)}><Text style={styles.chipText}>{name}</Text></Pressable>)}
+            {[['', 'Mọi dịch vụ'], ...services].map(([id, name]) => {
+              const active = selectedService === id;
+              return (
+                <Pressable
+                  key={id}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    active && { backgroundColor: colors.accentBg, borderColor: colors.primary },
+                  ]}
+                  onPress={() => setSelectedService(id)}
+                >
+                  <Text style={[styles.chipText, { color: active ? colors.accentText : colors.textSecondary }, active && { fontWeight: '800' }]}>{name}</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {['', ...dates].map(date => <Pressable key={date} style={[styles.chip, selectedDate === date && styles.chipActive]} onPress={() => setSelectedDate(date)}><Text style={styles.chipText}>{date ? date.split('-').reverse().join('/') : 'Mọi ngày'}</Text></Pressable>)}
+            {['', ...dates].map(date => {
+              const active = selectedDate === date;
+              return (
+                <Pressable
+                  key={date}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    active && { backgroundColor: colors.accentBg, borderColor: colors.primary },
+                  ]}
+                  onPress={() => setSelectedDate(date)}
+                >
+                  <Text style={[styles.chipText, { color: active ? colors.accentText : colors.textSecondary }, active && { fontWeight: '800' }]}>
+                    {date ? date.split('-').reverse().join('/') : 'Mọi ngày'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
           <MatchingSortPicker value={sort} onChange={setSort} />
         </View>}
@@ -215,10 +259,10 @@ function StaffJobsContent() {
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         >
           {activeTab === 'open' ? <StaffMatchingList matching={matching} filter={{ query: searchQuery, district: selectedDistrict, sort, mode: matchMode, serviceId: selectedService, date: selectedDate }} onResetFilters={() => { setSearchQuery(''); setSelectedDistrict('Tất cả'); setSelectedService(''); setSelectedDate(''); }} onClaimed={job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })} /> : filteredList.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol name="calendar" size={44} color={BrandColors.gray300} />
-              <Text style={styles.emptyTitle}>Không có ca làm việc nào</Text>
-              <Text style={styles.emptySub}>
+            <View style={[styles.emptyContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <IconSymbol name="calendar" size={44} color={colors.textMuted} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>Không có ca làm việc nào</Text>
+              <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
                 {activeTab === 'upcoming'
                   ? 'Bạn chưa có ca làm việc nào sắp tới. Hãy chuyển sang tab "Việc mới" để nhận thêm ca.'
                   : 'Chưa có lịch sử ca làm việc.'}
@@ -228,20 +272,20 @@ function StaffJobsContent() {
             filteredList.map((job) => {
               const badge = getStatusBadge(job.status);
               return (
-                <View key={job.id} style={styles.jobCard}>
+                <View key={job.id} style={[styles.jobCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   {/* Top row */}
                   <View style={styles.cardTop}>
                     <View style={styles.serviceRow}>
-                      <View style={styles.serviceIconWrap}>
+                      <View style={[styles.serviceIconWrap, { backgroundColor: colors.accentBg }]}>
                         <IconSymbol
                           name={job.serviceIcon || 'clean'}
                           size={18}
-                          color="#047857"
+                          color={colors.accentText}
                         />
                       </View>
                       <View>
-                        <Text style={styles.serviceName}>{job.serviceName}</Text>
-                        <Text style={styles.bookingCode}>{job.bookingCode}</Text>
+                        <Text style={[styles.serviceName, { color: colors.text }]}>{job.serviceName}</Text>
+                        <Text style={[styles.bookingCode, { color: colors.textMuted }]}>{job.bookingCode}</Text>
                       </View>
                     </View>
 
@@ -252,47 +296,47 @@ function StaffJobsContent() {
                       </View>
                   </View>
 
-                  <Text style={styles.packageTitle}>{job.packageTitle}</Text>
+                  <Text style={[styles.packageTitle, { color: colors.text }]}>{job.packageTitle}</Text>
 
                   {/* Customer and timing */}
-                  <View style={styles.jobMetaBox}>
+                  <View style={[styles.jobMetaBox, { backgroundColor: colors.surfaceElevated }]}>
                     <View style={styles.jobMetaRow}>
                       <IconSymbol name="⏱️" style={styles.metaIcon} />
-                      <Text style={styles.metaText}>
-                        {job.date} • <Text style={styles.metaBold}>{job.timeSlot}</Text>
+                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                        {job.date} • <Text style={[styles.metaBold, { color: colors.text }]}>{job.timeSlot}</Text>
                       </Text>
                     </View>
 
                     <View style={styles.jobMetaRow}>
                       <IconSymbol name="📍" style={styles.metaIcon} />
-                      <Text style={styles.metaText} numberOfLines={1}>
+                      <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
                         {job.address} ({job.district})
                       </Text>
                     </View>
 
                     <View style={styles.jobMetaRow}>
                       <IconSymbol name="👤" style={styles.metaIcon} />
-                      <Text style={styles.metaText}>
+                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
                         Khách: {job.customerName}
                       </Text>
                     </View>
                   </View>
 
-                  {job.cancellationReason && <View style={styles.notesBox}><Text style={[styles.notesText, { color: '#B91C1C' }]}>{job.cancellationReason}</Text>
-                    {job.responseTimedOut && <Text style={[styles.notesText, { color: '#92400E' }]}>Hãy chú ý lời mời và phản hồi sớm hơn để có doanh thu tốt hơn.</Text>}
+                  {job.cancellationReason && <View style={[styles.notesBox, { backgroundColor: colors.dangerBg, borderLeftColor: colors.dangerBorder }]}><Text style={[styles.notesText, { color: colors.dangerText }]}>{job.cancellationReason}</Text>
+                    {job.responseTimedOut && <Text style={[styles.notesText, { color: colors.warningText }]}>Hãy chú ý lời mời và phản hồi sớm hơn để có doanh thu tốt hơn.</Text>}
                   </View>}
                   {job.notes ? (
-                    <View style={styles.notesBox}>
-                      <Text style={styles.notesText} numberOfLines={2}>
+                    <View style={[styles.notesBox, { backgroundColor: colors.warningBg, borderLeftColor: colors.warningBorder }]}>
+                      <Text style={[styles.notesText, { color: colors.warningText }]} numberOfLines={2}>
                         📝 {job.notes}
                       </Text>
                     </View>
                   ) : null}
 
                   {/* Financial summary on card */}
-                  <View style={styles.financialRow}>
-                    <Text style={styles.financialLabel}>Thu nhập thực nhận:</Text>
-                    <Text style={styles.financialAmount}>
+                  <View style={[styles.financialRow, { borderTopColor: colors.divider }]}>
+                    <Text style={[styles.financialLabel, { color: colors.textMuted }]}>Thu nhập thực nhận:</Text>
+                    <Text style={[styles.financialAmount, { color: colors.accentText }]}>
                       {job.netIncome.toLocaleString('vi-VN')}đ
                     </Text>
                   </View>
@@ -300,7 +344,7 @@ function StaffJobsContent() {
                   {/* Action Buttons */}
                   <View style={styles.actionRow}>
                         <BookingChatLink bookingId={job.id} staffId={staffId}
-                          style={styles.chatBtn} textStyle={styles.chatBtnText} />
+                          style={[styles.chatBtn, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]} textStyle={[styles.chatBtnText, { color: colors.accentText }]} />
 
                         <Pressable
                           style={styles.primaryActionBtn}
@@ -331,7 +375,6 @@ function StaffJobsContent() {
       </SafeAreaView>
 
       {/* Persistent Staff Bottom Nav */}
-      <StaffBottomNav activeTab="jobs" />
     </View>
   );
 }

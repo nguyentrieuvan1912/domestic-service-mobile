@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/context/ThemeContext';
@@ -8,17 +8,40 @@ import { IconSymbol } from './IconSymbol';
 const TAB_TOP_GAP = 4;
 const TAB_BOTTOM_GAP = 8;
 const TAB_SIDE_GAP = 12;
+const TAB_SURFACE_HEIGHT = 52;
 const TAB_ACTIVE_COLOR = '#AEF5D5';
 const TAB_IDLE_COLOR = '#F2F7F5';
 
 export function useBottomTabSpacing() {
   const insets = useSafeAreaInsets();
-  const { fontScale, width } = useWindowDimensions();
   const paddingBottom = Math.max(insets.bottom, Platform.OS === 'web' ? 6 : 4) + TAB_BOTTOM_GAP;
   const paddingHorizontal = Math.max(insets.left, insets.right) + TAB_SIDE_GAP;
-  const extraLabelSpace = fontScale > 1.15 ? 18 : width < 360 ? 12 : 0;
-  const height = 62 + TAB_TOP_GAP + paddingBottom + extraLabelSpace;
+  const height = TAB_SURFACE_HEIGHT + TAB_TOP_GAP + paddingBottom;
   return { height, paddingTop: TAB_TOP_GAP, paddingBottom, paddingHorizontal };
+}
+
+export function useFloatingTabOptions() {
+  const spacing = useBottomTabSpacing();
+  return {
+    headerShown: false,
+    animation: 'none',
+    sceneStyle: { backgroundColor: 'transparent' },
+    tabBarShowLabel: false,
+    tabBarHideOnKeyboard: true,
+    tabBarIconStyle: { width: 42, height: 32 },
+    tabBarBackground: () => <FloatingTabSurface inset={spacing.paddingHorizontal} bottom={spacing.paddingBottom} />,
+    tabBarStyle: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'transparent',
+      borderTopWidth: 0,
+      ...spacing,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
+  } as const;
 }
 
 export function FloatingTabSurface({ inset, bottom }: { inset: number; bottom: number }) {
@@ -40,13 +63,6 @@ export function TabImageIcon({ name, focused }: { name: string; focused: boolean
   </View>;
 }
 
-export function BottomTabLabel({ label, focused }: { label: string; focused: boolean }) {
-  return <Text numberOfLines={2} maxFontSizeMultiplier={1.5}
-    style={[styles.label, focused && styles.selected]}>
-    {label}
-  </Text>;
-}
-
 const styles = StyleSheet.create({
   surface: {
     position: 'absolute',
@@ -63,8 +79,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255, 255, 255, 0.52)',
   },
-  icon: { width: 42, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 42, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   activeIcon: { backgroundColor: 'rgba(172, 245, 211, 0.17)' },
-  label: { color: TAB_IDLE_COLOR, fontSize: 11, lineHeight: 15, textAlign: 'center', marginTop: 2, fontWeight: '600' },
-  selected: { color: TAB_ACTIVE_COLOR, fontWeight: '800' },
 });

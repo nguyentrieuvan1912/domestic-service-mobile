@@ -9,9 +9,9 @@ import { addCalendarDays, displayDate, displayTime, localDate } from '@/data/sta
 import { selectedSlots, setDaySlots, slotLocked, weekDates, weekStart, hourSlots, HOUR_STARTS, WEEK_SLOTS, WORK_SHIFTS, toggleShift } from '@/data/weeklyAvailability';
 import type { AvailabilityActor, AvailabilityDay, AvailabilityDraft, AvailabilitySnapshot } from '@/types/staff-availability';
 import { BrandColors } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { EmptyState } from '@/components/common/EmptyState';
-import { StaffBottomNav } from './StaffBottomNav';
 
 export function StaffAvailabilityScreen() {
   const router = useRouter();
@@ -26,28 +26,31 @@ const presetSlots = (start: string, end: string) => WEEK_SLOTS.filter(time => ti
 function DayButton({ label, time, checked, rest, disabled, onPress }: {
   label: string; time?: string; checked?: boolean; rest?: boolean; disabled: boolean; onPress: () => void;
 }) {
-  const filled = checked ? (rest ? s.restSelected : s.workSelected) : undefined;
-  const selectedText = checked ? (rest ? s.restStatusText : s.buttonWhite) : undefined;
+  const { colors, isDark } = useAppTheme();
+  const filled = checked ? (rest ? [s.restSelected, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }] : s.workSelected) : undefined;
+  const selectedText = checked ? (rest ? { color: colors.dangerText } : s.buttonWhite) : undefined;
   const marker = checked ? (rest ? '× ' : '✓ ') : '';
   return <Pressable
     accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
     accessibilityLabel={time ? label + ', ' + time : label}
     accessibilityState={{ checked, disabled }}
     disabled={disabled}
-    style={({ pressed }) => [s.dayButton, filled, (pressed || disabled) && s.disabled]}
+    style={({ pressed }) => [s.dayButton, { backgroundColor: isDark ? colors.surfaceElevated : '#fff', borderColor: colors.border }, filled, (pressed || disabled) && s.disabled]}
     onPress={onPress}>
-    <Text style={[s.dayButtonLabel, selectedText]}>{marker}{label}</Text>
-    {!!time && <Text style={[s.dayButtonTime, selectedText]}>{time}</Text>}
+    <Text style={[s.dayButtonLabel, { color: colors.accentText }, selectedText]}>{marker}{label}</Text>
+    {!!time && <Text style={[s.dayButtonTime, { color: colors.textSecondary }, selectedText]}>{time}</Text>}
   </Pressable>;
 }
 
 function WorkPeriods({ intervals }: Pick<AvailabilityDay, 'intervals'>) {
-  return intervals.map(period => <View key={period.startsAt} style={s.period}>
-    <Text style={s.periodTime}>{displayTime(period.startsAt)}–{displayTime(period.endsAt)}</Text>
+  const { colors } = useAppTheme();
+  return intervals.map(period => <View key={period.startsAt} style={[s.period, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]}>
+    <Text style={[s.periodTime, { color: colors.accentText }]}>{displayTime(period.startsAt)}–{displayTime(period.endsAt)}</Text>
   </View>);
 }
 
 function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
+  const { colors, isDark } = useAppTheme();
   const router = useRouter(), navigation = useNavigation();
   const [loaded, setLoaded] = useState<AvailabilitySnapshot>(), [draft, setDraft] = useState<AvailabilityDraft>();
   const [week, setWeek] = useState(() => weekStart()), [now, setNow] = useState(Date.now());
@@ -99,14 +102,14 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
     if (!loaded || editing || saving) return;
     setWeek(start); setDraft(clone(loaded, start)); setNotice(''); setError('');
   };
-  return <View style={s.root}><SafeAreaView edges={['top']} style={s.screen}>
-    <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/staff')}><IconSymbol name="back" size={24} color={BrandColors.gray800} /></Pressable><Text style={s.title}>Đăng ký lịch tuần</Text><View style={{ width: 24 }} /></View>
-    {loading ? <View style={s.center}><ActivityIndicator color={BrandColors.primary} /><Text>Đang tải lịch đã lưu…</Text></View> : !draft || !loaded ? <EmptyState icon="warning" title="Chưa tải được lịch" description={error} actionText="Thử lại" onAction={() => setAttempt(value => value + 1)} /> : <>
+  return <View style={s.root}><SafeAreaView edges={['top', 'bottom']} style={s.screen}>
+    <View style={[s.header, { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }]}><Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={() => router.canGoBack() ? router.back() : router.replace('/staff')}><IconSymbol name="back" size={24} color={colors.text} /></Pressable><Text style={[s.title, { color: colors.text }]}>Đăng ký lịch tuần</Text><View style={{ width: 24 }} /></View>
+    {loading ? <View style={s.center}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.textSecondary }}>Đang tải lịch đã lưu…</Text></View> : !draft || !loaded ? <EmptyState icon="warning" title="Chưa tải được lịch" description={error} actionText="Thử lại" onAction={() => setAttempt(value => value + 1)} /> : <>
       <ScrollView contentContainerStyle={s.content}>
-        <View style={s.row}>{[weekStart(now), addCalendarDays(weekStart(now), 7)].map((start, i) => <Pressable key={start} disabled={editing || saving} accessibilityRole="button" accessibilityState={{ selected: week === start }} style={[s.week, week === start && s.selected]} onPress={() => switchWeek(start)}><Text style={week === start ? s.white : s.link}>{i === 0 ? 'Tuần này' : 'Tuần kế tiếp'}</Text></Pressable>)}</View>
-        <View style={s.card}><Text style={s.title}>{displayDate(dates[0])} – {displayDate(dates[6])}</Text><Text style={s.body}>Thứ Hai đến Chủ nhật • Giờ Việt Nam</Text><Text style={s.status}>{registered ? '✓ Đã đăng ký cả tuần' : 'Chưa xác nhận lịch tuần này'}</Text><Text style={s.body}>{editing ? `Đang sửa từ ${new Date(editingFrom!).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}. Khung giờ đã bắt đầu được khóa.` : 'Xem đủ 7 ngày bên dưới. Bấm thay đổi lịch để chỉnh các khung giờ chưa bắt đầu.'}</Text>
+        <View style={s.row}>{[weekStart(now), addCalendarDays(weekStart(now), 7)].map((start, i) => <Pressable key={start} disabled={editing || saving} accessibilityRole="button" accessibilityState={{ selected: week === start }} style={[s.week, { backgroundColor: colors.surface, borderColor: colors.border }, week === start && s.selected]} onPress={() => switchWeek(start)}><Text style={week === start ? s.white : [s.link, { color: colors.accentText }]}>{i === 0 ? 'Tuần này' : 'Tuần kế tiếp'}</Text></Pressable>)}</View>
+        <View style={[s.card, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}><Text style={[s.title, { color: colors.text }]}>{displayDate(dates[0])} – {displayDate(dates[6])}</Text><Text style={[s.body, { color: colors.textSecondary }]}>Thứ Hai đến Chủ nhật • Giờ Việt Nam</Text><Text style={[s.status, { color: colors.accentText }]}>{registered ? '✓ Đã đăng ký cả tuần' : 'Chưa xác nhận lịch tuần này'}</Text><Text style={[s.body, { color: colors.textSecondary }]}>{editing ? `Đang sửa từ ${new Date(editingFrom!).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}. Khung giờ đã bắt đầu được khóa.` : 'Xem đủ 7 ngày bên dưới. Bấm thay đổi lịch để chỉnh các khung giờ chưa bắt đầu.'}</Text>
           {editing && <>
-            <Text style={s.heading}>Chọn ca cho cả tuần (có thể chọn nhiều ca)</Text>
+            <Text style={[s.heading, { color: colors.text }]}>Chọn ca cho cả tuần (có thể chọn nhiều ca)</Text>
             <View style={s.buttonRow}>
               {[...presets, { title: 'Cả ngày', start: '08:00', end: '20:00' }, { title: 'Nghỉ', start: '08:00', end: '08:00' }].map(preset =>
                 <DayButton key={preset.title} label={preset.title} disabled={saving} onPress={() => {
@@ -121,7 +124,7 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
                   setError(''); setNotice('');
                 }} />)}
             </View>
-            <Text style={s.sub}>Áp dụng cho các giờ còn lại; giữ nguyên thời gian đã qua.</Text>
+            <Text style={[s.sub, { color: colors.textMuted }]}>Áp dụng cho các giờ còn lại; giữ nguyên thời gian đã qua.</Text>
           </>}
         </View>
         {draft.days.map(day => {
@@ -140,15 +143,15 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
               checked={slots.length > 0 && slots.every(time => daySlots.includes(time))} disabled={saving || !slots.length}
               onPress={() => updateDay(day, selectedSlots(toggleShift(day, preset.start, preset.end, Date.now())))} />;
           }) : [];
-          return <View key={day.date} style={[s.card, s.dayCard, expired && s.past, (!confirmed || resting) && s.darkCardBorder, resting && s.restCard]}>
+          return <View key={day.date} style={[s.card, s.dayCard, { backgroundColor: colors.surface, borderColor: colors.border }, expired && { backgroundColor: isDark ? colors.surfaceMuted : BrandColors.gray100 }, (!confirmed || resting) && { borderColor: isDark ? colors.textMuted : BrandColors.gray900 }, resting && { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
             <View style={s.row}>
-              <Text style={[s.heading, s.grow]}>{displayDate(day.date)}{day.date === today ? ' • Hôm nay' : ''}</Text>
-              <View style={[s.dayStatus, resting ? s.restStatus : confirmed && !expired && s.workStatus]}>
-                <Text style={[s.dayStatusText, resting ? s.restStatusText : confirmed && !expired && s.status]}>{dayStatus}</Text>
+              <Text style={[s.heading, s.grow, { color: colors.text }]}>{displayDate(day.date)}{day.date === today ? ' • Hôm nay' : ''}</Text>
+              <View style={[s.dayStatus, { backgroundColor: colors.surfaceMuted }, resting ? { backgroundColor: colors.dangerBg, borderWidth: 1, borderColor: colors.dangerBorder } : confirmed && !expired && { backgroundColor: colors.accentBg, borderWidth: 1, borderColor: colors.accentBorder }]}>
+                <Text style={[s.dayStatusText, { color: colors.textSecondary }, resting ? { color: colors.dangerText } : confirmed && !expired && { color: colors.accentText }]}>{dayStatus}</Text>
               </View>
             </View>
             <View style={s.wrap}>
-              {day.intervals.length ? <WorkPeriods intervals={day.intervals} /> : <Text style={s.body}>{resting
+              {day.intervals.length ? <WorkPeriods intervals={day.intervals} /> : <Text style={[s.body, { color: colors.textSecondary }]}>{resting
                 ? (editing ? 'Đã chọn nghỉ ngày này.' : 'Đã xác nhận nghỉ trong ngày này.')
                 : 'Chưa có khung giờ làm việc.'}</Text>}
             </View>
@@ -163,17 +166,17 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
                 <DayButton label="Nghỉ" checked={resting} rest disabled={saving} onPress={() => updateDay(day, [])} />
               </View>
             </>}
-            {bookings.map(booking => <Text key={booking.id} style={s.sub}>Ca {booking.bookingCode} • {displayTime(booking.startsAt)}–{displayTime(booking.endsAt)}{booking.district ? ` • ${booking.district}` : ''}</Text>)}
+            {bookings.map(booking => <Text key={booking.id} style={[s.sub, { color: colors.textMuted }]}>Ca {booking.bookingCode} • {displayTime(booking.startsAt)}–{displayTime(booking.endsAt)}{booking.district ? ` • ${booking.district}` : ''}</Text>)}
           </View>;
         })}
-        <View style={[s.card, s.row]}><View style={s.grow}><Text style={s.heading}>Thông báo việc phù hợp</Text><Text style={s.sub}>Theo lịch và phường/xã đã xác nhận.</Text></View><Switch disabled={!editing || saving} value={draft.matchNotifications} onValueChange={value => setDraft(current => current ? { ...current, matchNotifications: value } : current)} /></View>
-        <Pressable disabled={saving} style={s.chip} onPress={() => dirty ? setError('Hãy xác nhận hoặc hủy thay đổi trước khi tải lại.') : setAttempt(value => value + 1)}><Text style={s.link}>Tải lại lịch đã lưu</Text></Pressable>
+        <View style={[s.card, s.row, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}><View style={s.grow}><Text style={[s.heading, { color: colors.text }]}>Thông báo việc phù hợp</Text><Text style={[s.sub, { color: colors.textMuted }]}>Theo lịch và phường/xã đã xác nhận.</Text></View><Switch disabled={!editing || saving} value={draft.matchNotifications} onValueChange={value => setDraft(current => current ? { ...current, matchNotifications: value } : current)} /></View>
+        <Pressable disabled={saving} style={[s.chip, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => dirty ? setError('Hãy xác nhận hoặc hủy thay đổi trước khi tải lại.') : setAttempt(value => value + 1)}><Text style={[s.link, { color: colors.accentText }]}>Tải lại lịch đã lưu</Text></Pressable>
       </ScrollView>
-      <View style={s.footer}>
-        {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-        {!!notice && <Text accessibilityLiveRegion="polite" style={s.status}>{notice}</Text>}
+      <View style={[s.footer, { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }]}>
+        {!!error && <Text accessibilityRole="alert" style={[s.error, { color: colors.dangerText }]}>{error}</Text>}
+        {!!notice && <Text accessibilityLiveRegion="polite" style={[s.status, { color: colors.accentText }]}>{notice}</Text>}
         {editing ? <>
-          <Text style={s.sub}>Bản nháp chưa áp dụng. Xác nhận để lưu cả tuần.</Text>
+          <Text style={[s.sub, { color: colors.textMuted }]}>Bản nháp chưa áp dụng. Xác nhận để lưu cả tuần.</Text>
           <View style={s.buttonRow}>
             <DayButton label="Hủy thay đổi" disabled={saving} onPress={() => {
               setDraft(clone(loaded, week)); setEditingFrom(null); setError('');
@@ -183,33 +186,29 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
               <Text style={[s.dayButtonLabel, s.buttonWhite]}>{saving ? 'Đang lưu…' : 'Xác nhận'}</Text>
             </Pressable>
           </View>
-        </> : <Pressable style={s.primary} onPress={() => {
+        </> : <Pressable accessibilityRole="button" style={s.primary} onPress={() => {
           const timestamp = Date.now(); setNow(timestamp); setEditingFrom(timestamp); setNotice(''); setError('');
         }}><Text style={s.white}>{registered ? 'Thay đổi lịch' : 'Đăng ký cả tuần'}</Text></Pressable>}
       </View>
     </>}
   </SafeAreaView>
-    <View style={modalDay && s.hiddenNav} pointerEvents={modalDay ? 'none' : 'auto'}
-      accessibilityElementsHidden={!!modalDay} importantForAccessibility={modalDay ? 'no-hide-descendants' : 'auto'}>
-      <StaffBottomNav activeTab="profile" />
-    </View>
     <Modal visible={!!modalDay} transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={closeTimePicker}>
       <View style={s.scrim}>
-        <SafeAreaView edges={['bottom']} style={[s.modal, s.timeSheet]}>
+        <SafeAreaView edges={['bottom']} style={[s.modal, s.timeSheet, { backgroundColor: colors.surface }]}>
           <View style={s.row}>
-            <Text style={[s.title, s.grow]}>{modalDay ? displayDate(modalDay.date) : ''} • Chọn giờ chi tiết</Text>
+            <Text style={[s.title, s.grow, { color: colors.text }]}>{modalDay ? displayDate(modalDay.date) : ''} • Chọn giờ chi tiết</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Đóng bảng chọn giờ"
-              style={s.closeTimePicker} onPress={closeTimePicker}>
-              <IconSymbol name="close" size={22} color={BrandColors.gray800} />
+              style={[s.closeTimePicker, { backgroundColor: colors.surfaceMuted }]} onPress={closeTimePicker}>
+              <IconSymbol name="close" size={22} color={colors.text} />
             </Pressable>
           </View>
-          {modalDay && <View style={s.timeSummary}>
-            <Text style={s.heading}>Giờ làm đã chọn</Text>
+          {modalDay && <View style={[s.timeSummary, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[s.heading, { color: colors.text }]}>Giờ làm đã chọn</Text>
             {modalDay.intervals.length ? <ScrollView horizontal style={s.periodScroll} contentContainerStyle={s.periodRow}>
               <WorkPeriods intervals={modalDay.intervals} />
-            </ScrollView> : <Text style={s.sub}>Chưa chọn giờ làm.</Text>}
+            </ScrollView> : <Text style={[s.sub, { color: colors.textMuted }]}>Chưa chọn giờ làm.</Text>}
           </View>}
-          <Text style={s.sub}>Mỗi ô chọn một giờ. Giờ đã bắt đầu được khóa. Xác nhận ở màn hình tuần để lưu.</Text>
+          <Text style={[s.sub, { color: colors.textMuted }]}>Mỗi ô chọn một giờ. Giờ đã bắt đầu được khóa. Xác nhận ở màn hình tuần để lưu.</Text>
           {modalDay && <ScrollView>
             <View style={s.wrap}>
               {HOUR_STARTS.map(time => {
@@ -220,9 +219,9 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
                 return <Pressable key={time} disabled={locked || saving} accessibilityRole="checkbox"
                   accessibilityState={{ checked: selected, disabled: locked || saving }}
                   accessibilityLabel={time + ' đến ' + end}
-                  style={[s.slot, selected && s.selected, locked && s.disabled]}
+                  style={[s.slot, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }, selected && s.selected, locked && s.disabled]}
                   onPress={() => updateDay(modalDay, selected ? modalSlots.filter(item => !block.includes(item)) : [...modalSlots, ...block])}>
-                  <Text style={selected ? s.white : s.link}>{locked ? '🔒 ' : ''}{time}–{end}</Text>
+                  <Text style={selected ? s.white : [s.link, { color: colors.accentText }]}>{locked ? '🔒 ' : ''}{time}–{end}</Text>
                 </Pressable>;
               })}
             </View>
@@ -231,7 +230,7 @@ function AvailabilityEditor({ actor }: { actor: AvailabilityActor }) {
         </SafeAreaView>
       </View>
     </Modal>
-    <Modal visible={!!leave && !allowLeave} transparent onRequestClose={() => setLeave(null)}><View style={s.scrim}><SafeAreaView edges={['bottom']} style={s.modal}><Text style={s.title}>Lịch chưa được xác nhận</Text><Text style={s.body}>Tiếp tục chỉnh sửa hoặc bỏ bản nháp để rời màn hình.</Text><Pressable disabled={saving} style={s.primary} onPress={() => setLeave(null)}><Text style={s.white}>Tiếp tục chỉnh sửa</Text></Pressable><Pressable disabled={saving} style={s.chip} onPress={() => setAllowLeave(true)}><Text style={s.link}>Bỏ thay đổi và rời màn hình</Text></Pressable></SafeAreaView></View></Modal>
+    <Modal visible={!!leave && !allowLeave} transparent onRequestClose={() => setLeave(null)}><View style={s.scrim}><SafeAreaView edges={['bottom']} style={[s.modal, { backgroundColor: colors.surface }]}><Text style={[s.title, { color: colors.text }]}>Lịch chưa được xác nhận</Text><Text style={[s.body, { color: colors.textSecondary }]}>Tiếp tục chỉnh sửa hoặc bỏ bản nháp để rời màn hình.</Text><Pressable disabled={saving} style={s.primary} onPress={() => setLeave(null)}><Text style={s.white}>Tiếp tục chỉnh sửa</Text></Pressable><Pressable disabled={saving} style={[s.chip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} onPress={() => setAllowLeave(true)}><Text style={[s.link, { color: colors.accentText }]}>Bỏ thay đổi và rời màn hình</Text></Pressable></SafeAreaView></View></Modal>
   </View>;
 }
 const s = StyleSheet.create({
@@ -255,7 +254,6 @@ const s = StyleSheet.create({
   chip: { padding: 10, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 10, backgroundColor: '#fff' }, week: { flex: 1, padding: 12, borderWidth: 1, borderColor: BrandColors.gray200, borderRadius: 12, backgroundColor: '#fff' }, selected: { backgroundColor: BrandColors.primary, borderColor: BrandColors.primary },
   period: { backgroundColor: BrandColors.primaryLight, borderColor: BrandColors.black, borderWidth: 1, borderRadius: 8, padding: 8 },
   periodTime: { color: BrandColors.black, fontWeight: '600', fontSize: 13 },
-  hiddenNav: { opacity: 0 },
   timeSheet: { maxHeight: '90%' },
   closeTimePicker: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.gray100 },
   timeSummary: { backgroundColor: BrandColors.gray50, borderRadius: 10, padding: 10, gap: 6 },

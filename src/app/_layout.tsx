@@ -68,14 +68,10 @@ function AuthStack() {
           <Stack.Protected guard={isAuthenticated}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="staff/index" options={{ headerShown: false }} />
-          <Stack.Screen name="staff/jobs" options={{ headerShown: false }} />
+          <Stack.Screen name="staff/(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="staff/job-detail" options={{ headerShown: false }} />
-          <Stack.Screen name="staff/wallet" options={{ headerShown: false }} />
           <Stack.Screen name="staff/availability" options={{ headerShown: false }} />
           <Stack.Screen name="staff/areas" options={{ headerShown: false }} />
-          <Stack.Screen name="staff/community" options={{ headerShown: false }} />
-          <Stack.Screen name="staff/profile" options={{ headerShown: false }} />
           <Stack.Screen name="staff/account-details" options={{ headerShown: false }} />
           <Stack.Screen name="staff/personal-info" options={{ headerShown: false }} />
           <Stack.Screen name="service/[id]" options={{ headerShown: false }} />
@@ -97,6 +93,7 @@ function AuthStack() {
           <Stack.Screen name="account/addresses" options={{ headerShown: false }} />
           <Stack.Screen name="account/wallet" options={{ headerShown: false }} />
           <Stack.Screen name="account/personal-info" options={{ headerShown: false }} />
+          <Stack.Screen name="account/change-password" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>
         {isAuthenticated && <StaffScheduleReminder />}

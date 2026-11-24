@@ -9,9 +9,11 @@ import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { BrandColors } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function StaffPersonalInfoScreen() {
   const router = useRouter();
+  const { colors } = useAppTheme();
   const { currentStaff, updateStaffProfile, refreshProfile } = useAuth();
   useFocusEffect(useCallback(() => { void refreshProfile().catch(() => undefined); }, [refreshProfile]));
   const staff = currentStaff;
@@ -35,35 +37,35 @@ export default function StaffPersonalInfoScreen() {
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <KeyboardSafeLayout>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}><IconSymbol name="back" size={25} color={BrandColors.gray800} /></Pressable>
-        <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Pressable style={[styles.backButton, { backgroundColor: colors.surfaceMuted }]} onPress={() => router.back()}><IconSymbol name="back" size={25} color={colors.text} /></Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Thông tin cá nhân</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarSection}>
           <Image source={remoteImageSource(staff?.avatar || '/api/v1/identity/staff-avatar.png')} style={styles.avatar} />
-          <Text style={styles.avatarName}>{staff?.fullName || 'Chưa đăng nhập'}</Text>
-          <Text style={styles.avatarHint}>Ảnh phải rõ mặt, chính chủ. Vui lòng liên hệ Admin nếu cần thay đổi ảnh đại diện.</Text>
+          <Text style={[styles.avatarName, { color: colors.text }]}>{staff?.fullName || 'Chưa đăng nhập'}</Text>
+          <Text style={[styles.avatarHint, { color: colors.textSecondary }]}>Ảnh phải rõ mặt, chính chủ. Vui lòng liên hệ Admin nếu cần thay đổi ảnh đại diện.</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
-          <Text style={styles.sectionHint}>Bạn có thể chủ động cập nhật các thông tin này.</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Thông tin liên hệ</Text>
+          <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Bạn có thể chủ động cập nhật các thông tin này.</Text>
 
-          <Text style={styles.fieldLabel}>Số điện thoại</Text>
-          <View style={styles.inputRow}><IconSymbol name="phone" size={17} color={BrandColors.gray500} /><TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} placeholder="Nhập số điện thoại" /></View>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Số điện thoại</Text>
+          <View style={[styles.inputRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}><IconSymbol name="phone" size={17} color={colors.textMuted} /><TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={[styles.input, { color: colors.text }]} placeholder="Nhập số điện thoại" placeholderTextColor={colors.textMuted} /></View>
 
-          <Text style={styles.fieldLabel}>Email</Text>
-          <View style={styles.inputRow}><IconSymbol name="✉️" style={styles.inputIcon} /><TextInput value={email} editable={false} keyboardType="email-address" autoCapitalize="none" style={styles.input} placeholder="Nhập email" /></View>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Email</Text>
+          <View style={[styles.inputRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}><IconSymbol name="✉️" style={styles.inputIcon} /><TextInput value={email} editable={false} keyboardType="email-address" autoCapitalize="none" style={[styles.input, { color: colors.textSecondary }]} placeholder="Nhập email" placeholderTextColor={colors.textMuted} /></View>
 
-          <Text style={styles.fieldLabel}>Giới thiệu bản thân</Text>
-          <TextInput value={bio} onChangeText={setBio} multiline textAlignVertical="top" style={[styles.inputRow, styles.bioInput]} placeholder="Giới thiệu ngắn về bạn" />
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Giới thiệu bản thân</Text>
+          <TextInput value={bio} onChangeText={setBio} multiline textAlignVertical="top" style={[styles.inputRow, styles.bioInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.text }]} placeholder="Giới thiệu ngắn về bạn" placeholderTextColor={colors.textMuted} />
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.lockedHeading}><IconSymbol name="shield" size={18} color="#047857" /><View><Text style={styles.sectionTitle}>Thông tin đã xác thực</Text><Text style={styles.sectionHint}>Chỉ CleanMaster có thể thay đổi sau khi xét duyệt.</Text></View></View>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.lockedHeading}><IconSymbol name="shield" size={18} color={colors.accentText} /><View><Text style={[styles.sectionTitle, { color: colors.text }]}>Thông tin đã xác thực</Text><Text style={[styles.sectionHint, { color: colors.textMuted }]}>Chỉ CleanMaster có thể thay đổi sau khi xét duyệt.</Text></View></View>
           <ReadOnlyRow label="Họ và tên" value={staff?.fullName || 'Chưa đăng nhập'} />
           <ReadOnlyRow label="Mã nhân viên" value={staff?.id ? `NV-${staff.id.replace('staff-', '').padStart(3, '0')}` : 'Chưa đăng nhập'} />
           <ReadOnlyRow label="CCCD" value={staff?.idCardNumber || 'Chưa cập nhật'} />
@@ -71,16 +73,17 @@ export default function StaffPersonalInfoScreen() {
           <ReadOnlyRow label="Kinh nghiệm" value={`${staff?.experienceYears ?? 0} năm`} last />
         </View>
 
-        <View style={styles.notice}><IconSymbol name="info" size={16} color="#0369A1" /><Text style={styles.noticeText}>Nếu cần chỉnh sửa thông tin đã xác thực, vui lòng liên hệ bộ phận vận hành CleanMaster để được hỗ trợ.</Text></View>
+        <View style={[styles.notice, { backgroundColor: colors.infoBg, borderColor: colors.infoBorder }]}><IconSymbol name="info" size={16} color={colors.infoText} /><Text style={[styles.noticeText, { color: colors.infoText }]}>Nếu cần chỉnh sửa thông tin đã xác thực, vui lòng liên hệ bộ phận vận hành CleanMaster để được hỗ trợ.</Text></View>
       </ScrollView>
 
-      <View style={styles.bottomBar}><Pressable style={styles.saveButton} disabled={saving} onPress={handleSave}><Text style={styles.saveButtonText}>Lưu thay đổi</Text></Pressable></View>
+      <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}><Pressable style={styles.saveButton} disabled={saving} onPress={handleSave}><Text style={styles.saveButtonText}>Lưu thay đổi</Text></Pressable></View>
     </KeyboardSafeLayout>
   </SafeAreaView>;
 }
 
 function ReadOnlyRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
-  return <View style={[styles.readOnlyRow, last && styles.readOnlyRowLast]}><Text style={styles.readOnlyLabel}>{label}</Text><View style={styles.readOnlyValueWrap}><Text style={styles.readOnlyValue}>{value}</Text><IconSymbol name="lock" size={13} color={BrandColors.gray400} /></View></View>;
+  const { colors } = useAppTheme();
+  return <View style={[styles.readOnlyRow, { borderTopColor: colors.divider }, last && styles.readOnlyRowLast]}><Text style={[styles.readOnlyLabel, { color: colors.textMuted }]}>{label}</Text><View style={styles.readOnlyValueWrap}><Text style={[styles.readOnlyValue, { color: colors.text }]}>{value}</Text><IconSymbol name="lock" size={13} color={colors.textMuted} /></View></View>;
 }
 
 const styles = StyleSheet.create({

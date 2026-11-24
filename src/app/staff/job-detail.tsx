@@ -24,6 +24,7 @@ import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
 import { opportunityTime } from '@/components/staff/StaffMatchingList';
 import { operationRequest } from '@/api/operations';
 import { EmptyState } from '@/components/common/EmptyState';
+import { CelebrationOverlay } from '@/components/common/CleanMasterAnimations';
 
 export default function StaffJobDetailScreen() {
   const { currentUser, currentStaff } = useAuth();
@@ -42,6 +43,7 @@ function StaffJobDetailContent() {
   const [detailAttempt, setDetailAttempt] = useState(0);
   const [claimBusy, setClaimBusy] = useState(false);
   const [evidenceReady, setEvidenceReady] = useState(false);
+  const [completedCelebration, setCompletedCelebration] = useState(false);
   useEffect(() => setEvidenceReady(false), [id]);
   const claiming = useRef(false);
 
@@ -208,10 +210,7 @@ function StaffJobDetailContent() {
             onPress: async () => {
               const res = await StaffService.updateJobStatus(assignment.id, 'COMPLETED', staffId, assignment.paymentMethod === 'CASH');
               if (res.success) {
-                Alert.alert(
-                  'Chúc mừng bạn đã hoàn thành ca! 🎉',
-                  'Đã lưu hoàn thành ca và ảnh minh chứng. Hệ thống tự ghi thu nhập vào ví khi toàn bộ nhân viên hoàn thành đơn; bạn có thể kiểm tra giao dịch trong Ví của tôi.'
-                );
+                setCompletedCelebration(true);
               } else if (res.reason) {
                 Alert.alert('Không thể hoàn thành', res.reason);
               }
@@ -572,6 +571,16 @@ function StaffJobDetailContent() {
           <Text style={styles.helpText}>Cần hỗ trợ sự cố khẩn cấp? Liên hệ Admin ngay</Text>
         </Pressable>
       </ScrollView>
+
+      <CelebrationOverlay
+        visible={completedCelebration}
+        variant="complete"
+        title="Hoàn thành ca xuất sắc!"
+        subtitle="Đã lưu hoàn thành ca và ảnh minh chứng. Thu nhập sẽ được hệ thống tự động ghi có vào Ví của bạn."
+        badgeText={assignment ? `Mã đơn: ${assignment.bookingCode}` : undefined}
+        actionLabel="Tuyệt vời"
+        onDone={() => setCompletedCelebration(false)}
+      />
     </SafeAreaView>
   );
 }

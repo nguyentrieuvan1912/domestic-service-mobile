@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BottomTabLabel, FloatingTabSurface, TabImageIcon, useBottomTabSpacing } from '@/components/common/TabImageIcon';
+import { FloatingTabSurface, TabImageIcon, useBottomTabSpacing } from '@/components/common/TabImageIcon';
 
 export type StaffTabKey = 'home' | 'jobs' | 'community' | 'wallet' | 'profile';
 
@@ -9,28 +9,28 @@ interface StaffBottomNavProps {
   activeTab: StaffTabKey;
 }
 
-const TABS: { key: StaffTabKey; label: string; icon: string; route: string }[] = [
-  { key: 'home', label: 'Trang chủ', icon: 'home', route: '/staff' },
-  { key: 'jobs', label: 'Ca làm việc', icon: 'calendar', route: '/staff/jobs' },
-  { key: 'community', label: 'Cộng đồng', icon: 'users', route: '/staff/community' },
-  { key: 'wallet', label: 'Thu nhập', icon: 'wallet', route: '/staff/wallet' },
-  { key: 'profile', label: 'Tài khoản', icon: 'user', route: '/staff/profile' },
-];
+export const STAFF_TABS = [
+  { name: 'index', key: 'home', label: 'Trang chủ', icon: 'home', route: '/staff' },
+  { name: 'jobs', key: 'jobs', label: 'Ca làm việc', icon: 'calendar', route: '/staff/jobs' },
+  { name: 'community', key: 'community', label: 'Cộng đồng', icon: 'users', route: '/staff/community' },
+  { name: 'wallet', key: 'wallet', label: 'Thu nhập', icon: 'wallet', route: '/staff/wallet' },
+  { name: 'profile', key: 'profile', label: 'Tài khoản', icon: 'user', route: '/staff/profile' },
+] as const;
 
 export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => {
   const router = useRouter();
   const spacing = useBottomTabSpacing();
 
-  const handleTabPress = (tab: (typeof TABS)[0]) => {
+  const handleTabPress = (tab: (typeof STAFF_TABS)[number]) => {
     if (tab.key === activeTab) return;
-    router.replace(tab.route as never);
+    router.replace(tab.route);
   };
 
   return (
     <View pointerEvents="box-none" style={[styles.container, spacing]}>
       <FloatingTabSurface inset={spacing.paddingHorizontal} bottom={spacing.paddingBottom} />
       <View style={styles.tabBar}>
-        {TABS.map((tab) => {
+        {STAFF_TABS.map((tab) => {
           const isActive = tab.key === activeTab;
           return (
             <Pressable
@@ -43,7 +43,6 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({ activeTab }) => 
               android_ripple={{ color: 'rgba(255, 255, 255, 0.14)' }}
             >
               <TabImageIcon name={tab.icon} focused={isActive} />
-              <BottomTabLabel label={tab.label} focused={isActive} />
             </Pressable>
           );
         })}
@@ -61,7 +60,7 @@ const styles = StyleSheet.create({
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    padding: 5,
+    justifyContent: 'center',
     borderRadius: 24,
     overflow: 'hidden',
   },

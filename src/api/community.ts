@@ -7,9 +7,10 @@ export const REACTIONS: { id: Reaction; emoji: string; label: string }[] = [
   { id: 'HAHA', emoji: '😆', label: 'Vui' }, { id: 'WOW', emoji: '😮', label: 'Ngạc nhiên' },
   { id: 'SAD', emoji: '😢', label: 'Buồn' }, { id: 'SUPPORT', emoji: '🤗', label: 'Ủng hộ' },
 ];
+export type CommunityAuthorRole = 'ADMIN' | 'STAFF' | 'CUSTOMER';
 export type CommunityMedia = { id: number; uri: string; type: 'image' | 'video'; width?: number; height?: number };
-export type CommunityPost = { id: number; author: string; avatar: string | null; content: string; status: string; createdAt: string; likes: number; myReaction: Reaction | null; reactions: Partial<Record<Reaction, number>>; commentCount: number; media: CommunityMedia[] };
-export type CommunityComment = { id: number; author: string; userId: number; content: string; media: CommunityMedia[]; deleted: boolean; avatar: string | null; createdAt: string; parentId: number | null; parentAuthor: string | null; parentContent: string | null; myReaction: Reaction | null; reactions: Partial<Record<Reaction, number>> };
+export type CommunityPost = { id: number; author: string; authorRole?: CommunityAuthorRole; avatar: string | null; content: string; status: string; createdAt: string; likes: number; myReaction: Reaction | null; reactions: Partial<Record<Reaction, number>>; commentCount: number; media: CommunityMedia[] };
+export type CommunityComment = { id: number; author: string; authorRole?: CommunityAuthorRole; userId: number; content: string; media: CommunityMedia[]; deleted: boolean; avatar: string | null; createdAt: string; parentId: number | null; parentAuthor: string | null; parentContent: string | null; myReaction: Reaction | null; reactions: Partial<Record<Reaction, number>> };
 export type CommentPage = { items: CommunityComment[]; hasMore: boolean; nextBefore: number; deletedIds: number[] };
 export const REPORT_REASONS = [{ id: 'SPAM', label: 'Spam / quảng cáo' }, { id: 'MISINFORMATION', label: 'Thông tin sai lệch' }, { id: 'ABUSE', label: 'Xúc phạm / nội dung không phù hợp' }, { id: 'OTHER', label: 'Lý do khác' }];
 export function applyCommentDeletions(items: CommunityComment[], ids: number[] = []) {

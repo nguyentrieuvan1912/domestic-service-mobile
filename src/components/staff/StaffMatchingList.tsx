@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { EmptyState } from '@/components/common/EmptyState';
 import { StaffMatchingRepository } from '@/data/connectedStaffRepository';
@@ -15,7 +16,8 @@ import type { useStaffMatching } from '@/hooks/use-staff-matching';
 type MatchingState = ReturnType<typeof useStaffMatching>;
 export const DEFAULT_MATCH_FILTER: MatchingFilter = { query: '', district: 'Tất cả', sort: STAFF_MATCHING_POLICY.defaultSort };
 export function MatchingSortPicker({ value, onChange }: { value: MatchingSort; onChange: (value: MatchingSort) => void }) {
-  return <View style={styles.row}><Text style={styles.sub}>Sắp xếp:</Text>{(['START_TIME', 'INCOME'] as const).map(sort => <Pressable key={sort} accessibilityRole="button" accessibilityState={{ selected: value === sort }} onPress={() => onChange(sort)} style={[styles.chip, value === sort && styles.selected]}><Text style={value === sort ? styles.light : styles.link}>{sort === 'START_TIME' ? 'Giờ bắt đầu' : 'Thu nhập'}</Text></Pressable>)}</View>;
+  const { colors } = useAppTheme();
+  return <View style={styles.row}><Text style={[styles.sub, { color: colors.textSecondary }]}>Sắp xếp:</Text>{(['START_TIME', 'INCOME'] as const).map(sort => <Pressable key={sort} accessibilityRole="button" accessibilityState={{ selected: value === sort }} onPress={() => onChange(sort)} style={[styles.chip, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, value === sort && styles.selected]}><Text style={value === sort ? styles.light : [styles.link, { color: colors.accentText }]}>{sort === 'START_TIME' ? 'Giờ bắt đầu' : 'Thu nhập'}</Text></Pressable>)}</View>;
 }
 export function opportunityTime(job: Pick<MatchingOpportunity, 'startsAt' | 'endsAt'>): string {
   if (!Number.isFinite(Date.parse(job.startsAt)) || !Number.isFinite(Date.parse(job.endsAt))) return 'Chưa có giờ hợp lệ';
@@ -24,11 +26,12 @@ export function opportunityTime(job: Pick<MatchingOpportunity, 'startsAt' | 'end
 export function StaffMatchingList({ matching, filter = DEFAULT_MATCH_FILTER, limit, onResetFilters, onClaimed }: {
   matching: MatchingState; filter?: MatchingFilter; limit?: number; onResetFilters?: () => void; onClaimed?: (assignment: AcceptedAssignment) => void;
 }) {
+  const { colors } = useAppTheme();
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string>();
   const { actor, status, data, retry } = matching;
   if (!actor) return <EmptyState icon="shield" title="Vui lòng đăng nhập nhân viên" actionText="Đăng nhập" onAction={() => router.replace('/auth/login')} />;
-  if (status === 'LOADING') return <View style={styles.card}><ActivityIndicator color={BrandColors.primary} /><Text style={styles.body}>Đang kiểm tra việc phù hợp…</Text></View>;
+  if (status === 'LOADING') return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}><ActivityIndicator color={BrandColors.primary} /><Text style={[styles.body, { color: colors.textSecondary }]}>Đang kiểm tra việc phù hợp…</Text></View>;
   if (status === 'ERROR' || !data) return <EmptyState icon="warning" title="Chưa tải được việc phù hợp" description={matching.error} actionText="Thử lại" onAction={retry} />;
   const items = selectMatchingItems(data, filter);
   const noInvitations = filter.mode === 'A' && !data.items.some(item => item.opportunity.mode === 'A');
@@ -52,26 +55,27 @@ export function StaffMatchingList({ matching, filter = DEFAULT_MATCH_FILTER, lim
   };
   return <View style={styles.list}>
     {items.length === 0 ? <EmptyState icon="calendar" title={noInvitations ? 'Chưa có khách chọn bạn' : empty[0]} description={noInvitations ? 'Lời mời mới sẽ xuất hiện tại đây và trong mục thông báo.' : empty[1]} actionText={noInvitations ? 'Tải lại lời mời' : empty[2]} onAction={emptyAction} /> : <>
-      <Text style={styles.sub}>{items.length} ca phù hợp{limit && items.length > limit ? ` • Hiển thị ${limit} ca đầu` : ''}. Thu nhập là ước tính cho một vị trí.</Text>
-      {items.slice(0, limit ?? items.length).map(({ opportunity: job }) => <View key={job.id} style={styles.card}>
-        <View style={styles.row}><IconSymbol name={job.serviceIcon ?? 'clean'} size={20} color={BrandColors.primaryDark} /><Text style={[styles.heading, styles.grow]}>{job.serviceName}</Text></View>
-        <Text style={styles.heading}>{job.packageTitle}</Text><Text style={styles.body}>{opportunityTime(job)}</Text>
-        <Text style={styles.body}>{job.district}{job.city ? ` • ${job.city}` : ''}</Text>
-        {!!job.addOnsText && <Text style={styles.sub}>Dịch vụ thêm: {job.addOnsText}</Text>}
-        {job.totalCustomerPaid != null && <Text style={styles.body}>Tổng tiền đơn: {job.totalCustomerPaid.toLocaleString('vi-VN')}đ{job.paymentMethod === 'CASH' ? ' • Tiền mặt' : ''}</Text>}
-        <Text style={styles.sub}>{job.mode === 'B' ? 'Nhận vị trí trống' : 'Khách chọn bạn'} • Còn {job.positionsRemaining}/{job.positionsRequired} vị trí</Text>
-        <Text style={styles.income}>{job.incomePendingPolicy ? 'Thu nhập chờ quyết toán' : 'Ước tính ' + job.netIncome.toLocaleString('vi-VN') + 'đ / nhân viên'}</Text>
-        {job.distance && <Text style={styles.sub}>{job.distance.km} km • {job.distance.source}</Text>}
-        <View style={styles.row}><Pressable accessibilityRole="button" style={[styles.secondary, styles.grow]} onPress={() => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })}><Text style={styles.link}>Chi tiết</Text></Pressable><Pressable accessibilityRole="button" style={[styles.primary, styles.grow]} onPress={() => setSelectedId(job.id)}><Text style={styles.light}>Vì sao phù hợp</Text></Pressable></View>
+      <Text style={[styles.sub, { color: colors.textSecondary }]}>{items.length} ca phù hợp{limit && items.length > limit ? ` • Hiển thị ${limit} ca đầu` : ''}. Thu nhập là ước tính cho một vị trí.</Text>
+      {items.slice(0, limit ?? items.length).map(({ opportunity: job }) => <View key={job.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.row}><IconSymbol name={job.serviceIcon ?? 'clean'} size={20} color={colors.accentText} /><Text style={[styles.heading, styles.grow, { color: colors.text }]}>{job.serviceName}</Text></View>
+        <Text style={[styles.heading, { color: colors.text }]}>{job.packageTitle}</Text><Text style={[styles.body, { color: colors.textSecondary }]}>{opportunityTime(job)}</Text>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>{job.district}{job.city ? ` • ${job.city}` : ''}</Text>
+        {!!job.addOnsText && <Text style={[styles.sub, { color: colors.textMuted }]}>Dịch vụ thêm: {job.addOnsText}</Text>}
+        {job.totalCustomerPaid != null && <Text style={[styles.body, { color: colors.textSecondary }]}>Tổng tiền đơn: {job.totalCustomerPaid.toLocaleString('vi-VN')}đ{job.paymentMethod === 'CASH' ? ' • Tiền mặt' : ''}</Text>}
+        <Text style={[styles.sub, { color: colors.textMuted }]}>{job.mode === 'B' ? 'Nhận vị trí trống' : 'Khách chọn bạn'} • Còn {job.positionsRemaining}/{job.positionsRequired} vị trí</Text>
+        <Text style={[styles.income, { color: colors.accentText }]}>{job.incomePendingPolicy ? 'Thu nhập chờ quyết toán' : 'Ước tính ' + job.netIncome.toLocaleString('vi-VN') + 'đ / nhân viên'}</Text>
+        {job.distance && <Text style={[styles.sub, { color: colors.textMuted }]}>{job.distance.km} km • {job.distance.source}</Text>}
+        <View style={styles.row}><Pressable accessibilityRole="button" style={[styles.secondary, styles.grow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]} onPress={() => router.push({ pathname: '/staff/job-detail', params: { id: job.id } })}><Text style={[styles.link, { color: colors.accentText }]}>Chi tiết</Text></Pressable><Pressable accessibilityRole="button" style={[styles.primary, styles.grow]} onPress={() => setSelectedId(job.id)}><Text style={styles.light}>Vì sao phù hợp</Text></Pressable></View>
       </View>)}
     </>}
-    <Pressable accessibilityRole="button" style={styles.secondary} onPress={retry}><Text style={styles.link}>Tải lại việc phù hợp</Text></Pressable>
+    <Pressable accessibilityRole="button" style={[styles.secondary, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={retry}><Text style={[styles.link, { color: colors.accentText }]}>Tải lại việc phù hợp</Text></Pressable>
     {selectedId && <StaffMatchExplanation matching={matching} opportunityId={selectedId} onClose={() => setSelectedId(undefined)} onClaimed={onClaimed ?? (job => router.push({ pathname: '/staff/job-detail', params: { id: job.id } }))} />}
   </View>;
 }
 export function StaffMatchExplanation({ matching, opportunityId, onClose, onClaimed }: {
   matching: MatchingState; opportunityId: string; onClose: () => void; onClaimed: (assignment: AcceptedAssignment) => void;
 }) {
+  const { colors } = useAppTheme();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
@@ -90,17 +94,17 @@ export function StaffMatchExplanation({ matching, opportunityId, onClose, onClai
     } catch (reason: unknown) { if (!abort.signal.aborted) setError(reason instanceof Error ? reason.message : 'Chưa nhận được ca.'); }
     finally { if (!abort.signal.aborted) { controller.current = null; setBusy(false); } }
   };
-  return <Modal visible transparent animationType="slide" onRequestClose={() => { if (!busy) onClose(); }}><View style={styles.scrim}><SafeAreaView edges={['bottom']} style={styles.sheet}>
-    <View style={styles.row}><Text style={[styles.title, styles.grow]}>{available ? 'Vì sao phù hợp' : 'Điều kiện nhận ca'}</Text><Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={styles.close}><IconSymbol name="close" size={22} color={BrandColors.gray700} /></Pressable></View>
+  return <Modal visible transparent animationType="slide" onRequestClose={() => { if (!busy) onClose(); }}><View style={styles.scrim}><SafeAreaView edges={['bottom']} style={[styles.sheet, { backgroundColor: colors.surface }]}>
+    <View style={styles.row}><Text style={[styles.title, styles.grow, { color: colors.text }]}>{available ? 'Vì sao phù hợp' : 'Điều kiện nhận ca'}</Text><Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={styles.close}><IconSymbol name="close" size={22} color={colors.textSecondary} /></Pressable></View>
     <ScrollView contentContainerStyle={styles.sheetContent}>
-      {item ? <><Text style={styles.heading}>{item.opportunity.serviceName}</Text><Text style={styles.body}>{opportunityTime(item.opportunity)}</Text><Text style={styles.body}>{item.opportunity.district} • {item.opportunity.incomePendingPolicy ? 'Thu nhập chờ quyết toán' : item.opportunity.netIncome.toLocaleString('vi-VN') + 'đ / nhân viên'}</Text>
-        <Text style={styles.body}>{item.opportunity.mode === 'B' ? 'Nhận vị trí trống' : 'Khách chọn bạn'} • Còn {item.opportunity.positionsRemaining}/{item.opportunity.positionsRequired} vị trí. Bạn sẽ nhận một vị trí.</Text>
-        {item.eligibility.checks.map((check, index) => <View style={styles.check} key={`${check.code}-${index}`}><Text style={[styles.heading, !check.passed && styles.error]}>{check.passed ? '✓' : '!'} {check.label}</Text><Text style={styles.body}>{check.detail}</Text></View>)}
-      </> : <Text style={styles.error}>{matching.status === 'LOADING' ? 'Đang kiểm tra lại điều kiện…' : 'Ca không còn khả dụng. Tải lại danh sách để xem ca khác.'}</Text>}
-      <Text style={styles.sub}>Xem địa chỉ và công việc khách chọn trong Chi tiết ca. Thông tin liên hệ được mở sau khi nhận ca; điều kiện được kiểm tra lại khi xác nhận.</Text>
-      {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+      {item ? <><Text style={[styles.heading, { color: colors.text }]}>{item.opportunity.serviceName}</Text><Text style={[styles.body, { color: colors.textSecondary }]}>{opportunityTime(item.opportunity)}</Text><Text style={[styles.body, { color: colors.textSecondary }]}>{item.opportunity.district} • {item.opportunity.incomePendingPolicy ? 'Thu nhập chờ quyết toán' : item.opportunity.netIncome.toLocaleString('vi-VN') + 'đ / nhân viên'}</Text>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>{item.opportunity.mode === 'B' ? 'Nhận vị trí trống' : 'Khách chọn bạn'} • Còn {item.opportunity.positionsRemaining}/{item.opportunity.positionsRequired} vị trí. Bạn sẽ nhận một vị trí.</Text>
+        {item.eligibility.checks.map((check, index) => <View style={[styles.check, { backgroundColor: colors.surfaceElevated }]} key={`${check.code}-${index}`}><Text style={[styles.heading, { color: colors.text }, !check.passed && { color: colors.dangerText }]}>{check.passed ? '✓' : '!'} {check.label}</Text><Text style={[styles.body, { color: colors.textSecondary }]}>{check.detail}</Text></View>)}
+      </> : <Text style={[styles.error, { color: colors.dangerText }]}>{matching.status === 'LOADING' ? 'Đang kiểm tra lại điều kiện…' : 'Ca không còn khả dụng. Tải lại danh sách để xem ca khác.'}</Text>}
+      <Text style={[styles.sub, { color: colors.textMuted }]}>Xem địa chỉ và công việc khách chọn trong Chi tiết ca. Thông tin liên hệ được mở sau khi nhận ca; điều kiện được kiểm tra lại khi xác nhận.</Text>
+      {!!error && <Text accessibilityRole="alert" style={[styles.error, { color: colors.dangerText }]}>{error}</Text>}
     </ScrollView>
-    {!available && item?.eligibility.reasons[0] && <Text accessibilityRole="alert" style={styles.error}>{item.eligibility.reasons[0].message}</Text>}
+    {!available && item?.eligibility.reasons[0] && <Text accessibilityRole="alert" style={[styles.error, { color: colors.dangerText }]}>{item.eligibility.reasons[0].message}</Text>}
     <Pressable accessibilityRole="button" disabled={!available || busy} style={[styles.primary, (!available || busy) && styles.disabled]} onPress={() => { void claim(); }}><Text style={styles.light}>{busy ? 'Đang kiểm tra và nhận…' : available ? 'Xác nhận nhận một vị trí' : 'Chưa thể nhận ca'}</Text></Pressable>
   </SafeAreaView></View></Modal>;
 }

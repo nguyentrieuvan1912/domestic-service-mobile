@@ -7,9 +7,11 @@ import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
 import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
+  const { colors } = useAppTheme();
   const { currentCustomer, updateCustomerProfile } = useAuth();
   const [fullName, setFullName] = useState(currentCustomer?.fullName || '');
   const [phone, setPhone] = useState(currentCustomer?.phone || '');
@@ -42,9 +44,9 @@ export default function PersonalInfoScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
-            <IconSymbol name="arrowBack" size={28} color={BrandColors.gray900} />
+            <IconSymbol name="arrowBack" size={28} color={colors.text} />
           </Pressable>
-          <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Thông tin cá nhân</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -52,59 +54,59 @@ export default function PersonalInfoScreen() {
           keyboardShouldPersistTaps="handled">
           <View style={styles.avatarSection}>
             <AvatarEditor style={styles.avatar} disabled={saving} />
-            <Text style={styles.avatarHint}>Ảnh đại diện</Text>
-            <Text style={styles.avatarSubHint}>Bấm vào ảnh để chọn ảnh mới hoặc dùng ảnh mặc định.</Text>
+            <Text style={[styles.avatarHint, { color: colors.text }]}>Ảnh đại diện</Text>
+            <Text style={[styles.avatarSubHint, { color: colors.textSecondary }]}>Bấm vào ảnh để chọn ảnh mới hoặc dùng ảnh mặc định.</Text>
           </View>
 
-          <View style={styles.formCard}>
-            <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
+          <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Thông tin liên hệ</Text>
 
-            <Text style={styles.fieldLabel}>Họ và tên</Text>
-            <View style={styles.fieldRow}>
-              <IconSymbol name="user" size={17} color={BrandColors.gray500} />
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Họ và tên</Text>
+            <View style={[styles.fieldRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <IconSymbol name="user" size={17} color={colors.textMuted} />
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
                 placeholder="Nhập họ và tên"
-                placeholderTextColor={BrandColors.gray400}
-                style={styles.input}
+                placeholderTextColor={colors.textMuted}
+                style={[styles.input, { color: colors.text }]}
               />
             </View>
 
-            <Text style={styles.fieldLabel}>Số điện thoại</Text>
-            <View style={styles.fieldRow}>
-              <IconSymbol name="phone" size={17} color={BrandColors.gray500} />
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Số điện thoại</Text>
+            <View style={[styles.fieldRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <IconSymbol name="phone" size={17} color={colors.textMuted} />
               <TextInput
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="Nhập số điện thoại"
-                placeholderTextColor={BrandColors.gray400}
+                placeholderTextColor={colors.textMuted}
                 keyboardType="phone-pad"
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
               />
             </View>
 
-            <Text style={styles.fieldLabel}>Email</Text>
-            <View style={styles.fieldRow}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Email</Text>
+            <View style={[styles.fieldRow, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
               <IconSymbol name="✉️" style={styles.fieldEmoji} />
               <TextInput
                 value={email}
                 editable={false}
                 placeholder="Gmail đã xác thực"
-                placeholderTextColor={BrandColors.gray400}
+                placeholderTextColor={colors.textMuted}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                style={styles.input}
+                style={[styles.input, { color: colors.textSecondary }]}
               />
             </View>
           </View>
 
-          <Text style={styles.note}>
+          <Text style={[styles.note, { color: colors.textSecondary }]}>
             Thông tin này chỉ dùng để phục vụ đơn hàng và thông báo từ CleanMaster.
           </Text>
         </ScrollView>
 
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <Pressable style={styles.saveButton} disabled={saving} onPress={handleSave}>
             <Text style={styles.saveButtonText}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</Text>
           </Pressable>

@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from 'expo-router';
+import { useAppTheme } from '@/context/ThemeContext';
 export { matchingModeCounts } from '@/utils/staff-matching-mode';
 
 export function MatchingModePicker({ value, onChange, invitations, open }: { value: 'A' | 'B'; onChange: (mode: 'A' | 'B') => void; invitations: number; open: number }) {
+  const { colors } = useAppTheme();
   const opacity = useRef(new Animated.Value(1)).current;
   const focused = useIsFocused();
   useEffect(() => {
@@ -24,10 +26,10 @@ export function MatchingModePicker({ value, onChange, invitations, open }: { val
     return () => { active = false; animation?.stop(); listener.remove(); opacity.setValue(1); };
   }, [invitations > 0, focused, opacity]);
   return <View style={styles.row}>
-    <Animated.View style={[styles.grow, { opacity }]}><Pressable accessibilityRole="button" accessibilityLabel={`Khách chọn bạn, ${invitations} đơn chờ nhận`} accessibilityState={{ selected: value === 'A' }} onPress={() => onChange('A')} style={[styles.button, value === 'A' && styles.selected, invitations > 0 && styles.alert]}>
-      <Text style={[styles.text, (value === 'A' || invitations > 0) && styles.light]}>Khách chọn bạn</Text><Text style={[styles.count, (value === 'A' || invitations > 0) && styles.light]}>{invitations}</Text>
+    <Animated.View style={[styles.grow, { opacity }]}><Pressable accessibilityRole="button" accessibilityLabel={`Khách chọn bạn, ${invitations} đơn chờ nhận`} accessibilityState={{ selected: value === 'A' }} onPress={() => onChange('A')} style={[styles.button, { backgroundColor: colors.surface, borderColor: colors.border }, value === 'A' && styles.selected, invitations > 0 && styles.alert]}>
+      <Text style={[styles.text, { color: colors.text }, (value === 'A' || invitations > 0) && styles.light]}>Khách chọn bạn</Text><Text style={[styles.count, { color: colors.accentText }, (value === 'A' || invitations > 0) && styles.light]}>{invitations}</Text>
     </Pressable></Animated.View>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Tìm việc, ${open} đơn phù hợp`} accessibilityState={{ selected: value === 'B' }} onPress={() => onChange('B')} style={[styles.button, styles.grow, value === 'B' && styles.selected]}><Text style={[styles.text, value === 'B' && styles.light]}>Tìm việc</Text><Text style={[styles.count, value === 'B' && styles.light]}>{open}</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Tìm việc, ${open} đơn phù hợp`} accessibilityState={{ selected: value === 'B' }} onPress={() => onChange('B')} style={[styles.button, { backgroundColor: colors.surface, borderColor: colors.border }, styles.grow, value === 'B' && styles.selected]}><Text style={[styles.text, { color: colors.text }, value === 'B' && styles.light]}>Tìm việc</Text><Text style={[styles.count, { color: colors.accentText }, value === 'B' && styles.light]}>{open}</Text></Pressable>
   </View>;
 }
 const styles = StyleSheet.create({

@@ -66,7 +66,7 @@ export const AIChatBubble: React.FC<AIChatBubbleProps> = ({
     <View style={[styles.wrapper, isUser ? styles.wrapperUser : styles.wrapperBot]}>
       {!isUser && (
         <Image
-          source={require('@/assets/images/ai-mascot.png')}
+          source={require('@/assets/images/ai-mascot.jpg')}
           style={styles.avatar}
           resizeMode="cover"
         />

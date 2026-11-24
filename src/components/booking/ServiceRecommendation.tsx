@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import type { usePackageRecommendation } from '@/hooks/use-package-recommendation';
 import type { PackageSuggestion } from '@/api/catalog-types';
 
-export function ServiceRecommendation({resource,packageId,staffCount,quantity,apply}:{resource:ReturnType<typeof usePackageRecommendation>;packageId:string;staffCount:number;quantity:number;apply:(option:PackageSuggestion)=>void}) {
+export function ServiceRecommendation({resource,packageId,staffCount,quantity,apply,fixedStaff = false}:{resource:ReturnType<typeof usePackageRecommendation>;packageId:string;staffCount:number;quantity:number;apply:(option:PackageSuggestion)=>void;fixedStaff?:boolean}) {
   if(!resource.measurementKey)return null;
   const option=resource.data?.options[0];
   const selected=!!option&&String(option.packageId)===packageId&&option.requiredStaffCount===staffCount&&option.quantity===quantity;
@@ -14,8 +14,8 @@ export function ServiceRecommendation({resource,packageId,staffCount,quantity,ap
       <Text style={styles.price}>{option.baseAmount.toLocaleString('vi-VN')}đ</Text>
       <Text style={styles.text}>Đủ định mức cho {Number(option.coveredAreaM2).toLocaleString('vi-VN')} m²; diện tích bạn nhập: {Number(resource.data!.areaM2).toLocaleString('vi-VN')} m².</Text>
       <Text style={styles.text}>{resource.data!.message}</Text>
-      {selected?<Text accessibilityLiveRegion="polite" style={styles.link}>✓ Đã chọn gói và số nhân viên theo đề xuất</Text>:<Pressable accessibilityRole="button" style={styles.button} onPress={()=>apply(option)}><Text style={styles.buttonText}>Áp dụng gói và số nhân viên đề xuất</Text></Pressable>}
-      <Text style={styles.text}>Bạn vẫn có thể chọn gói khác hoặc thêm nhân viên.</Text>
+      {selected?<Text accessibilityLiveRegion="polite" style={styles.link}>{fixedStaff ? '✓ Đã chọn gói theo đề xuất' : '✓ Đã chọn gói và số nhân viên theo đề xuất'}</Text>:<Pressable accessibilityRole="button" style={styles.button} onPress={()=>apply(option)}><Text style={styles.buttonText}>{fixedStaff ? 'Áp dụng gói đề xuất' : 'Áp dụng gói và số nhân viên đề xuất'}</Text></Pressable>}
+      <Text style={styles.text}>{fixedStaff ? 'Bạn vẫn có thể chọn gói khác.' : 'Bạn vẫn có thể chọn gói khác hoặc thêm nhân viên.'}</Text>
     </>:!!resource.data&&<Text style={styles.text}>{resource.data.message}</Text>}
     {!!resource.data?.unconfiguredPackageIds.length&&<Text style={styles.note}>Các gói chưa có định mức diện tích không được dùng để so sánh.</Text>}
   </View>;

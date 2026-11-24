@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardSafeLayout } from '@/components/common/KeyboardSafeLayout';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { SparkleTypingDots } from '@/components/common/CleanMasterAnimations';
 import { AIChatBubble } from '@/components/common/AIChatBubble';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { operationRequest } from '@/api/operations';
@@ -296,7 +297,7 @@ export default function AIAssistantScreen() {
 
         <View style={styles.headerCenter}>
           <Image
-            source={require('@/assets/images/ai-mascot.png')}
+            source={require('@/assets/images/ai-mascot.jpg')}
             style={styles.headerAvatar}
           />
           <View>
@@ -358,9 +359,7 @@ export default function AIAssistantScreen() {
           {pendingMessage && (
             <>
               <AIChatBubble message={pendingMessage} />
-              <View style={styles.typingBox}>
-                <Text style={styles.typingText}>CleanMaster AI đang trả lời…</Text>
-              </View>
+              <SparkleTypingDots label="CleanMaster AI đang trả lời…" />
             </>
           )}
 

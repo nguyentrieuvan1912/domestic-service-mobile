@@ -10,6 +10,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { StaffBottomNav } from '@/components/staff/StaffBottomNav';
 import { StaffService } from '@/data/staffService';
 import { useAuth } from '@/context/AuthContext';
+import { useAppTheme } from '@/context/ThemeContext';
 import { StaffCapabilitySection } from '@/components/staff/StaffCapabilitySection';
 import { EmptyState } from '@/components/common/EmptyState';
 
@@ -25,6 +26,7 @@ const PAGE_COPY: Record<DetailSection, { title: string; description: string }> =
 
 export default function StaffAccountDetailsScreen() {
   const { height: bottomTabHeight } = useBottomTabSpacing();
+  const { colors } = useAppTheme();
   const router = useRouter(); const [, render] = useState(0);
   useEffect(() => StaffService.subscribe(() => render(x=>x+1)), []);
   const { currentUser, currentStaff } = useAuth();
@@ -46,21 +48,21 @@ export default function StaffAccountDetailsScreen() {
 
   return <View style={styles.root}>
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={goBack} style={styles.backButton} accessibilityLabel="Quay lại"><IconSymbol name="back" size={24} color={BrandColors.gray800} /></Pressable>
-        <Text style={styles.headerTitle}>{page.title}</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Pressable onPress={goBack} style={[styles.backButton, { backgroundColor: colors.surfaceMuted }]} accessibilityLabel="Quay lại"><IconSymbol name="back" size={24} color={colors.text} /></Pressable>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{page.title}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: styles.content.paddingBottom + bottomTabHeight }]}>
         <StaffConnectionStatus />
-        <Text style={styles.description}>{page.description}</Text>
+        <Text style={[styles.description, { color: colors.textSecondary }]}>{page.description}</Text>
 
-        {section === 'badges' && <View style={styles.card}>
-          {BADGES.map((badge) => <View key={badge.label} style={styles.badgeRow}>
-            <View style={styles.badgeIcon}><IconSymbol name={badge.icon} size={20} /></View>
-            <View style={styles.detailCopy}><Text style={styles.detailTitle}>{badge.label}</Text><Text style={styles.detailSub}>Được khách hàng khen {badge.count} lần</Text></View>
-            <Text style={styles.badgeCount}>{badge.count}</Text>
+        {section === 'badges' && <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {BADGES.map((badge) => <View key={badge.label} style={[styles.badgeRow, { borderBottomColor: colors.divider }]}>
+            <View style={[styles.badgeIcon, { backgroundColor: colors.accentBg }]}><IconSymbol name={badge.icon} size={20} /></View>
+            <View style={styles.detailCopy}><Text style={[styles.detailTitle, { color: colors.text }]}>{badge.label}</Text><Text style={[styles.detailSub, { color: colors.textMuted }]}>Được khách hàng khen {badge.count} lần</Text></View>
+            <Text style={[styles.badgeCount, { color: colors.accentText }]}>{badge.count}</Text>
           </View>)}
         </View>}
 
@@ -68,14 +70,14 @@ export default function StaffAccountDetailsScreen() {
           ? <EmptyState icon="warning" title="Không thể mở năng lực" description="Liên kết năng lực không hợp lệ." actionText="Về danh sách" onAction={() => router.replace({ pathname: '/staff/account-details', params: { section: 'skills' } })} />
           : <StaffCapabilitySection key={currentUser.id + ':' + (capabilityId ?? '')} capabilityId={capabilityId} />)}
 
-        {section === 'reviews' && <View style={styles.card}>
-          {reviews.map((review) => <View key={review.id} style={styles.reviewItem}>
+        {section === 'reviews' && <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {reviews.map((review) => <View key={review.id} style={[styles.reviewItem, { borderBottomColor: colors.divider }]}>
             <View style={styles.reviewTop}>
               <Image source={remoteImageSource(review.customerAvatar || undefined)} style={styles.reviewerAvatar} />
-              <View style={styles.detailCopy}><Text style={styles.detailTitle}>{review.customerName}</Text><Text style={styles.reviewDate}>{review.createdAt.split('T')[0]}</Text></View>
-              <Text style={styles.rating}>{'★'.repeat(review.rating)}<Text style={styles.emptyStars}>{'★'.repeat(5 - review.rating)}</Text></Text>
+              <View style={styles.detailCopy}><Text style={[styles.detailTitle, { color: colors.text }]}>{review.customerName}</Text><Text style={[styles.reviewDate, { color: colors.textMuted }]}>{review.createdAt.split('T')[0]}</Text></View>
+              <Text style={styles.rating}>{'★'.repeat(review.rating)}<Text style={[styles.emptyStars, { color: colors.border }]}>{'★'.repeat(5 - review.rating)}</Text></Text>
             </View>
-            <Text style={styles.reviewComment}>{review.comment}</Text>
+            <Text style={[styles.reviewComment, { color: colors.textSecondary }]}>{review.comment}</Text>
           </View>)}
         </View>}
       </ScrollView>

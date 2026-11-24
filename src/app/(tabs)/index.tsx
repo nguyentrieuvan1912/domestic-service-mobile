@@ -23,8 +23,10 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SvgXml } from 'react-native-svg';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { StaffSpotlightCard } from '@/components/common/StaffSpotlightCard';
 import { formatVND } from '@/components/common/Badge';
 import { RatingStars } from '@/components/common/RatingStars';
 import { ServiceCategoryCard } from '@/components/common/ServiceCategoryCard';
@@ -47,11 +49,101 @@ import type { CatalogHomeBanner } from '@/api/catalog-types';
 import { useBookingResume } from '@/hooks/use-booking-resume';
 
 
-const bannerThemes: Record<CatalogHomeBanner['theme'], { gradient: [string, string]; badge: string }> = {
-  BLUE: { gradient: ['#0284C7', '#0369A1'], badge: '#B91C1C' },
-  GREEN: { gradient: ['#0D9488', '#115E59'], badge: '#047857' },
-  ORANGE: { gradient: ['#C2410C', '#9A3412'], badge: '#7C2D12' },
-  NAVY: { gradient: ['#1E3A8A', '#1E40AF'], badge: '#1D4ED8' },
+const BANNER_SPARKLE_DECOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 120" fill="none">
+  <circle cx="28" cy="22" r="32" fill="#FFFFFF" fill-opacity="0.08"/>
+  <circle cx="146" cy="96" r="44" fill="#FFFFFF" fill-opacity="0.07"/>
+  <path d="M122 18l2.2 5.8 5.8 2.2-5.8 2.2-2.2 5.8-2.2-5.8-5.8-2.2 5.8-2.2 2.2-5.8z" fill="#FFFFFF" fill-opacity="0.45"/>
+  <path d="M96 86l1.5 4 4 1.5-4 1.5-1.5 4-1.5-4-4-1.5 4-1.5 1.5-4z" fill="#FFFFFF" fill-opacity="0.32"/>
+  <circle cx="108" cy="36" r="2.5" fill="#FFFFFF" fill-opacity="0.35"/>
+  <circle cx="74" cy="20" r="2" fill="#FFFFFF" fill-opacity="0.28"/>
+</svg>`;
+
+const CHRISTMAS_BANNER_IMG = require('../../../assets/images/banners/banner-christmas.jpg');
+const AI_VOICE_BANNER_IMG = require('../../../assets/images/banners/banner-ai-voice.jpg');
+const CLEANMASTER_BANNER_IMG = require('../../../assets/images/banners/banner-cleanmaster.jpg');
+
+type FeaturedHomeBanner = {
+  kind: 'FEATURED';
+  id: string;
+  badge: string;
+  badgeBg: string;
+  badgeTextColor?: string;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  ctaTextColor: string;
+  localImage: number;
+  overlayColors: readonly [string, string, string];
+  route: '/ai' | '/catalog' | '/(tabs)/services';
+};
+
+type CatalogBannerItem = CatalogHomeBanner & { kind: 'CATALOG' };
+type HomeBannerItem = FeaturedHomeBanner | CatalogBannerItem;
+
+const FEATURED_HOME_BANNERS: FeaturedHomeBanner[] = [
+  {
+    kind: 'FEATURED',
+    id: 'featured-christmas-promo',
+    badge: '🎄 GIÁNG SINH AN LÀNH',
+    badgeBg: '#F59E0B',
+    badgeTextColor: '#450A0A',
+    title: 'Giảm 30% đón Noel sạch bóng',
+    description: 'Nhập mã NOEL30 • Ưu đãi tổng vệ sinh & dọn nhà mùa lễ hội',
+    buttonLabel: 'Săn ưu đãi ngay',
+    ctaTextColor: '#991B1B',
+    localImage: CHRISTMAS_BANNER_IMG,
+    overlayColors: ['rgba(127, 29, 29, 0.92)', 'rgba(6, 78, 59, 0.56)', 'rgba(6, 78, 59, 0.06)'],
+    route: '/catalog',
+  },
+  {
+    kind: 'FEATURED',
+    id: 'featured-ai-voice',
+    badge: '✨ TRỢ LÝ AI 24/7',
+    badgeBg: '#10B981',
+    title: 'Nói để đặt lịch trong 30 giây',
+    description: 'Tư vấn gói theo diện tích & ước lượng chi phí bằng giọng nói',
+    buttonLabel: 'Thử AI ngay',
+    ctaTextColor: '#065F46',
+    localImage: AI_VOICE_BANNER_IMG,
+    overlayColors: ['rgba(6, 78, 59, 0.90)', 'rgba(13, 148, 136, 0.48)', 'rgba(15, 23, 42, 0.08)'],
+    route: '/ai',
+  },
+  {
+    kind: 'FEATURED',
+    id: 'featured-cleanmaster-care',
+    badge: '🛡️ CHUẨN CLEANMASTER',
+    badgeBg: '#047857',
+    title: 'Nhân viên xác minh CCCD 100%',
+    description: 'Chat & Gọi Video bảo mật trong đơn • Thanh toán payOS minh bạch',
+    buttonLabel: 'Khám phá dịch vụ',
+    ctaTextColor: '#047857',
+    localImage: CLEANMASTER_BANNER_IMG,
+    overlayColors: ['rgba(4, 120, 87, 0.88)', 'rgba(6, 95, 70, 0.52)', 'rgba(6, 78, 59, 0.06)'],
+    route: '/catalog',
+  },
+];
+
+const bannerThemes: Record<CatalogHomeBanner['theme'], { overlay: readonly [string, string, string]; badge: string; ctaText: string }> = {
+  BLUE: {
+    overlay: ['rgba(3, 105, 161, 0.93)', 'rgba(2, 132, 199, 0.78)', 'rgba(14, 116, 144, 0.55)'],
+    badge: '#F59E0B',
+    ctaText: '#0369A1',
+  },
+  GREEN: {
+    overlay: ['rgba(6, 78, 59, 0.93)', 'rgba(13, 148, 136, 0.78)', 'rgba(4, 120, 87, 0.55)'],
+    badge: '#10B981',
+    ctaText: '#047857',
+  },
+  ORANGE: {
+    overlay: ['rgba(154, 52, 18, 0.93)', 'rgba(194, 65, 12, 0.78)', 'rgba(217, 119, 6, 0.55)'],
+    badge: '#F59E0B',
+    ctaText: '#9A3412',
+  },
+  NAVY: {
+    overlay: ['rgba(30, 58, 138, 0.94)', 'rgba(30, 64, 175, 0.80)', 'rgba(15, 23, 42, 0.58)'],
+    badge: '#38BDF8',
+    ctaText: '#1E3A8A',
+  },
 };
 
 export default function HomeScreen() {
@@ -62,7 +154,8 @@ export default function HomeScreen() {
   const { currentCustomer } = useAuth();
   const bookingResource = useCustomerBookings(); const catalog = useBookingCatalog(catalogRevision);
   const bannerResource = useCatalogResource<CatalogHomeBanner[]>('/home-banners', catalogRevision);
-  const banners = bannerResource.data ?? [];
+  const catalogBanners: CatalogBannerItem[] = (bannerResource.data ?? []).map(item => ({ ...item, kind: 'CATALOG' }));
+  const banners: HomeBannerItem[] = [...FEATURED_HOME_BANNERS, ...catalogBanners];
   const bannerOrder = banners.map(banner => banner.id).join(',');
   const services = catalog.services;
   const getServiceById = (id: string) => services.find(s=>s.id===id) || (bookingResource.bookings.find(b=>b.serviceId===id) ? bookingServiceView(bookingResource.bookings.find(b=>b.serviceId===id)!) : undefined);
@@ -214,17 +307,17 @@ export default function HomeScreen() {
               />
               <View style={styles.userMeta}>
                 <Text style={[styles.greetingText, { color: colors.textSecondary }]}>Xin chào bạn,</Text>
-                <Text style={[styles.userName, { color: colors.text }]}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
+                <Text style={[styles.userName, { color: colors.text }]} numberOfLines={2}>{currentCustomer?.fullName || 'Khách hàng'}</Text>
               </View>
             </Pressable>
 
             <View style={styles.headerActions}>
               <Pressable
-                style={styles.notifBtn}
+                style={[styles.notifBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 accessibilityRole="button"
                 accessibilityLabel={`Thông báo, ${unreadCount} chưa đọc`}
                 onPress={() => router.push('/notifications')}>
-                <IconSymbol name="bell" size={22} color={BrandColors.gray800} />
+                <IconSymbol name="bell" size={22} color={colors.text} />
                 <NotificationBadge count={unreadCount} />
               </Pressable>
 
@@ -232,48 +325,48 @@ export default function HomeScreen() {
           </View>
 
           {expiredBooking && <StaffResponseDecision key={expiredBooking.id} booking={expiredBooking} />}
-          {waitingBookings.map(booking => <Pressable key={booking.id} style={styles.upcomingBox}
+          {waitingBookings.map(booking => <Pressable key={booking.id} style={[styles.upcomingBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push({ pathname: '/booking/waiting', params: { id: booking.id } })}>
             <View style={styles.upcomingHeader}><View style={styles.upcomingDotRow}>
-              <IconSymbol name="clock" size={18} color={BrandColors.primary} />
-              <Text style={styles.upcomingTitle}>{booking.staffWaitState === 'EXPIRED' ? 'Hết giờ chờ • Cần xác nhận' : 'Đang chờ nhân viên nhận'}</Text>
-            </View><IconSymbol name="chevronRight" size={18} color={BrandColors.primary} /></View>
-            <Text style={styles.upcomingServiceName}>{booking.service.name || booking.service.serviceName || 'Đơn dịch vụ'}</Text>
-            <Text style={styles.upcomingTime}>{String(booking.staff?.fullName || 'Nhân viên đã chọn')} • {booking.bookingCode}</Text>
-            <Text style={styles.upcomingTime}>{booking.staffWaitState === 'EXPIRED' ? 'Nhấn để chờ thêm 5 phút hoặc tìm nhân viên khác' : 'Nhấn để xem thời gian chờ và phản hồi của nhân viên'}</Text>
+              <IconSymbol name="clock" size={18} color={colors.accentText} />
+              <Text style={[styles.upcomingTitle, { color: colors.accentText }]}>{booking.staffWaitState === 'EXPIRED' ? 'Hết giờ chờ • Cần xác nhận' : 'Đang chờ nhân viên nhận'}</Text>
+            </View><IconSymbol name="chevronRight" size={18} color={colors.accentText} /></View>
+            <Text style={[styles.upcomingServiceName, { color: colors.text }]}>{booking.service.name || booking.service.serviceName || 'Đơn dịch vụ'}</Text>
+            <Text style={[styles.upcomingTime, { color: colors.textSecondary }]}>{String(booking.staff?.fullName || 'Nhân viên đã chọn')} • {booking.bookingCode}</Text>
+            <Text style={[styles.upcomingTime, { color: colors.textMuted }]}>{booking.staffWaitState === 'EXPIRED' ? 'Nhấn để chờ thêm 5 phút hoặc tìm nhân viên khác' : 'Nhấn để xem thời gian chờ và phản hồi của nhân viên'}</Text>
           </Pressable>)}
 
           {/* Address Selector Pill */}
           <Pressable
-            style={styles.addressBar}
+            style={[styles.addressBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/account/addresses')}>
-            <IconSymbol name="location" size={16} color={BrandColors.primary} />
-            <Text numberOfLines={1} style={styles.addressText}>
+            <IconSymbol name="location" size={16} color={colors.accentText} />
+            <Text numberOfLines={1} style={[styles.addressText, { color: colors.text }]}>
               {defaultAddress
                 ? `${defaultAddress.title}: ${defaultAddress.streetAddress}, ${defaultAddress.district}`
                 : 'Chọn địa chỉ phục vụ của bạn...'}
             </Text>
-            <IconSymbol name="chevronRight" size={14} color={BrandColors.gray400} />
+            <IconSymbol name="chevronRight" size={14} color={colors.textMuted} />
           </Pressable>
 
           {/* ACTIVE BOOKING PREVIEW (If exists) */}
           {upcomingBooking && (
             <Pressable
-              style={styles.upcomingBox}
+              style={[styles.upcomingBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={() => router.push(`/booking/${upcomingBooking.id}`)}>
               <View style={styles.upcomingHeader}>
                 <View style={styles.upcomingDotRow}>
                   <View style={styles.livePulseDot} />
-                  <Text style={styles.upcomingTitle}>Đơn dịch vụ sắp tới</Text>
+                  <Text style={[styles.upcomingTitle, { color: colors.accentText }]}>Đơn dịch vụ sắp tới</Text>
                 </View>
                 <BookingStatusBadge status={upcomingBooking.status} size="sm" />
               </View>
 
-              <Text style={styles.upcomingServiceName}>
+              <Text style={[styles.upcomingServiceName, { color: colors.text }]}>
                 {services.find((s) => s.id === upcomingBooking.serviceId)?.name ||
                   'Dịch vụ gia đình'}
               </Text>
-              <Text style={styles.upcomingTime}>
+              <Text style={[styles.upcomingTime, { color: colors.textSecondary }]}>
                 📅 {upcomingBooking.bookingDate} • {upcomingBooking.startTime} - {upcomingBooking.endTime}
               </Text>
             </Pressable>
@@ -351,37 +444,14 @@ export default function HomeScreen() {
 
           {/* DEDICATED SECTION: CHỌN NHÂN VIÊN THEO NHU CẦU CỦA RIÊNG BẠN (MODE A) */}
           <View style={styles.staffModeSection}>
-            <Pressable
-              style={styles.compactStaffBanner}
+            <StaffSpotlightCard
               onPress={() =>
                 router.push({
                   pathname: '/booking/new',
                   params: { serviceId: 'srv-001', mode: 'MODE_A' },
                 })
-              }>
-              <LinearGradient
-                colors={['#0F766E', '#0D9488']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.compactStaffGradient}>
-                <View style={styles.compactStaffIconBox}>
-                  <IconSymbol name="person" size={22} color="#FFFFFF" />
-                </View>
-
-                <View style={styles.compactStaffTextBox}>
-                  <Text style={styles.compactStaffTitle} numberOfLines={1}>
-                    Chọn nhân viên theo nhu cầu của riêng bạn
-                  </Text>
-                  <Text style={styles.compactStaffSubtitle} numberOfLines={1}>
-                    Chủ động duyệt hồ sơ, xem đánh giá 5★ & chọn thợ
-                  </Text>
-                </View>
-
-                <View style={styles.compactStaffArrow}>
-                  <IconSymbol name="chevronRight" size={16} color="#FFFFFF" />
-                </View>
-              </LinearGradient>
-            </Pressable>
+              }
+            />
           </View>
 
           {/* HERO BANNERS CAROUSEL */}
@@ -421,6 +491,54 @@ export default function HomeScreen() {
                 alignItems: 'center',
               }}>
               {banners.map((banner) => {
+                if (banner.kind === 'FEATURED') {
+                  return (
+                    <Pressable
+                      key={banner.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={banner.title}
+                      style={[styles.bannerCard, { width: bannerWidth, height: 172 }]}
+                      onPress={() => router.push(banner.route)}
+                    >
+                      <Image
+                        source={banner.localImage}
+                        resizeMode="cover"
+                        style={styles.bannerBackdropImage}
+                      />
+                      <LinearGradient
+                        colors={banner.overlayColors}
+                        start={{ x: 0, y: 0.5 }}
+                        end={{ x: 1, y: 0.5 }}
+                        style={styles.bannerFeaturedOverlay}
+                      >
+                        <View pointerEvents="none" style={styles.bannerDecorSvg}>
+                          <SvgXml xml={BANNER_SPARKLE_DECOR_SVG} width={180} height={120} />
+                        </View>
+                        <View style={styles.bannerFeaturedCol}>
+                          <View style={[styles.bannerBadge, { backgroundColor: banner.badgeBg }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.bannerBadgeText,
+                                banner.badgeTextColor ? { color: banner.badgeTextColor } : null,
+                              ]}
+                            >
+                              {banner.badge}
+                            </Text>
+                          </View>
+                          <Text numberOfLines={2} style={styles.bannerTitle}>{banner.title}</Text>
+                          <Text numberOfLines={2} style={styles.bannerDesc}>{banner.description}</Text>
+                          <View style={styles.bannerCtaBtn}>
+                            <Text numberOfLines={1} style={[styles.bannerCtaText, { color: banner.ctaTextColor }]}>
+                              {banner.buttonLabel} →
+                            </Text>
+                          </View>
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                }
+
                 const fullImage = banner.layout === 'FULL_IMAGE';
                 const theme = bannerThemes[banner.theme];
                 return (
@@ -428,7 +546,7 @@ export default function HomeScreen() {
                   key={banner.id}
                   accessibilityRole="button"
                   accessibilityLabel={banner.title}
-                  style={[styles.bannerCard, { width: bannerWidth, height: fullImage ? bannerWidth * 5 / 12 : 160 }]}
+                  style={[styles.bannerCard, { width: bannerWidth, height: fullImage ? bannerWidth * 5 / 12 : 172 }]}
                   onPress={() =>
                     router.push({
                       pathname: '/service/[id]',
@@ -436,21 +554,39 @@ export default function HomeScreen() {
                     })
                   }>
                   {fullImage ? <Image source={remoteImageSource(banner.imageUrl)} style={styles.bannerFullImage} resizeMode="cover" />
-                    : <LinearGradient colors={theme.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bannerGradient}>
-                    <View style={styles.bannerContentCol}>
-                      {!!banner.badge && <View style={[styles.bannerBadge, { backgroundColor: theme.badge }]}>
-                        <Text numberOfLines={1} style={styles.bannerBadgeText}>{banner.badge}</Text>
-                      </View>}
-                      <Text numberOfLines={2} style={styles.bannerTitle}>{banner.title}</Text>
-                      {!!banner.description && <Text numberOfLines={2} style={styles.bannerDesc}>{banner.description}</Text>}
-                      {!!banner.buttonLabel && <View style={styles.bannerCtaBtn}>
-                        <Text numberOfLines={1} style={styles.bannerCtaText}>{banner.buttonLabel} →</Text>
-                      </View>}
-                    </View>
+                    : <View style={styles.bannerRichShell}>
+                      <Image
+                        source={remoteImageSource(banner.imageUrl)}
+                        resizeMode="cover"
+                        blurRadius={5}
+                        style={styles.bannerBackdropImage}
+                      />
+                      <LinearGradient
+                        colors={theme.overlay}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.bannerGradient}
+                      >
+                        <View pointerEvents="none" style={styles.bannerDecorSvg}>
+                          <SvgXml xml={BANNER_SPARKLE_DECOR_SVG} width={180} height={120} />
+                        </View>
+                        <View style={styles.bannerContentCol}>
+                          {!!banner.badge && <View style={[styles.bannerBadge, { backgroundColor: theme.badge }]}>
+                            <Text numberOfLines={1} style={styles.bannerBadgeText}>{banner.badge}</Text>
+                          </View>}
+                          <Text numberOfLines={2} style={styles.bannerTitle}>{banner.title}</Text>
+                          {!!banner.description && <Text numberOfLines={2} style={styles.bannerDesc}>{banner.description}</Text>}
+                          {!!banner.buttonLabel && <View style={styles.bannerCtaBtn}>
+                            <Text numberOfLines={1} style={[styles.bannerCtaText, { color: theme.ctaText }]}>{banner.buttonLabel} →</Text>
+                          </View>}
+                        </View>
 
-                    <Image source={remoteImageSource(banner.imageUrl)} resizeMode="cover"
-                      style={[styles.bannerImage, { width: Math.min(110, (bannerWidth - Spacing.three * 2) * 0.4) }]} />
-                  </LinearGradient>}
+                        <View style={styles.bannerImageFrame}>
+                          <Image source={remoteImageSource(banner.imageUrl)} resizeMode="cover"
+                            style={[styles.bannerImage, { width: Math.min(108, (bannerWidth - Spacing.three * 2) * 0.36) }]} />
+                        </View>
+                      </LinearGradient>
+                    </View>}
                 </Pressable>
               ); })}
             </ScrollView>
@@ -523,7 +659,7 @@ export default function HomeScreen() {
               <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>Khách hàng tin tưởng đặt nhiều nhất</Text>
             </View>
             <Pressable onPress={() => router.push('/(tabs)/services')}>
-              <Text style={styles.seeAllText}>Xem thêm</Text>
+              <Text style={[styles.seeAllText, { color: colors.accentText }]}>Xem thêm</Text>
             </Pressable>
           </View>
 
@@ -664,7 +800,7 @@ export default function HomeScreen() {
             colors={['#10B981', '#059669']}
             style={styles.floatingAIGradient}>
             <Image
-              source={require('@/assets/images/ai-mascot.png')}
+              source={require('@/assets/images/ai-mascot.jpg')}
               style={styles.aiMascotImg}
             />
             <View style={styles.aiBtnTextCol}>
@@ -771,13 +907,15 @@ const styles = StyleSheet.create({
   },
   topHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
     paddingHorizontal: Spacing.three,
     paddingTop: 8,
     paddingBottom: 6,
   },
   profileRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -790,6 +928,8 @@ const styles = StyleSheet.create({
     borderColor: BrandColors.primary,
   },
   userMeta: {
+    flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
   },
   greetingText: {
@@ -954,6 +1094,49 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
     shadowRadius: 6,
+  },
+  bannerRichShell: {
+    flex: 1,
+    position: 'relative',
+  },
+  bannerBackdropImage: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  bannerFeaturedOverlay: {
+    flex: 1,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 14,
+    justifyContent: 'center',
+  },
+  bannerFeaturedCol: {
+    width: '68%',
+    justifyContent: 'space-evenly',
+    gap: 5,
+  },
+  bannerDecorSvg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    opacity: 0.9,
+  },
+  bannerImageFrame: {
+    alignSelf: 'center',
+    borderRadius: BorderRadius.lg + 2,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    overflow: 'hidden',
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 4,
   },
   bannerGradient: {
     flex: 1,

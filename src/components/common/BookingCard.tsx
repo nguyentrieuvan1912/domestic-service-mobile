@@ -2,6 +2,7 @@ import { remoteImageSource } from '@/utils/image-source';
 import React from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { Booking } from '@/types/booking';
 import { BookingStatusBadge } from './BookingStatusBadge';
 import { formatVND } from './Badge';
@@ -25,6 +26,7 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   onRebook,
   onPay,
 }) => {
+  const { colors } = useAppTheme();
   const service = bookingServiceView(booking as ConnectedBooking);
   const staff = (booking as ConnectedBooking & { staff?: { fullName: string; avatar: string } }).staff;
 
@@ -36,12 +38,12 @@ export const BookingCard: React.FC<BookingCardProps> = ({
   );
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
+    <Pressable style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress}>
       {/* Top row: Code & Status badge */}
-      <View style={styles.topRow}>
+      <View style={[styles.topRow, { borderBottomColor: colors.divider }]}>
         <View style={styles.codeGroup}>
-          <Text style={styles.codeText}>{booking.bookingCode}</Text>
-          <Text style={styles.dateSmall}>
+          <Text style={[styles.codeText, { color: colors.text }]}>{booking.bookingCode}</Text>
+          <Text style={[styles.dateSmall, { color: colors.textMuted }]}>
             {booking.bookingDate} • {booking.startTime} - {booking.endTime}
           </Text>
         </View>
@@ -51,26 +53,26 @@ export const BookingCard: React.FC<BookingCardProps> = ({
       {/* Middle row: Service image, title & package */}
       <View style={styles.serviceRow}>
         {service?.image ? (
-          <Image source={remoteImageSource(service.image)} style={styles.serviceImage} />
+          <Image source={remoteImageSource(service.image)} style={[styles.serviceImage, { backgroundColor: colors.surfaceMuted }]} />
         ) : (
-          <View style={styles.imagePlaceholder}>
-            <IconSymbol name="home" size={20} color={BrandColors.gray500} />
+          <View style={[styles.imagePlaceholder, { backgroundColor: colors.surfaceMuted }]}>
+            <IconSymbol name="home" size={20} color={colors.textMuted} />
           </View>
         )}
         <View style={styles.serviceInfo}>
-          <Text numberOfLines={1} style={styles.serviceName}>
+          <Text numberOfLines={1} style={[styles.serviceName, { color: colors.text }]}>
             {service?.name || 'Dịch vụ gia đình'}
           </Text>
-          <Text style={styles.packageDetailText}>
+          <Text style={[styles.packageDetailText, { color: colors.textMuted }]}>
             {booking.mode === 'MODE_A' ? 'Tự chọn nhân viên' : 'Hệ thống điều phối'} • {booking.requiredStaffCount} NV
           </Text>
           {staff ? (
             <View style={styles.staffAssignedRow}>
               <Image source={remoteImageSource(staff.avatar)} style={styles.staffThumb} />
-              <Text style={styles.staffAssignedName}>{!hasAcceptedStaff ? 'Nhân viên đã chọn: ' : ''}{staff.fullName}</Text>
+              <Text style={[styles.staffAssignedName, { color: colors.textSecondary }]}>{!hasAcceptedStaff ? 'Nhân viên đã chọn: ' : ''}{staff.fullName}</Text>
             </View>
           ) : (
-            <Text style={styles.matchingNote}>
+            <Text style={[styles.matchingNote, { color: colors.infoText }]}>
               {isClosed ? 'Đã dừng điều phối' : booking.status === 'AWAITING_PAYMENT' ? 'Tiếp tục thanh toán để hoàn tất đặt dịch vụ.' : booking.status === 'MATCHING' ? 'Đang tìm nhân viên gần bạn...' : 'Đang xử lý điều phối'}
             </Text>
           )}
@@ -79,59 +81,59 @@ export const BookingCard: React.FC<BookingCardProps> = ({
 
       {booking.status === 'CANCELLED' && (booking.cancelledAt || booking.cancellationReason) && (
         <View style={styles.cancellationInfo}>
-          {!!booking.cancelledAt && <Text style={styles.cancellationText}>Hủy lúc {new Date(booking.cancelledAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</Text>}
-          {!!booking.cancellationReason && <Text style={styles.cancellationText}>{booking.cancellationReason}</Text>}
+          {!!booking.cancelledAt && <Text style={[styles.cancellationText, { color: colors.textMuted }]}>Hủy lúc {new Date(booking.cancelledAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</Text>}
+          {!!booking.cancellationReason && <Text style={[styles.cancellationText, { color: colors.textSecondary }]}>{booking.cancellationReason}</Text>}
         </View>
       )}
 
       {/* Bottom row: Total amount & Quick action buttons */}
-      <View style={styles.bottomRow}>
+      <View style={[styles.bottomRow, { borderTopColor: colors.divider }]}>
         <View>
-          <Text style={styles.priceLabel}>Tổng tiền</Text>
-          <Text style={styles.priceValue}>{formatVND(booking.totalAmount)}</Text>
+          <Text style={[styles.priceLabel, { color: colors.textMuted }]}>Tổng tiền</Text>
+          <Text style={[styles.priceValue, { color: colors.accentText }]}>{formatVND(booking.totalAmount)}</Text>
         </View>
 
         <View style={styles.actionsGroup}>
           {isCompleted && onReview && (
             <Pressable
-              style={styles.reviewButton}
+              style={[styles.reviewButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
               onPress={(e) => {
                 e.stopPropagation();
                 onReview();
               }}>
-              <Text style={styles.reviewButtonText}>Đánh giá</Text>
+              <Text style={[styles.reviewButtonText, { color: colors.text }]}>Đánh giá</Text>
             </Pressable>
           )}
 
           {canCancel && onCancel && (
             <Pressable
-              style={styles.cancelButton}
+              style={[styles.cancelButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
               onPress={(e) => {
                 e.stopPropagation();
                 onCancel();
               }}>
-              <Text style={styles.cancelButtonText}>Hủy đơn</Text>
+              <Text style={[styles.cancelButtonText, { color: colors.dangerText }]}>Hủy đơn</Text>
             </Pressable>
           )}
 
           {booking.status === 'AWAITING_PAYMENT' && onPay ? (
-            <Pressable accessibilityRole="button" style={styles.detailButton} onPress={(event) => { event.stopPropagation(); onPay(); }}>
-              <Text style={styles.detailButtonText}>Tiếp tục thanh toán</Text>
+            <Pressable accessibilityRole="button" style={[styles.detailButton, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]} onPress={(event) => { event.stopPropagation(); onPay(); }}>
+              <Text style={[styles.detailButtonText, { color: colors.accentText }]}>Tiếp tục thanh toán</Text>
             </Pressable>
           ) : onRebook && (
             <Pressable
-              style={styles.rebookButton}
+              style={[styles.rebookButton, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
               onPress={(e) => {
                 e.stopPropagation();
                 onRebook();
               }}>
-              <Text style={styles.rebookButtonText}>Đặt lại</Text>
+              <Text style={[styles.rebookButtonText, { color: colors.text }]}>Đặt lại</Text>
             </Pressable>
           )}
 
-          <Pressable style={styles.detailButton} onPress={onPress}>
-            <Text style={styles.detailButtonText}>Chi tiết</Text>
-            <IconSymbol name="chevronRight" size={13} color={BrandColors.primaryDark} />
+          <Pressable style={[styles.detailButton, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]} onPress={onPress}>
+            <Text style={[styles.detailButtonText, { color: colors.accentText }]}>Chi tiết</Text>
+            <IconSymbol name="chevronRight" size={13} color={colors.accentText} />
           </Pressable>
         </View>
       </View>

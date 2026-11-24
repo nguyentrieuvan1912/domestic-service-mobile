@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { CelebrationOverlay } from '@/components/common/CleanMasterAnimations';
 import { RatingView } from '@/components/common/RatingView';
 import { bookingServiceView, ConnectedBooking } from '@/data/connectedBookings';
 import { useBookingDetail } from '@/hooks/use-booking-detail';
@@ -39,6 +40,7 @@ function ReviewContent({ booking, staff }: { booking: ConnectedBooking; staff?: 
   const router = useRouter(); const service = bookingServiceView(booking);
   const [selectedStaffId,setSelectedStaffId]=useState(booking.staffId || booking.assignments.find(a=>a.executionStatus==='COMPLETED')?.staffId || '');
   const [saving, setSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [rating, setRating] = useState(5);
   const [selectedCriteria, setSelectedCriteria] = useState<string[]>([
     'Đúng giờ hẹn',
@@ -66,7 +68,7 @@ function ReviewContent({ booking, staff }: { booking: ConnectedBooking; staff?: 
       const target = booking.assignments.find(a => a.staffId === selectedStaffId && a.executionStatus === 'COMPLETED');
       if (!target) throw new Error('Chưa có nhân viên hoàn tất trong đơn hàng.');
       await operationRequest('booking', '/bookings/' + booking.id + '/reviews', 'POST', { staffId: target.staffId, rating, comment: comment.trim(), tags: selectedCriteria });
-      Alert.alert('Cảm ơn đánh giá của bạn!', 'Đánh giá đã được lưu vào hệ thống.', [{ text: 'Hoàn tất', onPress: () => router.back() }]);
+      setShowSuccess(true);
     } catch (error) { Alert.alert('Chưa gửi được đánh giá', error instanceof Error ? error.message : 'Vui lòng thử lại.'); }
     finally { setSaving(false); }
   };
@@ -152,6 +154,19 @@ function ReviewContent({ booking, staff }: { booking: ConnectedBooking; staff?: 
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <CelebrationOverlay
+        visible={showSuccess}
+        variant="review"
+        title="Cảm ơn đánh giá của bạn!"
+        subtitle="Phản hồi của bạn đã được lưu và giúp CleanMaster phục vụ gia đình bạn ngày càng tốt hơn."
+        badgeText={`${rating}★ • ${booking.bookingCode}`}
+        actionLabel="Hoàn tất"
+        onDone={() => {
+          setShowSuccess(false);
+          router.back();
+        }}
+      />
     </SafeAreaView>
   );
 }

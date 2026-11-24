@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
 import { IconSymbol } from '@/components/common/IconSymbol';
+import { LegalPolicyModal, type LegalPolicyTab } from '@/components/common/LegalPolicyModal';
 import { useAuth } from '@/context/AuthContext';
 import { EmailChallenge, EmailVerified, IdentitySession, identityRequest } from '@/api/identity';
 
@@ -20,6 +21,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const [policyModalTab, setPolicyModalTab] = useState<LegalPolicyTab | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -67,11 +69,47 @@ export default function RegisterScreen() {
         <Text style={styles.fieldLabel}>Số điện thoại</Text><TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="0901234567" keyboardType="phone-pad" autoComplete="tel" maxLength={12} editable={!isLoading} />
         <Text style={styles.fieldLabel}>Mật khẩu</Text><TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Tối thiểu 8 ký tự" secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={72} editable={!isLoading} />
         <Text style={styles.fieldLabel}>Xác nhận mật khẩu</Text><TextInput style={styles.input} value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Nhập lại mật khẩu" secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={72} editable={!isLoading} />
-        <Pressable style={styles.termsRow} disabled={isLoading} onPress={() => setAgreeTerms(!agreeTerms)}><Text style={{ fontSize: 18 }}>{agreeTerms ? '☑' : '☐'}</Text><Text style={styles.termsText}>Tôi đồng ý với <Text style={styles.termsHighlight}>Điều khoản sử dụng</Text> và <Text style={styles.termsHighlight}>Chính sách bảo mật</Text> của CleanMaster</Text></Pressable></>}
+        <View style={styles.termsRow}>
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreeTerms }}
+            disabled={isLoading}
+            hitSlop={8}
+            onPress={() => setAgreeTerms(!agreeTerms)}
+          >
+            <Text style={{ fontSize: 18 }}>{agreeTerms ? '☑' : '☐'}</Text>
+          </Pressable>
+          <Text style={styles.termsText}>
+            Tôi đồng ý với{' '}
+            <Text
+              accessibilityRole="link"
+              style={styles.termsHighlight}
+              onPress={() => setPolicyModalTab('terms')}
+            >
+              Điều khoản sử dụng
+            </Text>{' '}
+            và{' '}
+            <Text
+              accessibilityRole="link"
+              style={styles.termsHighlight}
+              onPress={() => setPolicyModalTab('privacy')}
+            >
+              Chính sách bảo mật
+            </Text>{' '}
+            của CleanMaster
+          </Text>
+        </View></>}
       <Pressable style={[styles.submitButton, isLoading && { opacity: 0.7 }]} onPress={next} disabled={isLoading}>{isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitButtonText}>{step === 'email' ? 'Tiếp theo' : step === 'code' ? 'Xác thực' : 'Tạo tài khoản'}</Text>}</Pressable>
       {step !== 'email' && <Pressable disabled={isLoading} onPress={backToEmail}><Text style={[styles.loginLink, { marginTop: 14 }]}>Đổi Gmail / xác thực lại</Text></Pressable>}
       <View style={styles.loginRow}><Text style={styles.loginText}>Đã có tài khoản? </Text><Pressable disabled={isLoading} onPress={() => router.push('/auth/login')}><Text style={styles.loginLink}>Đăng nhập</Text></Pressable></View>
     </View></ScrollView>
+    <LegalPolicyModal
+      visible={policyModalTab !== null}
+      initialTab={policyModalTab ?? 'terms'}
+      showAgreeButton
+      onAgree={() => setAgreeTerms(true)}
+      onClose={() => setPolicyModalTab(null)}
+    />
   </KeyboardAvoidingView></SafeAreaView>;
 }
 
@@ -166,6 +204,7 @@ const styles = StyleSheet.create({
   termsHighlight: {
     color: BrandColors.primary,
     fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   submitButton: {
     backgroundColor: BrandColors.primary,

@@ -91,14 +91,39 @@ oldDetail.resolve(liveBooking);await settle(detail);assert.equal(detail.value.bo
 detail.unmount();
 console.log('Booking detail: immediate core rendering, optional-service isolation, retained data on refresh error and order/account isolation passed.');
 // A failed first job search must recover on the next scheduled refresh without tapping Retry.
-react.useMemo=(factory,deps)=>react.useCallback(factory,deps)();
-react.useSyncExternalStore=(_subscribe,snapshot)=>snapshot();
+react.useMemo=(factory,deps)=>{
+  const index=runner.cursor++;
+  if(!equal(runner.slots[index]?.deps,deps)) runner.slots[index]={deps,value:factory()};
+  return runner.slots[index].value;
+};
+react.useSyncExternalStore=(subscribe,snapshot)=>{
+  const [,setSnapshot]=react.useState(snapshot);
+  react.useEffect(()=>subscribe(()=>setSnapshot(snapshot())),[subscribe,snapshot]);
+  return snapshot();
+};
 const staffLoads=[];const staffActor={userId:'97',staffId:'97'};
+let staffLoaded = false, staffRefreshes = 0;
+const staffListeners = new Set();
 const beforeStaffLoader=Module._load;
 Module._load=function(name,...args){
  if(name==='@/hooks/use-staff-actor')return require('../src/hooks/use-staff-actor.ts');
  if(name==='@/data/staffCapabilityAdapter')return{getCapabilityActor:()=>staffActor};
- if(name==='@/data/connectedStaffRepository')return{StaffRepository:{subscribe:()=>()=>{},getStoreRevision:()=>0},StaffMatchingRepository:{load:()=>new Promise((resolve,reject)=>staffLoads.push({resolve,reject})),refresh:async()=>{},read:()=>({items:[]})}};
+ if(name==='@/data/connectedStaffRepository')return{
+   StaffRepository:{
+     subscribe: listener => { staffListeners.add(listener); return () => staffListeners.delete(listener); },
+     getStoreRevision:()=>Number(staffLoaded),
+     getLoadState:()=>({loaded:staffLoaded})
+   },
+   StaffMatchingRepository:{
+     load:()=>new Promise((resolve,reject)=>staffLoads.push({resolve:()=>{
+       staffLoaded=true;
+       staffListeners.forEach(listener=>listener());
+       resolve();
+     },reject})),
+     refresh:async()=>{staffRefreshes++;},
+     read:()=>({items:[]})
+   }
+ };
  return beforeStaffLoader.call(this,name,...args);
 };
 const originalInterval=global.setInterval,originalClear=global.clearInterval;let jobPoll;
@@ -108,5 +133,9 @@ const jobs=mount(require('../src/hooks/use-staff-matching.ts').useStaffMatching)
 staffLoads[0].reject(new Error('Connection timed out'));await settle(jobs);assert.equal(jobs.value.status,'ERROR');
 jobPoll();assert.equal(staffLoads.length,2,'An initial error must not disable polling');staffLoads[1].resolve();await settle(jobs);
 assert.equal(jobs.value.status,'READY');jobs.unmount();
+const reopened=mount(require('../src/hooks/use-staff-matching.ts').useStaffMatching);
+assert.equal(reopened.value.status,'READY','An already loaded staff page renders its cached snapshot immediately');
+assert.equal(staffRefreshes,1,'Reopening a loaded page still refreshes matching from the backend');
+reopened.unmount();
 global.setInterval=originalInterval;global.clearInterval=originalClear;
 console.log('Staff matching: failed initial load automatically recovers on the next active poll.');

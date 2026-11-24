@@ -32,9 +32,9 @@ export default function ChatListScreen() {
     <View style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: colors.divider }]}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Tin nhắn & Tư vấn</Text>
-          {actor && <Pressable accessibilityRole="button" accessibilityLabel={`Thùng rác tin nhắn, ${trashCount} hội thoại`} onPress={() => router.push('/chat/trash')} style={styles.trashButton}>
+          {actor && <Pressable accessibilityRole="button" accessibilityLabel={`Thùng rác tin nhắn, ${trashCount} hội thoại`} onPress={() => router.push('/chat/trash')} style={[styles.trashButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <IconSymbol name="trash" size={22} color={colors.textSecondary} />
             {trashCount > 0 && <Text style={styles.trashCount}>{trashCount > 99 ? '99+' : trashCount}</Text>}
           </Pressable>}
@@ -43,37 +43,37 @@ export default function ChatListScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: styles.scrollContent.paddingBottom + bottomTabHeight }]}>
-        {error ? <Pressable onPress={() => void ChatRepository.loadList(actor).catch(() => {})} style={{ padding: 12, marginBottom: 12 }}><Text style={{ color: BrandColors.danger }}>{error} Chạm để thử lại.</Text></Pressable> : null}
+        {error ? <Pressable onPress={() => void ChatRepository.loadList(actor).catch(() => {})} style={{ padding: 12, marginBottom: 12 }}><Text style={{ color: colors.dangerText }}>{error} Chạm để thử lại.</Text></Pressable> : null}
         {/* Featured AI Assistant Banner */}
-        <Pressable style={styles.aiBanner} onPress={() => router.push('/ai')}>
-          <View style={styles.aiIconBox}>
+        <Pressable style={[styles.aiBanner, { backgroundColor: colors.accentBg, borderColor: colors.accentBorder }]} onPress={() => router.push('/ai')}>
+          <View style={[styles.aiIconBox, { backgroundColor: colors.surface }]}>
             <Image
-              source={require('@/assets/images/ai-mascot.png')}
+              source={require('@/assets/images/ai-mascot.jpg')}
               style={{ width: 40, height: 40, borderRadius: 20 }}
               resizeMode="cover"
             />
           </View>
           <View style={styles.aiInfo}>
             <View style={styles.aiTitleRow}>
-              <Text style={styles.aiTitle}>Trợ lý CleanMaster AI</Text>
-              <View style={styles.aiOnlineBadge}>
+              <Text style={[styles.aiTitle, { color: colors.accentText }]}>Trợ lý CleanMaster AI</Text>
+              <View style={[styles.aiOnlineBadge, { backgroundColor: colors.surface }]}>
                 <View style={styles.greenDot} />
-                <Text style={styles.aiOnlineText}>Online 24/7</Text>
+                <Text style={[styles.aiOnlineText, { color: colors.accentText }]}>Online 24/7</Text>
               </View>
             </View>
-            <Text style={styles.aiLastMsg}>
+            <Text style={[styles.aiLastMsg, { color: colors.textSecondary }]}>
               Tư vấn dịch vụ, chọn gói, so sánh giá và giải đáp chính sách...
             </Text>
           </View>
-          <IconSymbol name="chevronRight" size={16} color={BrandColors.primary} />
+          <IconSymbol name="chevronRight" size={16} color={colors.accentText} />
         </Pressable>
 
-        <Text style={styles.sectionHeader}>Nhân viên phụ trách đơn</Text>
+        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>Nhân viên phụ trách đơn</Text>
 
         {/* Conversations List */}
         <View style={styles.conversationList}>
-          {!isLoaded && !error && <Text style={styles.lastMsg}>Đang tải hội thoại…</Text>}
-          {isLoaded && conversations.length === 0 && <Text style={styles.lastMsg}>Chưa có cuộc trò chuyện cho tài khoản này.</Text>}
+          {!isLoaded && !error && <Text style={[styles.lastMsg, { color: colors.textSecondary }]}>Đang tải hội thoại…</Text>}
+          {isLoaded && conversations.length === 0 && <Text style={[styles.lastMsg, { color: colors.textSecondary }]}>Chưa có cuộc trò chuyện cho tài khoản này.</Text>}
           {conversations.map((conv) => {
             const unreadCount = actor?.role === 'STAFF' ? conv.unreadCountStaff : conv.unreadCountCustomer;
             const hasUnread = unreadCount > 0;
@@ -82,20 +82,21 @@ export default function ChatListScreen() {
                 key={conv.id}
                 style={[
                   styles.convCard,
-                  hasUnread && styles.convCardUnread,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  hasUnread && { backgroundColor: colors.surfaceElevated, borderColor: colors.primary },
                 ]}
                 onPress={() => router.push(`/chat/${conv.id}`)}>
                 <View style={styles.avatarWrapper}>
                   <Image source={remoteImageSource(actor?.role === 'STAFF' ? conv.customerAvatar : conv.staffAvatar)} style={styles.avatar} />
-                  <View style={styles.onlineDot} />
+                  <View style={[styles.onlineDot, { borderColor: colors.surface }]} />
                 </View>
 
                 <View style={styles.convBody}>
                   <View style={styles.convTopRow}>
-                    <Text style={[styles.staffName, hasUnread && styles.staffNameBold]}>
+                    <Text style={[styles.staffName, { color: colors.text }, hasUnread && styles.staffNameBold]}>
                       {actor?.role === 'STAFF' ? conv.customerName : conv.staffName}
                     </Text>
-                    <Text style={styles.timeText}>
+                    <Text style={[styles.timeText, { color: colors.textMuted }]}>
                       {new Date(conv.lastMessageTime).toLocaleTimeString('vi-VN', {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -104,11 +105,11 @@ export default function ChatListScreen() {
                     </Text>
                   </View>
 
-                  <Text style={styles.serviceTag}>{conv.serviceName}</Text>
+                  <Text style={[styles.serviceTag, { color: colors.accentText }]}>{conv.serviceName}</Text>
 
                   <View style={styles.convBottomRow}>
                     <Text
-                      style={[styles.lastMsg, hasUnread && styles.lastMsgBold]}
+                      style={[styles.lastMsg, { color: colors.textMuted }, hasUnread && [styles.lastMsgBold, { color: colors.text }]]}
                       numberOfLines={1}>
                       {conv.lastMessage || 'Chưa có tin nhắn'}
                     </Text>

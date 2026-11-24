@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { BrandColors, BorderRadius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/context/ThemeContext';
 import { IconSymbol } from './IconSymbol';
 
 interface EmptyStateProps {
@@ -18,13 +19,26 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   actionText,
   onAction,
 }) => {
+  const { colors, isDark } = useAppTheme();
+
   return (
     <View style={styles.container}>
-      <View style={styles.iconCircle}>
-        <IconSymbol name={icon} size={38} />
+      <View
+        style={[
+          styles.iconCircle,
+          {
+            backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+            borderWidth: isDark ? 1 : 0,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <IconSymbol name={icon} size={38} color={isDark ? colors.accentText : BrandColors.primaryDark} />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      {description ? <Text style={styles.description}>{description}</Text> : null}
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+      {description ? (
+        <Text style={[styles.description, { color: colors.textSecondary }]}>{description}</Text>
+      ) : null}
       {actionText && onAction ? (
         <Pressable style={styles.actionButton} onPress={onAction}>
           <Text style={styles.actionText}>{actionText}</Text>

@@ -18,6 +18,7 @@ import { IconSymbol } from '@/components/common/IconSymbol';
 import { Badge, formatVND } from '@/components/common/Badge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { AppearanceModal } from '@/components/common/AppearanceModal';
+import { LegalPolicyModal } from '@/components/common/LegalPolicyModal';
 import { useAuth } from '@/context/AuthContext';
 import { themeModeLabel, useAppTheme } from '@/context/ThemeContext';
 import { Redirect, useFocusEffect } from 'expo-router';
@@ -30,14 +31,15 @@ export default function ProfileScreen() {
   const { colors, mode, preset } = useAppTheme();
   const [profileError, setProfileError] = useState('');
   const [showAppearanceModal, setShowAppearanceModal] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
   const [statistics, setStatistics] = useState<{ owner: string; count: number | null; error: string }>({ owner: '', count: null, error: '' });
   const [statisticsAttempt, setStatisticsAttempt] = useState(0);
+  const statisticsOwner = currentCustomer && accessToken ? currentCustomer.id + ':' + accessToken : '';
   useFocusEffect(useCallback(() => {
     if (!currentCustomer || !accessToken) return;
-    const owner = currentCustomer.id;
+    const owner = statisticsOwner;
     const controller = new AbortController();
     let inFlight = false;
-    setStatistics({ owner, count: null, error: '' });
     const load = async () => {
       if (inFlight || controller.signal.aborted || AppState.currentState === 'background') return;
       inFlight = true;
@@ -46,14 +48,18 @@ export default function ProfileScreen() {
         if (!Number.isSafeInteger(result.completedBookings) || result.completedBookings < 0) throw new Error('Số đơn hoàn tất trả về chưa hợp lệ.');
         if (!controller.signal.aborted) setStatistics({ owner, count: result.completedBookings, error: '' });
       } catch (cause) {
-        if (!controller.signal.aborted) setStatistics({ owner, count: null, error: cause instanceof Error ? cause.message : 'Chưa tải được số đơn hoàn tất.' });
+        if (!controller.signal.aborted) {
+          setStatistics(previous => previous.owner === owner && previous.count !== null
+            ? previous
+            : { owner, count: null, error: cause instanceof Error ? cause.message : 'Chưa tải được số đơn hoàn tất.' });
+        }
       } finally { inFlight = false; }
     };
     void load();
     const timer = setInterval(() => { void load(); }, 15000);
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void load(); });
     return () => { controller.abort(); clearInterval(timer); listener.remove(); };
-  }, [currentCustomer?.id, accessToken, statisticsAttempt]));
+  }, [statisticsOwner, statisticsAttempt]));
   useFocusEffect(useCallback(() => {
     let active = true;
     void refreshProfile().then(() => { if (active) setProfileError(''); }).catch(error => { if (active) setProfileError(error.message); });
@@ -103,7 +109,7 @@ export default function ProfileScreen() {
           <Pressable
             style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => router.push('/(tabs)/bookings')}>
-            <Text style={styles.statNum}>{statistics.owner === currentCustomer.id && statistics.count !== null ? statistics.count : statistics.error ? '—' : '…'}</Text>
+            <Text style={styles.statNum}>{statistics.owner === statisticsOwner ? statistics.count ?? (statistics.error ? '—' : '…') : '…'}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Đơn hoàn tất</Text>
           </Pressable>
 
@@ -115,7 +121,7 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {statistics.owner === currentCustomer.id && !!statistics.error && (
+        {statistics.owner === statisticsOwner && !!statistics.error && (
           <Pressable accessibilityRole="button" onPress={() => setStatisticsAttempt(value => value + 1)} style={{ marginBottom: 12 }}>
             <Text style={{ color: BrandColors.danger }}>Chưa tải được số đơn hoàn tất. Chạm để thử lại.</Text>
           </Pressable>
@@ -162,6 +168,17 @@ export default function ProfileScreen() {
                 <Text style={[styles.menuLabel, { color: colors.text }]}>Thông báo của tôi</Text>
                 <Text style={[styles.menuSub, { color: colors.textMuted }]}>Cập nhật đơn và khuyến mãi</Text>
               </View>
+            </View>
+            <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
+          </Pressable>
+
+          <Pressable
+            style={[styles.menuItem, { borderBottomColor: colors.divider }]}
+            accessibilityRole="button"
+            onPress={() => router.push('/account/change-password')}>
+            <View style={styles.menuLeft}>
+              <IconSymbol name="lock" size={20} color={colors.accentText} />
+              <Text style={[styles.menuLabel, { color: colors.text }]}>Đổi mật khẩu</Text>
             </View>
             <IconSymbol name="chevronRight" size={16} color={colors.textMuted} />
           </Pressable>
@@ -256,12 +273,7 @@ export default function ProfileScreen() {
 
           <Pressable
             style={[styles.menuItem, { borderBottomWidth: 0 }]}
-            onPress={() =>
-              Alert.alert(
-                'Điều khoản sử dụng & Bảo mật',
-                'Nền tảng CleanMaster cam kết bảo mật 100% dữ liệu cá nhân khách hàng. Toàn bộ nhân viên cung cấp dịch vụ đều được xác minh danh tính và kiểm tra tư pháp.'
-              )
-            }>
+            onPress={() => setShowLegalModal(true)}>
             <View style={styles.menuLeft}>
               <IconSymbol name="📄" style={styles.menuIcon} />
               <View>
@@ -288,6 +300,13 @@ export default function ProfileScreen() {
         <AppearanceModal
           visible={showAppearanceModal}
           onClose={() => setShowAppearanceModal(false)}
+        />
+
+      {/* Legal & Privacy modal */}
+        <LegalPolicyModal
+          visible={showLegalModal}
+          initialTab="terms"
+          onClose={() => setShowLegalModal(false)}
         />
 
       {/* Logout confirmation modal */}
